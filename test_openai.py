@@ -103,6 +103,9 @@ if sheets_client is None:
 
 # Initialize OpenAI client with API key from environment
 try:
+    if not api_key:
+        raise ValueError("No OpenAI API key found in environment variables")
+        
     client = OpenAI(
         api_key=api_key,
         timeout=60.0  # Set a reasonable timeout
@@ -119,8 +122,7 @@ try:
 except Exception as e:
     logger.error(f"OpenAI connection failed: {str(e)}")
     logger.error(traceback.format_exc())
-    # Don't raise the error, allow the server to start anyway
-    client = None
+    raise RuntimeError(f"Failed to initialize OpenAI client: {str(e)}")
 
 def initialize_sheet(start_cli=False):
     """Initialize the sheet and optionally start the CLI"""
@@ -666,33 +668,36 @@ def get_chat_response(message):
     """Get a chat response from OpenAI"""
     global conversation_history
     
-    # Update system prompt to get current plant list
-    update_system_prompt()
-    
-    # Get complete plant data for context
-    plants_data = get_plant_data()
-    if isinstance(plants_data, list):
-        plant_details = "\n\nDetailed plant information:\n"
-        for plant in plants_data:
-            plant_details += f"\nPlant: {plant.get('Plant Name', '')}\n"
-            plant_details += f"Location: {plant.get('Location', '')}\n"
-            plant_details += f"Description: {plant.get('Description', '')}\n"
-            plant_details += f"Care Notes: {plant.get('Care Notes', '')}\n"
-        
-        # Add detailed plant data to system prompt
-        conversation_history[0]['content'] += plant_details
-    
-    # Limit conversation history
-    if len(conversation_history) > 6:  # System prompt + 5 messages
-        conversation_history = [
-            conversation_history[0],  # System prompt
-            *conversation_history[-5:]  # Last 5 messages
-        ]
-    
-    # Add user message to history
-    conversation_history.append({"role": "user", "content": message})
-    
     try:
+        if not client:
+            raise ValueError("OpenAI client is not initialized")
+            
+        # Update system prompt to get current plant list
+        update_system_prompt()
+        
+        # Get complete plant data for context
+        plants_data = get_plant_data()
+        if isinstance(plants_data, list):
+            plant_details = "\n\nDetailed plant information:\n"
+            for plant in plants_data:
+                plant_details += f"\nPlant: {plant.get('Plant Name', '')}\n"
+                plant_details += f"Location: {plant.get('Location', '')}\n"
+                plant_details += f"Description: {plant.get('Description', '')}\n"
+                plant_details += f"Care Notes: {plant.get('Care Notes', '')}\n"
+            
+            # Add detailed plant data to system prompt
+            conversation_history[0]['content'] += plant_details
+        
+        # Limit conversation history
+        if len(conversation_history) > 6:  # System prompt + 5 messages
+            conversation_history = [
+                conversation_history[0],  # System prompt
+                *conversation_history[-5:]  # Last 5 messages
+            ]
+        
+        # Add user message to history
+        conversation_history.append({"role": "user", "content": message})
+        
         logger.info("Sending request to OpenAI...")
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -708,7 +713,8 @@ def get_chat_response(message):
         
     except Exception as e:
         logger.error(f"Error in get_chat_response: {e}")
-        return f"An error occurred: {str(e)}"
+        logger.error(traceback.format_exc())
+        return f"I apologize, but I encountered an error: {str(e)}. Please try again or contact support if the issue persists."
 
 def update_plant_url(plant_id, new_url):
     """Update a plant's photo URL in the Google Sheet"""
