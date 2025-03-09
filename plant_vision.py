@@ -74,6 +74,7 @@ class ConversationManager:
         """Add a message to the conversation while managing token limit"""
         # Initialize conversation if it doesn't exist
         if conversation_id not in self.conversations:
+            logger.info(f"Creating new conversation {conversation_id}")
             self.conversations[conversation_id] = {
                 'messages': [],
                 'last_activity': datetime.now()
@@ -84,11 +85,13 @@ class ConversationManager:
         
         # Add new message
         self.conversations[conversation_id]['messages'].append(message)
+        logger.info(f"Added message to conversation {conversation_id}. Total messages: {len(self.conversations[conversation_id]['messages'])}")
         
         # Check total tokens and trim if necessary
         while self._get_total_tokens(conversation_id) > (MAX_TOKENS - TOKEN_BUFFER):
             # Remove oldest message after system message
             if len(self.conversations[conversation_id]['messages']) > 2:
+                logger.info(f"Trimming conversation {conversation_id} due to token limit")
                 del self.conversations[conversation_id]['messages'][1]
             else:
                 break
@@ -103,10 +106,13 @@ class ConversationManager:
     def get_messages(self, conversation_id: str) -> List[Dict]:
         """Get all messages for a conversation if it's still active"""
         if not self._is_conversation_active(conversation_id):
+            logger.info(f"Conversation {conversation_id} has timed out or doesn't exist")
             self.clear_conversation(conversation_id)
             return []
-            
-        return self.conversations.get(conversation_id, {}).get('messages', [])
+        
+        messages = self.conversations.get(conversation_id, {}).get('messages', [])
+        logger.info(f"Retrieved {len(messages)} messages for conversation {conversation_id}")
+        return messages
 
     def clear_conversation(self, conversation_id: str) -> None:
         """Clear a conversation history"""
@@ -223,7 +229,10 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None, c
             # Add system message
             conversation_manager.add_message(conversation_id, {
                 "role": "system",
-                "content": "You are a plant expert who analyzes plant images and provides detailed care recommendations. Reference previous interactions when relevant."
+                "content": """You are a plant expert who analyzes plant images and provides detailed care recommendations. 
+                When users ask follow-up questions, refer to the specific plant from the image that was analyzed, not plants from any database.
+                If the question is about the plant in the image or your previous analysis, provide detailed responses based on that specific plant.
+                Format your responses in markdown."""
             })
 
         # Add user message with image

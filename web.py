@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from test_openai import gardenbot_response, get_weather_forecast, analyze_forecast_for_plants
-from plant_vision import analyze_plant_image, validate_image, save_image
+from plant_vision import analyze_plant_image, validate_image, save_image, conversation_manager, client, MODEL_NAME
 import logging
 import os
 from typing import Optional, List, Dict
@@ -148,10 +148,11 @@ async def weather_page(request: Request):
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    logger.info(f"Chat endpoint accessed with message: {request.message}")
+    logger.info(f"Chat endpoint accessed with message: {request.message} (conversation_id: {request.conversation_id})")
     try:
         # Check if there's an active conversation
         if request.conversation_id and conversation_manager.get_messages(request.conversation_id):
+            logger.info("Using existing conversation context")
             # Add user message to conversation
             conversation_manager.add_message(request.conversation_id, {
                 "role": "user",
@@ -163,7 +164,7 @@ async def chat(request: ChatRequest):
             
             # Call GPT-4 with conversation history
             response = client.chat.completions.create(
-                model="gpt-4-turbo",
+                model=MODEL_NAME,
                 messages=messages,
                 max_tokens=1000,
                 temperature=0.7,
@@ -181,6 +182,7 @@ async def chat(request: ChatRequest):
                 "conversation_id": request.conversation_id
             }
         else:
+            logger.info("No active conversation, using garden database query")
             # No active conversation, use regular garden database query
             response = gardenbot_response(request.message)
             return {"response": response}
