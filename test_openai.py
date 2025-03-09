@@ -115,12 +115,12 @@ try:
 
     # Test the client with a simple request
     logger.info("Testing OpenAI connection...")
-    response = client.chat.completions.create(
+    test_response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": "test"}],
         max_tokens=5
     )
-    logger.info("OpenAI connection successful")
+    logger.info(f"OpenAI connection successful. Test response: {test_response}")
 except Exception as e:
     logger.error(f"OpenAI connection failed: {str(e)}")
     logger.error(traceback.format_exc())
@@ -668,10 +668,11 @@ def find_plant_id_by_name(plant_name):
 
 def get_chat_response(message):
     """Get a chat response from OpenAI"""
-    global conversation_history
+    global conversation_history, client
     
     try:
         if not client:
+            logger.error("OpenAI client is not initialized")
             raise ValueError("OpenAI client is not initialized")
             
         # Update system prompt to get current plant list
@@ -700,21 +701,30 @@ def get_chat_response(message):
         # Add user message to history
         conversation_history.append({"role": "user", "content": message})
         
-        logger.info("Sending request to OpenAI...")
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=conversation_history,
-            temperature=0.7,
-            max_tokens=2000
-        )
+        logger.info(f"Sending request to OpenAI with message: {message}")
+        logger.info(f"Conversation history length: {len(conversation_history)}")
         
-        assistant_response = response.choices[0].message.content
-        conversation_history.append({"role": "assistant", "content": assistant_response})
-        
-        return assistant_response
+        try:
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=conversation_history,
+                temperature=0.7,
+                max_tokens=2000
+            )
+            logger.info(f"Received response from OpenAI: {response}")
+            
+            assistant_response = response.choices[0].message.content
+            conversation_history.append({"role": "assistant", "content": assistant_response})
+            
+            return assistant_response
+            
+        except Exception as api_error:
+            logger.error(f"OpenAI API error: {str(api_error)}")
+            logger.error(traceback.format_exc())
+            return f"I encountered an error while processing your request: {str(api_error)}"
         
     except Exception as e:
-        logger.error(f"Error in get_chat_response: {e}")
+        logger.error(f"Error in get_chat_response: {str(e)}")
         logger.error(traceback.format_exc())
         return f"I apologize, but I encountered an error: {str(e)}. Please try again or contact support if the issue persists."
 
@@ -773,6 +783,14 @@ def update_plant_url(plant_id, new_url):
 def gardenbot_response(message):
     """Get a response from the chatbot"""
     try:
+        # Check if this is a weather-related query
+        weather_keywords = ['weather', 'forecast', 'temperature', 'rain', 'humidity', 'tomorrow', 'today']
+        is_weather_query = any(keyword in message.lower() for keyword in weather_keywords)
+        
+        if is_weather_query:
+            logger.info("Processing weather-related query")
+            return handle_weather_query(message)
+            
         # Handle update commands - must start with these exact phrases
         lower_msg = message.lower().strip()
         
@@ -1305,6 +1323,59 @@ def display_weather_advice():
         logger.error(f"Error displaying weather advice: {e}")
         print("\nUnable to generate weather-based plant care advice.")
         print("Please follow regular plant care schedule.")
+
+def handle_weather_query(message: str) -> str:
+    """Handle weather-related queries and return formatted response"""
+    try:
+        logger.info("Getting weather forecast...")
+        forecast = get_weather_forecast()
+        if not forecast:
+            return "I'm sorry, I couldn't retrieve the weather forecast at this time."
+
+        # Determine which days to include based on the query
+        days_to_show = 1  # default to tomorrow
+        if 'week' in message.lower():
+            days_to_show = 5
+        elif 'today' in message.lower():
+            days_to_show = 1
+        elif 'tomorrow' in message.lower():
+            days_to_show = 2
+        else:
+            days_to_show = 3  # default to next few days
+
+        advice = analyze_forecast_for_plants(forecast)
+        
+        # Format the response
+        response = "🌿 Weather Forecast and Plant Care Advice 🌿\n\n"
+        
+        # Add forecast summary
+        response += "Weather Forecast:\n"
+        for day in forecast[:days_to_show]:  # Show requested days
+            response += f"\n📅 {day['date']}:\n"
+            response += f"• Temperature: {day['temp_min']}°F to {day['temp_max']}°F\n"
+            response += f"• Conditions: {day['description']}\n"
+            response += f"• Rain: {day['rain']} inches\n"
+            response += f"• Humidity: {day['humidity']}%\n"
+            response += f"• Wind: {day['wind_speed']} mph\n"
+        
+        # Add plant care advice
+        response += "\n🌱 Plant Care Recommendations:\n"
+        
+        # Get all plants for context
+        plants = get_all_plants()
+        plant_names = [p['name'] for p in plants]
+        
+        # Add context about current plants
+        if plant_names:
+            response += f"\nBased on your {len(plant_names)} plants in the garden, here are specific recommendations:\n"
+        
+        response += advice
+        
+        return response
+    except Exception as e:
+        logger.error(f"Error handling weather query: {e}")
+        logger.error(traceback.format_exc())
+        return "I'm sorry, I encountered an error while processing the weather information."
 
 # Display weather-based plant care advice
 # display_weather_advice()  # Removing this line so it only runs when called from CLI
