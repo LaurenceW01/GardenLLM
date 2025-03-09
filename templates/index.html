@@ -3,6 +3,17 @@
 {% block title %}GardenLLM - Home{% endblock %}
 
 {% block content %}
+<!-- Add marked library for markdown rendering -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+    // Configure marked options
+    marked.setOptions({
+        breaks: true,  // Enable line breaks
+        gfm: true,     // Enable GitHub Flavored Markdown
+        sanitize: true // Sanitize HTML input
+    });
+</script>
+
 <div class="max-w-4xl mx-auto" x-data="{
     message: '',
     response: '',
@@ -34,12 +45,13 @@
             
             const data = await response.json();
             
-            // Add bot response
+            // Add bot response with markdown rendering
             const botDiv = document.createElement('div');
             botDiv.className = 'flex justify-start';
+            const markdownContent = marked.parse(data.response);
             botDiv.innerHTML = `
-                <div class='bg-gray-200 rounded-lg p-3 max-w-3/4'>
-                    ${data.response.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}
+                <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
+                    ${markdownContent}
                 </div>
             `;
             chatHistory.appendChild(botDiv);
@@ -117,4 +129,47 @@
         </div>
     </div>
 </div>
+
+<style>
+/* Add some basic markdown styling */
+.prose {
+    @apply text-gray-900;
+}
+.prose h1 {
+    @apply text-2xl font-bold mb-4;
+}
+.prose h2 {
+    @apply text-xl font-bold mb-3;
+}
+.prose h3 {
+    @apply text-lg font-bold mb-2;
+}
+.prose p {
+    @apply mb-2;
+}
+.prose ul {
+    @apply list-disc list-inside mb-2;
+}
+.prose ol {
+    @apply list-decimal list-inside mb-2;
+}
+.prose code {
+    @apply bg-gray-100 px-1 rounded;
+}
+.prose pre {
+    @apply bg-gray-100 p-2 rounded mb-2 overflow-x-auto;
+}
+.prose blockquote {
+    @apply border-l-4 border-gray-300 pl-4 italic;
+}
+.prose a {
+    @apply text-blue-600 hover:underline;
+}
+.prose table {
+    @apply min-w-full border border-gray-300 mb-2;
+}
+.prose th, .prose td {
+    @apply border border-gray-300 p-2;
+}
+</style>
 {% endblock %} 
