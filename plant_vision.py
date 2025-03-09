@@ -130,8 +130,7 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None) -
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": f"data:image/{image_format};base64,{base64_image}",
-                            "detail": "high"
+                            "url": f"data:image/{image_format};base64,{base64_image}"
                         }
                     }
                 ]
@@ -140,10 +139,10 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None) -
 
         # Call GPT-4 Vision API with the correct model name
         response = client.chat.completions.create(
-            model="gpt-4-vision",
+            model="gpt-4-vision-preview",
             messages=messages,
-            max_tokens=1000,  # Increased token limit for more detailed responses
-            temperature=0.7    # Add some creativity while keeping responses focused
+            max_tokens=1000,
+            temperature=0.7
         )
 
         return response.choices[0].message.content
