@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}GardenLLM - Home{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto" x-data="{ message: '', response: '', loading: false }">
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+        <h1 class="text-3xl font-bold mb-4 text-green-700">Welcome to GardenLLM</h1>
+        <p class="text-gray-600 mb-4">Your AI-powered garden assistant for Houston, TX.</p>
+        
+        <!-- Chat Interface -->
+        <div class="bg-gray-50 rounded-lg p-4 mb-4 h-96 overflow-y-auto" id="chat-history">
+            <div class="space-y-4">
+                <!-- Messages will be inserted here -->
+            </div>
+        </div>
+        
+        <!-- Input Form -->
+        <form @submit.prevent="submitMessage" class="flex flex-col md:flex-row gap-2">
+            <input 
+                type="text" 
+                x-model="message" 
+                class="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="Ask about your plants..."
+                :disabled="loading"
+            >
+            <button 
+                type="submit" 
+                class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                :disabled="loading"
+            >
+                <span x-show="!loading">Send</span>
+                <span x-show="loading">Processing...</span>
+            </button>
+        </form>
+    </div>
+
+    <!-- Weather Summary -->
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-2xl font-bold mb-4 text-green-700">Today's Weather</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <h3 class="font-bold text-lg mb-2">Temperature</h3>
+                <p class="text-2xl">{{ weather.temp }}°F</p>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <h3 class="font-bold text-lg mb-2">Conditions</h3>
+                <p class="text-2xl">{{ weather.conditions }}</p>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <h3 class="font-bold text-lg mb-2">Plant Care</h3>
+                <p>{{ weather.advice }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('chat', () => ({
+        message: '',
+        loading: false,
+        async submitMessage() {
+            if (!this.message.trim()) return;
+            
+            this.loading = true;
+            const chatHistory = document.querySelector('#chat-history .space-y-4');
+            
+            // Add user message
+            chatHistory.innerHTML += `
+                <div class="flex justify-end">
+                    <div class="bg-green-600 text-white rounded-lg p-3 max-w-3/4">
+                        ${this.message}
+                    </div>
+                </div>
+            `;
+            
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: this.message }),
+                });
+                
+                const data = await response.json();
+                
+                // Add bot response
+                chatHistory.innerHTML += `
+                    <div class="flex justify-start">
+                        <div class="bg-gray-200 rounded-lg p-3 max-w-3/4">
+                            ${data.response}
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error:', error);
+                chatHistory.innerHTML += `
+                    <div class="flex justify-start">
+                        <div class="bg-red-100 text-red-700 rounded-lg p-3 max-w-3/4">
+                            Sorry, there was an error processing your request.
+                        </div>
+                    </div>
+                `;
+            }
+            
+            this.message = '';
+            this.loading = false;
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+    }));
+});
+</script>
+{% endblock %} 

@@ -1,5 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -13,7 +14,13 @@ import traceback
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="GardenBot API")
+app = FastAPI(title="GardenLLM API")
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Set up templates
+templates = Jinja2Templates(directory="templates")
 
 # Update CORS settings
 app.add_middleware(
@@ -64,470 +71,48 @@ def handle_weather_query(message: str) -> str:
         logger.error(traceback.format_exc())
         return "I'm sorry, I encountered an error while processing the weather information."
 
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    # Get current weather for display
+    forecast = get_weather_forecast()
+    current_weather = {
+        'temp': f"{forecast[0]['temp_max']}/{forecast[0]['temp_min']}" if forecast else "N/A",
+        'conditions': forecast[0]['description'] if forecast else "N/A",
+        'advice': "Check plants according to regular schedule" if not forecast else analyze_forecast_for_plants(forecast).split('\n')[0]
+    }
+    
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "weather": current_weather}
+    )
+
+@app.get("/weather", response_class=HTMLResponse)
+async def weather_page(request: Request):
+    forecast = get_weather_forecast()
+    advice = analyze_forecast_for_plants(forecast)
+    
+    # Split advice into sections for better display
+    advice_sections = [section for section in advice.split('\n\n') if section.strip()]
+    
+    return templates.TemplateResponse(
+        "weather.html",
+        {
+            "request": request,
+            "forecast": forecast,
+            "plant_care": advice_sections
+        }
+    )
+
 @app.post("/chat")
 async def chat(request: ChatRequest):
     logger.info(f"Chat endpoint accessed with message: {request.message}")
     try:
-        # Check if this is a weather-related query
-        message_lower = request.message.lower()
-        weather_keywords = ['weather', 'forecast', 'temperature', 'rain', 'humidity', 'wind']
-        
-        if any(keyword in message_lower for keyword in weather_keywords):
-            logger.info("Processing weather-related query")
-            response = handle_weather_query(request.message)
-        else:
-            logger.info("Calling gardenbot_response")
-            response = gardenbot_response(request.message)
-        
-        # Log full response with clear markers and length
-        logger.info("=== START OF RESPONSE ===")
-        logger.info(response)
-        logger.info(f"Response length: {len(response)}")
-        logger.info("=== END OF RESPONSE ===")
-        
-        # Return full response with metadata
-        return {
-            "response": response,
-            "length": len(response),
-            "sections": response.count('###')
-        }
+        response = gardenbot_response(request.message)
+        return {"response": response}
     except Exception as e:
-        logger.error(f"Error in chat endpoint: {str(e)}", exc_info=True)
-        return {"response": "An error occurred while processing your request. Please try again."}
-
-@app.get("/", response_class=HTMLResponse)
-async def root():
-    html_content = """<!DOCTYPE html>
-    <html>
-    <head>
-        <title>GardenBot Chat</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                margin: 0;
-                padding: 20px;
-                display: flex;
-                flex-direction: column;
-                min-height: 100vh;
-            }
-            
-            #chat-container {
-                flex: 1;
-                overflow-y: auto;
-                margin-bottom: 20px;
-                padding: 20px;
-                border: 1px solid #e2e8f0;
-                border-radius: 8px;
-                background: white;
-            }
-            
-            .message {
-                margin-bottom: 20px;
-                white-space: pre-wrap;
-                word-wrap: break-word;
-                line-height: 1.6;
-            }
-            
-            .user-message {
-                color: #2c5282;
-            }
-            
-            .bot-message {
-                color: #2d3748;
-            }
-            
-            .message h3 {
-                color: #2c5282;
-                margin: 20px 0 10px 0;
-                font-size: 1.2em;
-                border-bottom: 1px solid #e2e8f0;
-                padding-bottom: 5px;
-            }
-            
-            .message h4 {
-                color: #4a5568;
-                margin: 15px 0 10px 0;
-                font-size: 1.1em;
-                font-weight: bold;
-            }
-            
-            .message ul {
-                margin: 5px 0 15px 20px;
-                padding-left: 20px;
-                list-style-type: disc;
-            }
-            
-            .message li {
-                margin: 5px 0;
-                line-height: 1.4;
-            }
-            
-            .info-table {
-                width: 100%;
-                margin: 10px 0;
-                border-collapse: collapse;
-            }
-            
-            .info-table th,
-            .info-table td {
-                padding: 8px;
-                text-align: left;
-                border: 1px solid #e2e8f0;
-            }
-            
-            .info-table th {
-                background-color: #f7fafc;
-                font-weight: bold;
-            }
-            
-            .info-table tr:nth-child(even) {
-                background-color: #f9fafb;
-            }
-            
-            #input-container {
-                display: flex;
-                gap: 10px;
-                padding: 10px;
-                background: white;
-            }
-            
-            #user-input {
-                flex: 1;
-                padding: 10px;
-                border: 1px solid #e2e8f0;
-                border-radius: 4px;
-                font-size: 16px;
-            }
-            
-            #send-button {
-                padding: 10px 20px;
-                background-color: #4299e1;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 16px;
-            }
-            
-            #send-button:hover {
-                background-color: #3182ce;
-            }
-            
-            .message p {
-                margin: 10px 0;
-                line-height: 1.5;
-            }
-            
-            .frost-list {
-                margin: 10px 0;
-                padding-left: 20px;
-                list-style-type: none;
-            }
-            
-            .frost-list li {
-                margin: 8px 0;
-                padding-left: 20px;
-                position: relative;
-                line-height: 1.6;
-            }
-            
-            .frost-list li::before {
-                content: "•";
-                position: absolute;
-                left: 0;
-                color: #4a5568;
-            }
-            
-            .plant-info {
-                display: block;
-                padding: 4px 0;
-            }
-            
-            .plant-name {
-                font-weight: 500;
-                color: #2d3748;
-            }
-            
-            .temp-info {
-                color: #4a5568;
-                margin-left: 5px;
-            }
-            
-            .not-in-garden {
-                color: #718096;
-                font-style: italic;
-            }
-        </style>
-        <script>
-            const apiUrl = window.location.origin;
-            
-            function formatResponse(text) {
-                // Split text into sections by double newline
-                const sections = text.split('\\n\\n');
-                let formattedText = '';
-                
-                for (const section of sections) {
-                    if (!section.trim()) continue;
-                    
-                    const lines = section.trim().split('\\n');
-                    
-                    // Handle bullet points
-                    if (lines[0].startsWith('-')) {
-                        formattedText += '<ul class="frost-list">';
-                        lines.forEach(line => {
-                            if (line.startsWith('-')) {
-                                const content = line.substring(1).trim();
-                                if (content.includes('Not currently in')) {
-                                    formattedText += `<li class="not-in-garden">${content}</li>`;
-                                } else {
-                                    const [plant, temp] = content.split(':');
-                                    formattedText += `
-                                        <li>
-                                            <div class="plant-info">
-                                                <span class="plant-name">${plant.trim()}</span>
-                                                <span class="temp-info">${temp.trim()}</span>
-                                            </div>
-                                        </li>`;
-                                }
-                            }
-                        });
-                        formattedText += '</ul>';
-                        continue;
-                    }
-                    
-                    // Handle location headers (###)
-                    if (lines[0].startsWith('###')) {
-                        const locationName = lines[0].substring(3).trim();
-                        formattedText += `<h3>${locationName}</h3>`;
-                        
-                        if (lines.length > 1) {
-                            formattedText += '<ul>';
-                            for (let i = 1; i < lines.length; i++) {
-                                const line = lines[i].trim();
-                                if (line.startsWith('-')) {
-                                    const plantName = line.substring(1).trim();
-                                    formattedText += `<li>${plantName}</li>`;
-                                }
-                            }
-                            formattedText += '</ul>';
-                        }
-                        continue;
-                    }
-                    
-                    // Handle regular text
-                    if (lines.join('').trim()) {
-                        formattedText += `<p>${lines.join(' ')}</p>`;
-                    }
-                }
-                
-                return formattedText;
-            }
-
-            function addMessage(sender, text, isUser) {
-                const container = document.getElementById('chat-container');
-                const messageDiv = document.createElement('div');
-                messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-                
-                if (isUser) {
-                    messageDiv.innerHTML = `<strong>${sender}:</strong> ${text}`;
-                } else {
-                    const formattedText = formatResponse(text);
-                    messageDiv.innerHTML = `<strong>${sender}:</strong> ${formattedText}`;
-                }
-                
-                container.appendChild(messageDiv);
-                container.scrollTop = container.scrollHeight;
-            }
-
-            async function sendMessage() {
-                const input = document.getElementById('user-input');
-                const message = input.value.trim();
-                if (!message) return;
-
-                addMessage('You', message, true);
-                input.value = '';
-
-                try {
-                    const response = await fetch('/chat', {
-                        method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json'
-                        },
-                        body: JSON.stringify({ message: message })
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-                    console.log('Response data:', data);
-                    
-                    if (data && data.response) {
-                        addMessage('GardenBot', data.response, false);
-                        const formattedContent = document.querySelector('.message:last-child');
-                        console.log('Formatted content:', formattedContent.innerHTML);
-                    } else {
-                        throw new Error('Invalid response format');
-                    }
-                } catch (error) {
-                    console.error('Error details:', error);
-                    addMessage('Error', 'The service is temporarily unavailable. Please try again later.', false);
-                }
-            }
-
-            document.addEventListener('DOMContentLoaded', function() {
-                const sendButton = document.getElementById('send-button');
-                const userInput = document.getElementById('user-input');
-                
-                sendButton.addEventListener('click', sendMessage);
-                userInput.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') {
-                        sendMessage();
-                    }
-                });
-            });
-        </script>
-    </head>
-    <body>
-        <div id="chat-container"></div>
-        <div id="input-container">
-            <input type="text" id="user-input" placeholder="Type your message...">
-            <button id="send-button">Send</button>
-        </div>
-    </body>
-    </html>"""
-    return HTMLResponse(content=html_content, status_code=200)
-
-@app.get("/terminal", response_class=HTMLResponse)
-async def terminal():
-    html_content = """<!DOCTYPE html>
-    <html>
-    <head>
-        <title>GardenBot Terminal</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-            body {
-                background: #1a1a1a;
-                color: #33ff33;
-                font-family: monospace;
-                margin: 0;
-                padding: 10px;
-                font-size: 16px;
-            }
-            
-            #terminal {
-                height: calc(100vh - 100px);
-                overflow-y: auto;
-                white-space: pre-wrap;
-                word-wrap: break-word;
-                margin-bottom: 10px;
-            }
-            
-            #input-line {
-                display: flex;
-                gap: 5px;
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                padding: 10px;
-                background: #1a1a1a;
-            }
-            
-            #prompt {
-                color: #33ff33;
-            }
-            
-            #cmd-input {
-                flex: 1;
-                background: transparent;
-                border: none;
-                color: #33ff33;
-                font-family: monospace;
-                font-size: 16px;
-                outline: none;
-            }
-            
-            .user-input {
-                color: #33ff33;
-            }
-            
-            .response {
-                color: #ffffff;
-                margin-bottom: 10px;
-            }
-        </style>
-        <script>
-            let history = [];
-            let historyIndex = -1;
-            
-            function addToTerminal(text, isUser = false) {
-                const terminal = document.getElementById('terminal');
-                const div = document.createElement('div');
-                div.className = isUser ? 'user-input' : 'response';
-                div.textContent = isUser ? '> ' + text : text;
-                terminal.appendChild(div);
-                terminal.scrollTop = terminal.scrollHeight;
-            }
-            
-            async function sendCommand(e) {
-                if (e.key === 'Enter') {
-                    const input = document.getElementById('cmd-input');
-                    const cmd = input.value.trim();
-                    
-                    if (cmd) {
-                        history.push(cmd);
-                        historyIndex = history.length;
-                        addToTerminal(cmd, true);
-                        input.value = '';
-                        
-                        try {
-                            const response = await fetch('/chat', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify({ message: cmd })
-                            });
-                            
-                            const data = await response.json();
-                            if (data.response) {
-                                addToTerminal(data.response);
-                            }
-                        } catch (error) {
-                            addToTerminal('Error: ' + error.message);
-                        }
-                    }
-                } else if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    if (historyIndex > 0) {
-                        historyIndex--;
-                        document.getElementById('cmd-input').value = history[historyIndex];
-                    }
-                } else if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    if (historyIndex < history.length - 1) {
-                        historyIndex++;
-                        document.getElementById('cmd-input').value = history[historyIndex];
-                    } else {
-                        historyIndex = history.length;
-                        document.getElementById('cmd-input').value = '';
-                    }
-                }
-            }
-        </script>
-    </head>
-    <body>
-        <div id="terminal"></div>
-        <div id="input-line">
-            <span id="prompt">></span>
-            <input type="text" id="cmd-input" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="sendCommand(event)">
-        </div>
-    </body>
-    </html>"""
-    return HTMLResponse(content=html_content, status_code=200)
+        logger.error(f"Error in chat endpoint: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
 async def health_check():
