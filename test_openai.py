@@ -107,7 +107,10 @@ try:
         raise ValueError("No OpenAI API key found in environment variables")
         
     client = OpenAI(
-        api_key=api_key
+        api_key=api_key,
+        base_url="https://api.openai.com/v1",
+        timeout=60.0,
+        max_retries=2
     )
 
     # Test the client with a simple request
