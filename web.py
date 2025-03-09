@@ -34,6 +34,7 @@ app.add_middleware(
 
 class ChatRequest(BaseModel):
     message: str
+    conversation_id: Optional[str] = None
 
 class WeatherResponse(BaseModel):
     forecast: List[Dict]
@@ -149,8 +150,41 @@ async def weather_page(request: Request):
 async def chat(request: ChatRequest):
     logger.info(f"Chat endpoint accessed with message: {request.message}")
     try:
-        response = gardenbot_response(request.message)
-        return {"response": response}
+        # Check if there's an active conversation
+        if request.conversation_id and conversation_manager.get_messages(request.conversation_id):
+            # Add user message to conversation
+            conversation_manager.add_message(request.conversation_id, {
+                "role": "user",
+                "content": request.message
+            })
+            
+            # Get conversation history
+            messages = conversation_manager.get_messages(request.conversation_id)
+            
+            # Call GPT-4 with conversation history
+            response = client.chat.completions.create(
+                model="gpt-4-turbo",
+                messages=messages,
+                max_tokens=1000,
+                temperature=0.7,
+                response_format={ "type": "text" }
+            )
+            
+            # Add AI's response to conversation history
+            conversation_manager.add_message(request.conversation_id, {
+                "role": "assistant",
+                "content": response.choices[0].message.content
+            })
+            
+            return {
+                "response": response.choices[0].message.content,
+                "conversation_id": request.conversation_id
+            }
+        else:
+            # No active conversation, use regular garden database query
+            response = gardenbot_response(request.message)
+            return {"response": response}
+            
     except Exception as e:
         logger.error(f"Error in chat endpoint: {e}")
         logger.error(traceback.format_exc())

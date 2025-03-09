@@ -93,16 +93,17 @@
                     },
                     body: JSON.stringify({ 
                         message: this.message,
-                        conversation_id: this.conversationId
+                        conversation_id: this.conversationId  // Include conversation ID if it exists
                     })
                 });
             }
             
             const data = await response.json();
             
-            // Store conversation ID
+            // Store or update conversation ID
             if (data.conversation_id) {
                 this.conversationId = data.conversation_id;
+                console.log('Conversation ID:', this.conversationId);  // For debugging
             }
             
             // Add bot response with markdown rendering

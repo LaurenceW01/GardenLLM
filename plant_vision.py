@@ -3,7 +3,7 @@ import os
 import logging
 import base64
 from typing import Optional, Tuple, List, Dict
-from datetime import datetime
+from datetime import datetime, timedelta
 import imghdr
 import traceback
 try:
@@ -28,8 +28,9 @@ MODEL_NAME = "gpt-4-turbo"  # Updated to use gpt-4-turbo
 
 class ConversationManager:
     def __init__(self):
-        self.conversations: Dict[str, List[Dict]] = {}
+        self.conversations: Dict[str, Dict] = {}  # Changed to store metadata
         self.encoding = tiktoken.encoding_for_model(MODEL_NAME)
+        self.conversation_timeout = timedelta(minutes=30)  # Timeout after 30 minutes
 
     def _count_tokens(self, text: str) -> int:
         """Count the number of tokens in a text string"""
@@ -58,19 +59,37 @@ class ConversationManager:
         
         return total
 
+    def _is_conversation_active(self, conversation_id: str) -> bool:
+        """Check if a conversation is still active"""
+        if conversation_id not in self.conversations:
+            return False
+        
+        last_activity = self.conversations[conversation_id].get('last_activity')
+        if not last_activity:
+            return False
+            
+        return datetime.now() - last_activity < self.conversation_timeout
+
     def add_message(self, conversation_id: str, message: Dict) -> None:
         """Add a message to the conversation while managing token limit"""
+        # Initialize conversation if it doesn't exist
         if conversation_id not in self.conversations:
-            self.conversations[conversation_id] = []
+            self.conversations[conversation_id] = {
+                'messages': [],
+                'last_activity': datetime.now()
+            }
+        
+        # Update last activity
+        self.conversations[conversation_id]['last_activity'] = datetime.now()
         
         # Add new message
-        self.conversations[conversation_id].append(message)
+        self.conversations[conversation_id]['messages'].append(message)
         
         # Check total tokens and trim if necessary
         while self._get_total_tokens(conversation_id) > (MAX_TOKENS - TOKEN_BUFFER):
             # Remove oldest message after system message
-            if len(self.conversations[conversation_id]) > 2:
-                del self.conversations[conversation_id][1]
+            if len(self.conversations[conversation_id]['messages']) > 2:
+                del self.conversations[conversation_id]['messages'][1]
             else:
                 break
 
@@ -79,11 +98,15 @@ class ConversationManager:
         if conversation_id not in self.conversations:
             return 0
         
-        return sum(self._count_message_tokens(msg) for msg in self.conversations[conversation_id])
+        return sum(self._count_message_tokens(msg) for msg in self.conversations[conversation_id]['messages'])
 
     def get_messages(self, conversation_id: str) -> List[Dict]:
-        """Get all messages for a conversation"""
-        return self.conversations.get(conversation_id, [])
+        """Get all messages for a conversation if it's still active"""
+        if not self._is_conversation_active(conversation_id):
+            self.clear_conversation(conversation_id)
+            return []
+            
+        return self.conversations.get(conversation_id, {}).get('messages', [])
 
     def clear_conversation(self, conversation_id: str) -> None:
         """Clear a conversation history"""
