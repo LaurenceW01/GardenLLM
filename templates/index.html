@@ -18,30 +18,78 @@
     message: '',
     response: '',
     loading: false,
+    imageFile: null,
+    imagePreview: null,
+    
+    clearImage() {
+        this.imageFile = null;
+        this.imagePreview = null;
+        document.getElementById('image-input').value = '';
+    },
+    
+    handleImageSelect(event) {
+        const file = event.target.files[0];
+        if (file) {
+            this.imageFile = file;
+            const reader = new FileReader();
+            reader.onload = e => this.imagePreview = e.target.result;
+            reader.readAsDataURL(file);
+        }
+    },
+    
     async submitMessage() {
-        if (!this.message.trim()) return;
+        if (!this.message.trim() && !this.imageFile) return;
         
         this.loading = true;
         const chatHistory = document.querySelector('#chat-history .space-y-4');
         
-        // Add user message
-        const userDiv = document.createElement('div');
-        userDiv.className = 'flex justify-end';
-        userDiv.innerHTML = `
-            <div class='bg-green-600 text-white rounded-lg p-3 max-w-3/4'>
-                ${this.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
-            </div>
-        `;
-        chatHistory.appendChild(userDiv);
-        
         try {
-            const response = await fetch('/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ message: this.message })
-            });
+            let response;
+            
+            if (this.imageFile) {
+                // Create message content with image preview
+                const userDiv = document.createElement('div');
+                userDiv.className = 'flex justify-end';
+                userDiv.innerHTML = `
+                    <div class='bg-green-600 text-white rounded-lg p-3 max-w-3/4'>
+                        <img src='${this.imagePreview}' class='max-w-full h-auto rounded mb-2'>
+                        ${this.message ? `<p>${this.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>` : ''}
+                    </div>
+                `;
+                chatHistory.appendChild(userDiv);
+                
+                // Create FormData for image upload
+                const formData = new FormData();
+                formData.append('file', this.imageFile);
+                if (this.message.trim()) {
+                    formData.append('message', this.message);
+                }
+                
+                // Send image for analysis
+                response = await fetch('/analyze-plant', {
+                    method: 'POST',
+                    body: formData
+                });
+            } else {
+                // Regular text message
+                const userDiv = document.createElement('div');
+                userDiv.className = 'flex justify-end';
+                userDiv.innerHTML = `
+                    <div class='bg-green-600 text-white rounded-lg p-3 max-w-3/4'>
+                        ${this.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                    </div>
+                `;
+                chatHistory.appendChild(userDiv);
+                
+                // Send text message
+                response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: this.message })
+                });
+            }
             
             const data = await response.json();
             
@@ -55,6 +103,11 @@
                 </div>
             `;
             chatHistory.appendChild(botDiv);
+            
+            // Clear form
+            this.message = '';
+            this.clearImage();
+            
         } catch (error) {
             console.error('Error:', error);
             const errorDiv = document.createElement('div');
@@ -67,7 +120,6 @@
             chatHistory.appendChild(errorDiv);
         }
         
-        this.message = '';
         this.loading = false;
         chatHistory.scrollTop = chatHistory.scrollHeight;
     }
@@ -84,22 +136,49 @@
         </div>
         
         <!-- Input Form -->
-        <form @submit.prevent="submitMessage" class="flex flex-col md:flex-row gap-2">
-            <input 
-                type="text" 
-                x-model="message" 
-                class="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="Ask about your plants..."
-                :disabled="loading"
-            >
-            <button 
-                type="submit" 
-                class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                :disabled="loading"
-            >
-                <span x-show="!loading">Send</span>
-                <span x-show="loading">Processing...</span>
-            </button>
+        <form @submit.prevent="submitMessage" class="space-y-4">
+            <!-- Image Preview -->
+            <div x-show="imagePreview" class="relative inline-block">
+                <img :src="imagePreview" class="max-h-32 rounded">
+                <button @click="clearImage" type="button" 
+                    class="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center">
+                    ×
+                </button>
+            </div>
+            
+            <div class="flex flex-col md:flex-row gap-2">
+                <!-- Image Upload -->
+                <label class="flex-none cursor-pointer bg-gray-100 hover:bg-gray-200 rounded-lg px-4 py-2 transition-colors">
+                    <input 
+                        type="file" 
+                        id="image-input"
+                        @change="handleImageSelect"
+                        accept="image/*"
+                        class="hidden"
+                        :disabled="loading"
+                    >
+                    📷 Add Image
+                </label>
+                
+                <!-- Text Input -->
+                <input 
+                    type="text" 
+                    x-model="message" 
+                    class="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Ask about your plants or upload a plant photo..."
+                    :disabled="loading"
+                >
+                
+                <!-- Submit Button -->
+                <button 
+                    type="submit" 
+                    class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                    :disabled="loading"
+                >
+                    <span x-show="!loading">Send</span>
+                    <span x-show="loading">Processing...</span>
+                </button>
+            </div>
         </form>
     </div>
 

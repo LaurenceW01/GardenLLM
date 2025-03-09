@@ -5,7 +5,11 @@ import base64
 from typing import Optional, Tuple
 from datetime import datetime
 import imghdr
-from PIL import Image
+import traceback
+try:
+    from PIL import Image
+except ImportError:
+    raise ImportError("Please install Pillow with: pip install Pillow")
 import io
 
 # Set up logging
@@ -20,7 +24,12 @@ def convert_heic_to_jpeg(image_data: bytes) -> Optional[bytes]:
     Convert HEIC image to JPEG format
     """
     try:
-        from pillow_heif import register_heif_opener
+        try:
+            from pillow_heif import register_heif_opener
+        except ImportError:
+            logger.error("pillow_heif not installed. Please install with: pip install pillow-heif")
+            return None
+            
         register_heif_opener()
         
         # Create a BytesIO object from the image data

@@ -1,10 +1,11 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, File, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from test_openai import gardenbot_response, get_weather_forecast, analyze_forecast_for_plants
+from plant_vision import analyze_plant_image, validate_image, save_image
 import logging
 import os
 from typing import Optional, List, Dict
@@ -37,6 +38,9 @@ class ChatRequest(BaseModel):
 class WeatherResponse(BaseModel):
     forecast: List[Dict]
     plant_care_advice: List[str]
+
+class ImageAnalysisRequest(BaseModel):
+    message: Optional[str] = None
 
 def handle_weather_query(message: str) -> str:
     """Handle weather-related queries and return formatted response"""
@@ -175,5 +179,40 @@ async def weather_api():
         )
     except Exception as e:
         logger.error(f"Error in weather endpoint: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/analyze-plant")
+async def analyze_plant(
+    file: UploadFile = File(...),
+    message: Optional[str] = None
+):
+    """Endpoint for analyzing plant images"""
+    try:
+        # Read image data
+        image_data = await file.read()
+        
+        # Validate image
+        if not validate_image(image_data):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid image format. Please upload a JPEG, PNG, or GIF image."
+            )
+            
+        # Save image
+        try:
+            file_path = save_image(image_data, file.filename)
+            logger.info(f"Image saved to {file_path}")
+        except Exception as e:
+            logger.error(f"Error saving image: {e}")
+            # Continue with analysis even if save fails
+            
+        # Analyze image
+        analysis = analyze_plant_image(image_data, message)
+        
+        return {"response": analysis}
+        
+    except Exception as e:
+        logger.error(f"Error in analyze_plant endpoint: {e}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
