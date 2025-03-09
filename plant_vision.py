@@ -24,7 +24,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # Constants for token management
 MAX_TOKENS = 4000  # Maximum tokens for context
 TOKEN_BUFFER = 1000  # Buffer for new responses
-MODEL_NAME = "gpt-4-vision-preview"  # Updated model name for vision tasks
+MODEL_NAME = "gpt-4-turbo"  # Updated to use gpt-4-turbo
 
 class ConversationManager:
     def __init__(self):
@@ -171,7 +171,7 @@ def process_image(image_data: bytes) -> Tuple[bytes, str]:
 
 def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None, conversation_id: Optional[str] = None) -> str:
     """
-    Analyze a plant image using GPT-4 Vision API with conversation memory
+    Analyze a plant image using GPT-4 Turbo with vision capabilities
     """
     try:
         # Process and validate the image
@@ -211,7 +211,8 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None, c
                 {
                     "type": "image_url",
                     "image_url": {
-                        "url": f"data:image/{image_format};base64,{base64_image}"
+                        "url": f"data:image/{image_format};base64,{base64_image}",
+                        "detail": "high"
                     }
                 }
             ]
@@ -220,12 +221,13 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None, c
         # Get conversation history
         messages = conversation_manager.get_messages(conversation_id)
 
-        # Call GPT-4 Vision API with conversation history
+        # Call GPT-4 Turbo API with conversation history
         response = client.chat.completions.create(
             model=MODEL_NAME,
             messages=messages,
             max_tokens=1000,
             temperature=0.7,
+            seed=123,  # Added for consistency
             response_format={ "type": "text" }
         )
 
