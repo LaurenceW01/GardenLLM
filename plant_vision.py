@@ -2,7 +2,7 @@ from openai import OpenAI
 import os
 import logging
 import base64
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict
 from datetime import datetime
 import imghdr
 import traceback
@@ -12,6 +12,7 @@ except ImportError:
     raise ImportError("Please install Pillow with: pip install Pillow")
 import io
 import openai
+import tiktoken
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -19,6 +20,78 @@ logger = logging.getLogger(__name__)
 
 # Initialize OpenAI client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# Constants for token management
+MAX_TOKENS = 4000  # Maximum tokens for context
+TOKEN_BUFFER = 1000  # Buffer for new responses
+MODEL_NAME = "gpt-4-turbo"  # Model name
+
+class ConversationManager:
+    def __init__(self):
+        self.conversations: Dict[str, List[Dict]] = {}
+        self.encoding = tiktoken.encoding_for_model(MODEL_NAME)
+
+    def _count_tokens(self, text: str) -> int:
+        """Count the number of tokens in a text string"""
+        return len(self.encoding.encode(text))
+
+    def _count_message_tokens(self, message: Dict) -> int:
+        """Count tokens in a message including role and content"""
+        total = 0
+        # Count tokens in the role
+        total += self._count_tokens(message.get("role", ""))
+        
+        # Count tokens in the content
+        content = message.get("content", "")
+        if isinstance(content, list):
+            for item in content:
+                if isinstance(item, dict):
+                    if item.get("type") == "text":
+                        total += self._count_tokens(item.get("text", ""))
+                    # Image URLs have a fixed token cost
+                    elif item.get("type") == "image_url":
+                        total += 100  # Approximate token cost for image
+                else:
+                    total += self._count_tokens(str(item))
+        else:
+            total += self._count_tokens(str(content))
+        
+        return total
+
+    def add_message(self, conversation_id: str, message: Dict) -> None:
+        """Add a message to the conversation while managing token limit"""
+        if conversation_id not in self.conversations:
+            self.conversations[conversation_id] = []
+        
+        # Add new message
+        self.conversations[conversation_id].append(message)
+        
+        # Check total tokens and trim if necessary
+        while self._get_total_tokens(conversation_id) > (MAX_TOKENS - TOKEN_BUFFER):
+            # Remove oldest message after system message
+            if len(self.conversations[conversation_id]) > 2:
+                del self.conversations[conversation_id][1]
+            else:
+                break
+
+    def _get_total_tokens(self, conversation_id: str) -> int:
+        """Get total tokens in a conversation"""
+        if conversation_id not in self.conversations:
+            return 0
+        
+        return sum(self._count_message_tokens(msg) for msg in self.conversations[conversation_id])
+
+    def get_messages(self, conversation_id: str) -> List[Dict]:
+        """Get all messages for a conversation"""
+        return self.conversations.get(conversation_id, [])
+
+    def clear_conversation(self, conversation_id: str) -> None:
+        """Clear a conversation history"""
+        if conversation_id in self.conversations:
+            del self.conversations[conversation_id]
+
+# Initialize conversation manager
+conversation_manager = ConversationManager()
 
 def convert_heic_to_jpeg(image_data: bytes) -> Optional[bytes]:
     """
@@ -96,9 +169,9 @@ def process_image(image_data: bytes) -> Tuple[bytes, str]:
         logger.error(f"Error processing image: {e}")
         raise ValueError("Invalid image format or corrupted image file")
 
-def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None) -> str:
+def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None, conversation_id: Optional[str] = None) -> str:
     """
-    Analyze a plant image using GPT-4 Vision API
+    Analyze a plant image using GPT-4 Vision API with conversation memory
     """
     try:
         # Process and validate the image
@@ -118,34 +191,49 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None) -
             4. Any visible issues or concerns
             Please format the response in markdown."""
 
-        # Prepare the messages for the API with the correct format
-        messages = [
-            {
-                "role": "system",
-                "content": "You are a plant expert who analyzes plant images and provides detailed care recommendations."
-            },
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": query},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/{image_format};base64,{base64_image}"
-                        }
-                    }
-                ]
-            }
-        ]
+        # Create conversation ID if not provided
+        if not conversation_id:
+            conversation_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        # Call GPT-4 Vision API with the correct model name and format
+        # Get existing conversation or start new one
+        if not conversation_manager.get_messages(conversation_id):
+            # Add system message
+            conversation_manager.add_message(conversation_id, {
+                "role": "system",
+                "content": "You are a plant expert who analyzes plant images and provides detailed care recommendations. Reference previous interactions when relevant."
+            })
+
+        # Add user message with image
+        conversation_manager.add_message(conversation_id, {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": query},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/{image_format};base64,{base64_image}"
+                    }
+                }
+            ]
+        })
+
+        # Get conversation history
+        messages = conversation_manager.get_messages(conversation_id)
+
+        # Call GPT-4 Vision API with conversation history
         response = client.chat.completions.create(
-            model="gpt-4-turbo",  # Updated to gpt-4-turbo
+            model=MODEL_NAME,
             messages=messages,
             max_tokens=1000,
             temperature=0.7,
             response_format={ "type": "text" }
         )
+
+        # Add assistant's response to conversation history
+        conversation_manager.add_message(conversation_id, {
+            "role": "assistant",
+            "content": response.choices[0].message.content
+        })
 
         return response.choices[0].message.content
 

@@ -41,6 +41,7 @@ class WeatherResponse(BaseModel):
 
 class ImageAnalysisRequest(BaseModel):
     message: Optional[str] = None
+    conversation_id: Optional[str] = None
 
 def handle_weather_query(message: str) -> str:
     """Handle weather-related queries and return formatted response"""
@@ -185,7 +186,8 @@ async def weather_api():
 @app.post("/analyze-plant")
 async def analyze_plant(
     file: UploadFile = File(...),
-    message: Optional[str] = None
+    message: Optional[str] = None,
+    conversation_id: Optional[str] = None
 ):
     """Endpoint for analyzing plant images"""
     try:
@@ -207,10 +209,10 @@ async def analyze_plant(
             logger.error(f"Error saving image: {e}")
             # Continue with analysis even if save fails
             
-        # Analyze image
-        analysis = analyze_plant_image(image_data, message)
+        # Analyze image with conversation history
+        analysis = analyze_plant_image(image_data, message, conversation_id)
         
-        return {"response": analysis}
+        return {"response": analysis, "conversation_id": conversation_id}
         
     except Exception as e:
         logger.error(f"Error in analyze_plant endpoint: {e}")
