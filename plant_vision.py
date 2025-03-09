@@ -118,15 +118,16 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None) -
             4. Any visible issues or concerns
             Please format the response in markdown."""
 
-        # Prepare the messages for the API
+        # Prepare the messages for the API with the correct format
         messages = [
+            {
+                "role": "system",
+                "content": "You are a plant expert who analyzes plant images and provides detailed care recommendations."
+            },
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "text",
-                        "text": query
-                    },
+                    {"type": "text", "text": query},
                     {
                         "type": "image_url",
                         "image_url": {
@@ -137,13 +138,13 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None) -
             }
         ]
 
-        # Call GPT-4 Vision API with the correct model name
+        # Call GPT-4 Vision API with the correct model name and format
         response = client.chat.completions.create(
-            model="gpt-4-turbo-preview",
+            model="gpt-4-turbo",  # Updated to gpt-4-turbo
             messages=messages,
             max_tokens=1000,
             temperature=0.7,
-            seed=123
+            response_format={ "type": "text" }
         )
 
         return response.choices[0].message.content
