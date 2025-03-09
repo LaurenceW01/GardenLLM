@@ -139,10 +139,11 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None) -
 
         # Call GPT-4 Vision API with the correct model name
         response = client.chat.completions.create(
-            model="gpt-4-vision",
+            model="gpt-4-turbo-preview",
             messages=messages,
             max_tokens=1000,
-            temperature=0.7
+            temperature=0.7,
+            seed=123
         )
 
         return response.choices[0].message.content
