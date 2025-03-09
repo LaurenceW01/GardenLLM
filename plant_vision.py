@@ -57,6 +57,19 @@ def process_image(image_data: bytes) -> Tuple[bytes, str]:
         # Try to open the image with PIL to validate it
         img = Image.open(io.BytesIO(image_data))
         
+        # Handle MPO images (multi-picture format)
+        if img.format and img.format.upper() == 'MPO':
+            logger.info("Converting MPO image to JPEG")
+            # MPO contains multiple images, we'll use the first one
+            img.seek(0)  # Ensure we're at the first image
+            # Convert to RGB if necessary
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            # Save as JPEG
+            output = io.BytesIO()
+            img.save(output, format='JPEG', quality=95)
+            return output.getvalue(), 'jpeg'
+        
         # If it's a HEIC/HEIF image, convert it
         if img.format and img.format.upper() in ['HEIC', 'HEIF']:
             logger.info("Converting HEIC/HEIF image to JPEG")
@@ -123,9 +136,9 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None) -
             }
         ]
 
-        # Call GPT-4 Vision API
+        # Call GPT-4 Vision API with the correct model name
         response = client.chat.completions.create(
-            model="gpt-4-vision-preview",
+            model="gpt-4-vision-preview-1106",  # Updated model name
             messages=messages,
             max_tokens=500
         )
