@@ -107,11 +107,10 @@ try:
         raise ValueError("No OpenAI API key found in environment variables")
         
     client = OpenAI(
-        api_key=api_key,
-        timeout=60.0  # Set a reasonable timeout
+        api_key=api_key
     )
 
-    # Test the client with GPT-3.5-turbo
+    # Test the client with a simple request
     logger.info("Testing OpenAI connection...")
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
