@@ -139,7 +139,7 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None) -
 
         # Call GPT-4 Vision API with the correct model name
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4-vision",
             messages=messages,
             max_tokens=1000,
             temperature=0.7
