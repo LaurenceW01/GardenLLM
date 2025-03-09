@@ -11,6 +11,7 @@ try:
 except ImportError:
     raise ImportError("Please install Pillow with: pip install Pillow")
 import io
+import openai
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -129,7 +130,8 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None) -
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": f"data:image/{image_format};base64,{base64_image}"
+                            "url": f"data:image/{image_format};base64,{base64_image}",
+                            "detail": "high"
                         }
                     }
                 ]
@@ -138,13 +140,20 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None) -
 
         # Call GPT-4 Vision API with the correct model name
         response = client.chat.completions.create(
-            model="gpt-4-vision-preview-1106",  # Updated model name
+            model="gpt-4-vision",
             messages=messages,
-            max_tokens=500
+            max_tokens=1000,  # Increased token limit for more detailed responses
+            temperature=0.7    # Add some creativity while keeping responses focused
         )
 
         return response.choices[0].message.content
 
+    except openai.AuthenticationError as e:
+        logger.error(f"Authentication error with OpenAI: {e}")
+        return "I apologize, but there seems to be an issue with the OpenAI API authentication. Please contact support."
+    except openai.NotFoundError as e:
+        logger.error(f"Model not found error: {e}")
+        return "I apologize, but the vision analysis service is currently unavailable. Please try again later or contact support."
     except Exception as e:
         logger.error(f"Error analyzing plant image: {e}")
         logger.error(f"Full error: {traceback.format_exc()}")
