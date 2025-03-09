@@ -24,7 +24,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # Constants for token management
 MAX_TOKENS = 4000  # Maximum tokens for context
 TOKEN_BUFFER = 1000  # Buffer for new responses
-MODEL_NAME = "gpt-4-turbo"  # Model name
+MODEL_NAME = "gpt-4-vision-preview"  # Updated model name for vision tasks
 
 class ConversationManager:
     def __init__(self):
