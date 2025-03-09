@@ -102,21 +102,25 @@ if sheets_client is None:
     raise RuntimeError("Could not initialize Google Sheets client")
 
 # Initialize OpenAI client with API key from environment
-client = OpenAI(
-    api_key=api_key
-)
-
-# Test the client with GPT-3.5-turbo instead of GPT-4
 try:
+    client = OpenAI(
+        api_key=api_key,
+        timeout=60.0  # Set a reasonable timeout
+    )
+
+    # Test the client with GPT-3.5-turbo
     logger.info("Testing OpenAI connection...")
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo",  # Changed from gpt-4
+        model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": "test"}],
         max_tokens=5
     )
     logger.info("OpenAI connection successful")
 except Exception as e:
     logger.error(f"OpenAI connection failed: {str(e)}")
+    logger.error(traceback.format_exc())
+    # Don't raise the error, allow the server to start anyway
+    client = None
 
 def initialize_sheet(start_cli=False):
     """Initialize the sheet and optionally start the CLI"""
