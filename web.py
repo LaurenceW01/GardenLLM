@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from test_openai import gardenbot_response, get_weather_forecast, analyze_forecast_for_plants
@@ -72,21 +72,30 @@ def handle_weather_query(message: str) -> str:
         return "I'm sorry, I encountered an error while processing the weather information."
 
 @app.get("/", response_class=HTMLResponse)
+@app.head("/")
 async def home(request: Request):
     # Get current weather for display
-    forecast = get_weather_forecast()
-    current_weather = {
-        'temp': f"{forecast[0]['temp_max']}/{forecast[0]['temp_min']}" if forecast else "N/A",
-        'conditions': forecast[0]['description'] if forecast else "N/A",
-        'advice': "Check plants according to regular schedule" if not forecast else analyze_forecast_for_plants(forecast).split('\n')[0]
-    }
+    try:
+        forecast = get_weather_forecast()
+        current_weather = {
+            'temp': f"{forecast[0]['temp_max']}/{forecast[0]['temp_min']}" if forecast else "N/A",
+            'conditions': forecast[0]['description'] if forecast else "N/A",
+            'advice': "Check plants according to regular schedule" if not forecast else analyze_forecast_for_plants(forecast).split('\n')[0]
+        }
+    except Exception as e:
+        logger.error(f"Error getting weather for home page: {e}")
+        current_weather = {
+            'temp': "N/A",
+            'conditions': "N/A",
+            'advice': "Check plants according to regular schedule"
+        }
     
     return templates.TemplateResponse(
         "index.html",
         {"request": request, "weather": current_weather}
     )
 
-@app.get("/weather", response_class=HTMLResponse)
+@app.get("/weather/page", response_class=HTMLResponse)
 async def weather_page(request: Request):
     forecast = get_weather_forecast()
     advice = analyze_forecast_for_plants(forecast)
@@ -115,13 +124,14 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
+@app.head("/health")
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "message": "GardenBot server is running"}
 
-@app.get("/weather")
-async def weather():
-    """Weather endpoint for retrieving forecast and plant care advice"""
+@app.get("/api/weather")
+async def weather_api():
+    """Weather API endpoint for retrieving forecast and plant care advice"""
     try:
         forecast = get_weather_forecast()
         if not forecast:
@@ -133,7 +143,7 @@ async def weather():
         advice = analyze_forecast_for_plants(forecast)
         return WeatherResponse(
             forecast=forecast,
-            plant_care_advice=advice
+            plant_care_advice=advice.split("\n")
         )
     except Exception as e:
         logger.error(f"Error in weather endpoint: {e}")

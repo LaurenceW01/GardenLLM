@@ -3,7 +3,63 @@
 {% block title %}GardenLLM - Home{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto" x-data="{ message: '', response: '', loading: false }">
+<div class="max-w-4xl mx-auto" x-data="{
+    message: '',
+    response: '',
+    loading: false,
+    async submitMessage() {
+        if (!this.message.trim()) return;
+        
+        this.loading = true;
+        const chatHistory = document.querySelector('#chat-history .space-y-4');
+        
+        // Add user message
+        const userDiv = document.createElement('div');
+        userDiv.className = 'flex justify-end';
+        userDiv.innerHTML = `
+            <div class='bg-green-600 text-white rounded-lg p-3 max-w-3/4'>
+                ${this.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+            </div>
+        `;
+        chatHistory.appendChild(userDiv);
+        
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ message: this.message })
+            });
+            
+            const data = await response.json();
+            
+            // Add bot response
+            const botDiv = document.createElement('div');
+            botDiv.className = 'flex justify-start';
+            botDiv.innerHTML = `
+                <div class='bg-gray-200 rounded-lg p-3 max-w-3/4'>
+                    ${data.response.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}
+                </div>
+            `;
+            chatHistory.appendChild(botDiv);
+        } catch (error) {
+            console.error('Error:', error);
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'flex justify-start';
+            errorDiv.innerHTML = `
+                <div class='bg-red-100 text-red-700 rounded-lg p-3 max-w-3/4'>
+                    Sorry, there was an error processing your request.
+                </div>
+            `;
+            chatHistory.appendChild(errorDiv);
+        }
+        
+        this.message = '';
+        this.loading = false;
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+}">
     <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
         <h1 class="text-3xl font-bold mb-4 text-green-700">Welcome to GardenLLM</h1>
         <p class="text-gray-600 mb-4">Your AI-powered garden assistant for Houston, TX.</p>
@@ -54,62 +110,4 @@
         </div>
     </div>
 </div>
-
-<script>
-document.addEventListener('alpine:init', () => {
-    Alpine.data('chat', () => ({
-        message: '',
-        loading: false,
-        async submitMessage() {
-            if (!this.message.trim()) return;
-            
-            this.loading = true;
-            const chatHistory = document.querySelector('#chat-history .space-y-4');
-            
-            // Add user message
-            chatHistory.innerHTML += `
-                <div class="flex justify-end">
-                    <div class="bg-green-600 text-white rounded-lg p-3 max-w-3/4">
-                        ${this.message}
-                    </div>
-                </div>
-            `;
-            
-            try {
-                const response = await fetch('/chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ message: this.message }),
-                });
-                
-                const data = await response.json();
-                
-                // Add bot response
-                chatHistory.innerHTML += `
-                    <div class="flex justify-start">
-                        <div class="bg-gray-200 rounded-lg p-3 max-w-3/4">
-                            ${data.response}
-                        </div>
-                    </div>
-                `;
-            } catch (error) {
-                console.error('Error:', error);
-                chatHistory.innerHTML += `
-                    <div class="flex justify-start">
-                        <div class="bg-red-100 text-red-700 rounded-lg p-3 max-w-3/4">
-                            Sorry, there was an error processing your request.
-                        </div>
-                    </div>
-                `;
-            }
-            
-            this.message = '';
-            this.loading = false;
-            chatHistory.scrollTop = chatHistory.scrollHeight;
-        }
-    }));
-});
-</script>
 {% endblock %} 
