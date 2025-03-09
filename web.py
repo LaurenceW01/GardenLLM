@@ -77,13 +77,27 @@ async def home(request: Request):
     # Get current weather for display
     try:
         forecast = get_weather_forecast()
+        if not forecast or len(forecast) == 0:
+            raise ValueError("No forecast data available")
+
+        # Get plant care advice
+        advice = analyze_forecast_for_plants(forecast)
+        
+        # Extract the first meaningful advice section
+        advice_lines = [line for line in advice.split('\n') if line.strip() and not line.startswith('===')]
+        first_advice = advice_lines[0] if advice_lines else "Check plants according to regular schedule"
+
         current_weather = {
             'temp': f"{forecast[0]['temp_max']}/{forecast[0]['temp_min']}" if forecast else "N/A",
             'conditions': forecast[0]['description'] if forecast else "N/A",
-            'advice': "Check plants according to regular schedule" if not forecast else analyze_forecast_for_plants(forecast).split('\n')[0]
+            'advice': first_advice
         }
+        
+        logger.info(f"Weather data prepared for home page: {current_weather}")
+        
     except Exception as e:
         logger.error(f"Error getting weather for home page: {e}")
+        logger.error(traceback.format_exc())
         current_weather = {
             'temp': "N/A",
             'conditions': "N/A",
