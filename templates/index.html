@@ -94,18 +94,25 @@
     <!-- Weather Summary -->
     <div class="bg-white rounded-lg shadow-lg p-6">
         <h2 class="text-2xl font-bold mb-4 text-green-700">Today's Weather</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="bg-gray-50 p-4 rounded-lg">
-                <h3 class="font-bold text-lg mb-2">Temperature</h3>
-                <p class="text-2xl">{{ weather.temp }}°F</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Weather Info -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h3 class="font-bold text-lg mb-2">Temperature</h3>
+                    <p class="text-2xl">{{ weather.temp }}°F</p>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h3 class="font-bold text-lg mb-2">Conditions</h3>
+                    <p class="text-2xl">{{ weather.conditions }}</p>
+                </div>
             </div>
-            <div class="bg-gray-50 p-4 rounded-lg">
-                <h3 class="font-bold text-lg mb-2">Conditions</h3>
-                <p class="text-2xl">{{ weather.conditions }}</p>
-            </div>
-            <div class="bg-gray-50 p-4 rounded-lg">
+            
+            <!-- Plant Care Section - Full Width -->
+            <div class="bg-gray-50 p-4 rounded-lg md:col-span-1">
                 <h3 class="font-bold text-lg mb-2">Plant Care</h3>
-                <p>{{ weather.advice }}</p>
+                <div class="prose max-w-none">
+                    <p class="whitespace-pre-line text-base">{{ weather.advice }}</p>
+                </div>
             </div>
         </div>
     </div>

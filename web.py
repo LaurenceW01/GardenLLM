@@ -83,9 +83,23 @@ async def home(request: Request):
         # Get plant care advice
         advice = analyze_forecast_for_plants(forecast)
         
-        # Extract the first meaningful advice section
-        advice_lines = [line for line in advice.split('\n') if line.strip() and not line.startswith('===')]
-        first_advice = advice_lines[0] if advice_lines else "Check plants according to regular schedule"
+        # Extract the most relevant advice sections
+        advice_sections = []
+        current_section = []
+        
+        for line in advice.split('\n'):
+            if line.strip():
+                if any(alert in line for alert in ['Alert:', '🌡️', '☀️', '💧', '🌧️', '💨']):
+                    if current_section:
+                        advice_sections.append('\n'.join(current_section))
+                        current_section = []
+                current_section.append(line.strip())
+        
+        if current_section:
+            advice_sections.append('\n'.join(current_section))
+        
+        # Take the first two most relevant sections
+        first_advice = '\n\n'.join(advice_sections[:2]) if advice_sections else "Check plants according to regular schedule"
 
         current_weather = {
             'temp': f"{forecast[0]['temp_max']}/{forecast[0]['temp_min']}" if forecast else "N/A",
