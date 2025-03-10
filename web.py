@@ -153,6 +153,13 @@ async def chat(request: ChatRequest):
         # Check if there's an active conversation
         if request.conversation_id and conversation_manager.get_messages(request.conversation_id):
             logger.info("Using existing conversation context")
+            
+            # Add context reminder before user message
+            conversation_manager.add_message(request.conversation_id, {
+                "role": "system",
+                "content": "Remember: This conversation is about the specific plant shown in the previously analyzed image. Do not reference any other plants or garden databases."
+            })
+            
             # Add user message to conversation
             conversation_manager.add_message(request.conversation_id, {
                 "role": "user",
@@ -171,7 +178,7 @@ async def chat(request: ChatRequest):
                 response_format={ "type": "text" }
             )
             
-            # Add AI's response to conversation history
+            # Add assistant's response to conversation history
             conversation_manager.add_message(request.conversation_id, {
                 "role": "assistant",
                 "content": response.choices[0].message.content

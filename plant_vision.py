@@ -209,31 +209,40 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None, c
         # Convert image to base64
         base64_image = base64.b64encode(processed_image).decode('utf-8')
         
-        # Prepare the system message and user query
-        if user_message:
-            query = f"Please analyze this plant image. User's comment: {user_message}"
-        else:
-            query = """Please analyze this plant image and provide:
-            1. Plant identification (species name and common name)
-            2. Assessment of the plant's current condition
-            3. Specific care recommendations to improve or maintain its health
-            4. Any visible issues or concerns
-            Please format the response in markdown."""
-
         # Create conversation ID if not provided
         if not conversation_id:
             conversation_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # Get existing conversation or start new one
         if not conversation_manager.get_messages(conversation_id):
-            # Add system message
+            # Add system message with explicit instructions
             conversation_manager.add_message(conversation_id, {
                 "role": "system",
                 "content": """You are a plant expert who analyzes plant images and provides detailed care recommendations. 
-                When users ask follow-up questions, refer to the specific plant from the image that was analyzed, not plants from any database.
-                If the question is about the plant in the image or your previous analysis, provide detailed responses based on that specific plant.
+                IMPORTANT: You must ONLY answer questions about the specific plant shown in the image that was analyzed.
+                DO NOT refer to any plants from a garden database.
+                If a user asks a follow-up question, it is about the plant you just analyzed in the image.
+                Always maintain context about the specific plant you identified in your analysis.
                 Format your responses in markdown."""
             })
+
+            # Add context-setting message
+            conversation_manager.add_message(conversation_id, {
+                "role": "system",
+                "content": "The following conversation will be about a specific plant shown in an image. All questions should be answered in relation to this specific plant only."
+            })
+
+        # Prepare the user query with explicit context
+        if user_message:
+            query = f"Please analyze this specific plant image. User's comment: {user_message}"
+        else:
+            query = """Please analyze this specific plant image and provide:
+            1. Plant identification (species name and common name)
+            2. Assessment of this plant's current condition
+            3. Specific care recommendations for this individual plant
+            4. Any visible issues or concerns with this particular plant
+            Remember: Your analysis and any follow-up questions will be specifically about this plant.
+            Please format the response in markdown."""
 
         # Add user message with image
         conversation_manager.add_message(conversation_id, {
@@ -263,13 +272,22 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None, c
             response_format={ "type": "text" }
         )
 
-        # Add assistant's response to conversation history
+        # Extract the plant identification from the response
+        ai_response = response.choices[0].message.content
+        
+        # Add assistant's response with context reinforcement
         conversation_manager.add_message(conversation_id, {
             "role": "assistant",
-            "content": response.choices[0].message.content
+            "content": ai_response
+        })
+        
+        # Add a context reminder message
+        conversation_manager.add_message(conversation_id, {
+            "role": "system",
+            "content": "Remember: The following questions will be about the specific plant that was just analyzed in the image. Do not reference any other plants or garden databases."
         })
 
-        return response.choices[0].message.content
+        return ai_response
 
     except openai.AuthenticationError as e:
         logger.error(f"Authentication error with OpenAI: {e}")
