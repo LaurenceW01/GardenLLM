@@ -88,6 +88,29 @@
                     method: 'POST',
                     body: formData
                 });
+                
+                const data = await response.json();
+                
+                // Store conversation ID from image analysis
+                if (data.conversation_id) {
+                    this.conversationId = data.conversation_id;
+                    console.log('New conversation started with ID:', this.conversationId);
+                }
+                
+                // Add bot response with markdown rendering
+                const botDiv = document.createElement('div');
+                botDiv.className = 'flex justify-start';
+                const markdownContent = marked.parse(data.response);
+                botDiv.innerHTML = `
+                    <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
+                        ${markdownContent}
+                    </div>
+                `;
+                chatHistory.appendChild(botDiv);
+                
+                // Clear image after upload
+                this.clearImage();
+                
             } else {
                 // Regular text message
                 const userDiv = document.createElement('div');
@@ -99,6 +122,8 @@
                 `;
                 chatHistory.appendChild(userDiv);
                 
+                console.log('Sending message with conversation ID:', this.conversationId);
+                
                 // Send text message with mode indicator
                 response = await fetch('/chat', {
                     method: 'POST',
@@ -107,34 +132,23 @@
                     },
                     body: JSON.stringify({ 
                         message: this.message,
-                        conversation_id: this.useDatabase ? null : this.conversationId,
+                        conversation_id: this.conversationId,  // Always send conversation ID if it exists
                         use_database: this.useDatabase
                     })
                 });
-            }
-            
-            const data = await response.json();
-            
-            // Store or update conversation ID
-            if (data.conversation_id) {
-                this.conversationId = data.conversation_id;
-                console.log('Conversation ID:', this.conversationId);
-            }
-            
-            // Add bot response with markdown rendering
-            const botDiv = document.createElement('div');
-            botDiv.className = 'flex justify-start';
-            const markdownContent = marked.parse(data.response);
-            botDiv.innerHTML = `
-                <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
-                    ${markdownContent}
-                </div>
-            `;
-            chatHistory.appendChild(botDiv);
-            
-            // Only clear image if we're in database mode or if this was an image upload
-            if (this.useDatabase || this.imageFile) {
-                this.clearImage();
+                
+                const data = await response.json();
+                
+                // Add bot response with markdown rendering
+                const botDiv = document.createElement('div');
+                botDiv.className = 'flex justify-start';
+                const markdownContent = marked.parse(data.response);
+                botDiv.innerHTML = `
+                    <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
+                        ${markdownContent}
+                    </div>
+                `;
+                chatHistory.appendChild(botDiv);
             }
             
             // Clear message but maintain conversation context
