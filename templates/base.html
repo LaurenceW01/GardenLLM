@@ -9,29 +9,16 @@
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@2.8.2/dist/alpine.min.js" defer></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
-    <nav class="bg-green-600 text-white p-4 shadow-lg">
-        <div class="container mx-auto flex justify-between items-center">
-            <a href="/" class="text-2xl font-bold">GardenLLM</a>
-            <div class="hidden md:flex space-x-4">
-                <a href="/" class="hover:text-green-200">Home</a>
+    <!-- Navigation Menu -->
+    <nav class="bg-green-700 text-white p-4 shadow-lg">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <a href="/" class="text-xl font-bold">GardenLLM</a>
+            <div class="space-x-4">
+                <a href="/" class="hover:text-green-200">Chat</a>
                 <a href="/weather" class="hover:text-green-200">Weather</a>
-                <a href="/plants" class="hover:text-green-200">Plants</a>
             </div>
-            <!-- Mobile menu button -->
-            <button class="md:hidden" x-data="{ open: false }" @click="open = !open">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
-                </svg>
-            </button>
         </div>
     </nav>
-
-    <!-- Mobile menu -->
-    <div class="md:hidden bg-green-500 text-white" x-data="{ open: false }" x-show="open">
-        <a href="/" class="block p-4 hover:bg-green-600">Home</a>
-        <a href="/weather" class="block p-4 hover:bg-green-600">Weather</a>
-        <a href="/plants" class="block p-4 hover:bg-green-600">Plants</a>
-    </div>
 
     <main class="container mx-auto p-4">
         {% block content %}{% endblock %}

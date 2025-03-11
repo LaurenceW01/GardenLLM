@@ -7,28 +7,44 @@
     <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
         <h1 class="text-3xl font-bold mb-4 text-green-700">Weather Forecast & Plant Care</h1>
         
-        <!-- 5-Day Forecast -->
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-            {% for day in forecast %}
-            <div class="bg-gray-50 rounded-lg p-4">
-                <h3 class="font-bold text-lg mb-2">{{ day.date }}</h3>
-                <div class="space-y-2">
-                    <p class="text-sm">High: {{ day.temp_max }}°F</p>
-                    <p class="text-sm">Low: {{ day.temp_min }}°F</p>
-                    <p class="text-sm">Rain: {{ day.rain }}in</p>
-                    <p class="text-sm">Wind: {{ day.wind_speed }}mph</p>
-                    <p class="text-sm">{{ day.description }}</p>
-                </div>
+        <!-- Current Weather Summary -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <h3 class="font-bold text-lg mb-2">Today's Temperature</h3>
+                <p class="text-2xl">{{ weather.temp }}°F</p>
             </div>
-            {% endfor %}
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <h3 class="font-bold text-lg mb-2">Conditions</h3>
+                <p class="text-2xl">{{ weather.conditions }}</p>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <h3 class="font-bold text-lg mb-2">Humidity</h3>
+                <p class="text-2xl">{{ weather.humidity }}%</p>
+            </div>
         </div>
 
-        <!-- Plant Care Advice -->
-        <div class="bg-gray-50 rounded-lg p-6">
+        <!-- 5-Day Forecast -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold mb-4 text-green-700">5-Day Forecast</h2>
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {% for day in forecast %}
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h4 class="font-bold">{{ day.date }}</h4>
+                    <p>{{ day.temp_min }}°F to {{ day.temp_max }}°F</p>
+                    <p>{{ day.description }}</p>
+                    <p>Rain: {{ day.rain }}in</p>
+                    <p>Wind: {{ day.wind_speed }}mph</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Plant Care Recommendations -->
+        <div class="bg-gray-50 p-6 rounded-lg">
             <h2 class="text-2xl font-bold mb-4 text-green-700">Plant Care Recommendations</h2>
-            <div class="space-y-4">
+            <div class="prose max-w-none">
                 {% for advice in plant_care %}
-                <div class="bg-white rounded-lg p-4 shadow">
+                <div class="mb-4">
                     {{ advice | safe }}
                 </div>
                 {% endfor %}
@@ -36,4 +52,38 @@
         </div>
     </div>
 </div>
+
+<style>
+/* Add some basic markdown styling */
+.prose {
+    @apply text-gray-900;
+}
+.prose h1 {
+    @apply text-2xl font-bold mb-4;
+}
+.prose h2 {
+    @apply text-xl font-bold mb-3;
+}
+.prose h3 {
+    @apply text-lg font-bold mb-2;
+}
+.prose p {
+    @apply mb-2;
+}
+.prose ul {
+    @apply list-disc list-inside mb-2;
+}
+.prose ol {
+    @apply list-decimal list-inside mb-2;
+}
+.prose code {
+    @apply bg-gray-100 px-1 rounded;
+}
+.prose pre {
+    @apply bg-gray-100 p-2 rounded mb-2 overflow-x-auto;
+}
+.prose blockquote {
+    @apply border-l-4 border-gray-300 pl-4 italic;
+}
+</style>
 {% endblock %} 

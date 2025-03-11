@@ -130,22 +130,56 @@ async def home(request: Request):
         {"request": request, "weather": current_weather}
     )
 
-@app.get("/weather/page", response_class=HTMLResponse)
+@app.get("/weather")
 async def weather_page(request: Request):
-    forecast = get_weather_forecast()
-    advice = analyze_forecast_for_plants(forecast)
-    
-    # Split advice into sections for better display
-    advice_sections = [section for section in advice.split('\n\n') if section.strip()]
-    
-    return templates.TemplateResponse(
-        "weather.html",
-        {
-            "request": request,
-            "forecast": forecast,
-            "plant_care": advice_sections
+    """Weather page with forecast and plant care advice"""
+    try:
+        # Get weather forecast
+        forecast = get_weather_forecast()
+        if not forecast:
+            return templates.TemplateResponse(
+                "weather.html",
+                {
+                    "request": request,
+                    "weather": {"temp": "N/A", "conditions": "N/A", "humidity": "N/A"},
+                    "forecast": [],
+                    "plant_care": ["Unable to retrieve weather data. Please try again later."]
+                }
+            )
+
+        # Get current weather
+        current_weather = {
+            'temp': f"{forecast[0]['temp_max']}/{forecast[0]['temp_min']}",
+            'conditions': forecast[0]['description'],
+            'humidity': forecast[0]['humidity']
         }
-    )
+
+        # Get plant care advice
+        advice = analyze_forecast_for_plants(forecast)
+        # Split advice into sections for better display
+        advice_sections = [section for section in advice.split('\n\n') if section.strip()]
+
+        return templates.TemplateResponse(
+            "weather.html",
+            {
+                "request": request,
+                "weather": current_weather,
+                "forecast": forecast,
+                "plant_care": advice_sections
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error in weather page: {e}")
+        logger.error(traceback.format_exc())
+        return templates.TemplateResponse(
+            "weather.html",
+            {
+                "request": request,
+                "weather": {"temp": "Error", "conditions": "Error", "humidity": "Error"},
+                "forecast": [],
+                "plant_care": [f"Error loading weather data: {str(e)}"]
+            }
+        )
 
 @app.post("/chat")
 async def chat(request: ChatRequest):

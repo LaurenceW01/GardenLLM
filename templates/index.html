@@ -27,16 +27,22 @@
         this.imageFile = null;
         this.imagePreview = null;
         document.getElementById('image-input').value = '';
-        // Don't automatically switch mode when clearing image
     },
     
     toggleMode() {
         this.useDatabase = !this.useDatabase;
         if (this.useDatabase) {
             this.clearImage();
-            this.conversationId = null;
+            if (this.conversationId && !this.conversationId.startsWith('db_')) {
+                this.conversationId = null;
+            }
+        } else {
+            if (this.conversationId && this.conversationId.startsWith('db_')) {
+                this.conversationId = null;
+            }
         }
         console.log('Mode switched to:', this.useDatabase ? 'Database' : 'Image Analysis');
+        console.log('Current conversation ID:', this.conversationId);
     },
     
     handleImageSelect(event) {
@@ -46,7 +52,6 @@
             const reader = new FileReader();
             reader.onload = e => this.imagePreview = e.target.result;
             reader.readAsDataURL(file);
-            // When image is selected, automatically switch to image analysis mode
             this.useDatabase = false;
             console.log('Switched to Image Analysis mode due to image upload');
         }
@@ -62,7 +67,6 @@
             let response;
             
             if (this.imageFile) {
-                // Create message content with image preview
                 const userDiv = document.createElement('div');
                 userDiv.className = 'flex justify-end';
                 userDiv.innerHTML = `
@@ -73,7 +77,6 @@
                 `;
                 chatHistory.appendChild(userDiv);
                 
-                // Create FormData for image upload
                 const formData = new FormData();
                 formData.append('file', this.imageFile);
                 if (this.message.trim()) {
@@ -83,7 +86,6 @@
                     formData.append('conversation_id', this.conversationId);
                 }
                 
-                // Send image for analysis
                 response = await fetch('/analyze-plant', {
                     method: 'POST',
                     body: formData
@@ -91,13 +93,11 @@
                 
                 const data = await response.json();
                 
-                // Store conversation ID from image analysis
                 if (data.conversation_id) {
                     this.conversationId = data.conversation_id;
                     console.log('New conversation started with ID:', this.conversationId);
                 }
                 
-                // Add bot response with markdown rendering
                 const botDiv = document.createElement('div');
                 botDiv.className = 'flex justify-start';
                 const markdownContent = marked.parse(data.response);
@@ -108,11 +108,9 @@
                 `;
                 chatHistory.appendChild(botDiv);
                 
-                // Clear image after upload
                 this.clearImage();
                 
             } else {
-                // Regular text message
                 const userDiv = document.createElement('div');
                 userDiv.className = 'flex justify-end';
                 userDiv.innerHTML = `
@@ -124,7 +122,6 @@
                 
                 console.log('Sending message with conversation ID:', this.conversationId);
                 
-                // Send text message with mode indicator
                 response = await fetch('/chat', {
                     method: 'POST',
                     headers: {
@@ -132,14 +129,13 @@
                     },
                     body: JSON.stringify({ 
                         message: this.message,
-                        conversation_id: this.conversationId,  // Always send conversation ID if it exists
+                        conversation_id: this.conversationId,
                         use_database: this.useDatabase
                     })
                 });
                 
                 const data = await response.json();
                 
-                // Add bot response with markdown rendering
                 const botDiv = document.createElement('div');
                 botDiv.className = 'flex justify-start';
                 const markdownContent = marked.parse(data.response);
@@ -151,7 +147,6 @@
                 chatHistory.appendChild(botDiv);
             }
             
-            // Clear message but maintain conversation context
             this.message = '';
             
         } catch (error) {
@@ -244,32 +239,6 @@
                 </button>
             </div>
         </form>
-    </div>
-
-    <!-- Weather Summary -->
-    <div class="bg-white rounded-lg shadow-lg p-6">
-        <h2 class="text-2xl font-bold mb-4 text-green-700">Today's Weather</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- Weather Info -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="bg-gray-50 p-4 rounded-lg">
-                    <h3 class="font-bold text-lg mb-2">Temperature</h3>
-                    <p class="text-2xl">{{ weather.temp }}°F</p>
-                </div>
-                <div class="bg-gray-50 p-4 rounded-lg">
-                    <h3 class="font-bold text-lg mb-2">Conditions</h3>
-                    <p class="text-2xl">{{ weather.conditions }}</p>
-                </div>
-            </div>
-            
-            <!-- Plant Care Section - Full Width -->
-            <div class="bg-gray-50 p-4 rounded-lg md:col-span-1">
-                <h3 class="font-bold text-lg mb-2">Plant Care</h3>
-                <div class="prose max-w-none">
-                    <p class="whitespace-pre-line text-base">{{ weather.advice }}</p>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
