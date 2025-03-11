@@ -159,7 +159,11 @@ async def chat(request: ChatRequest):
             
         # If not using database mode and there's an active conversation, continue it
         elif request.conversation_id and conversation_manager.get_messages(request.conversation_id):
-            logger.info("Using existing conversation context about analyzed plant image")
+            logger.info(f"Continuing existing conversation {request.conversation_id}")
+            
+            # Get existing conversation history
+            messages = conversation_manager.get_messages(request.conversation_id)
+            logger.info(f"Found {len(messages)} existing messages in conversation")
             
             # Add user message to conversation
             conversation_manager.add_message(request.conversation_id, {
@@ -167,7 +171,7 @@ async def chat(request: ChatRequest):
                 "content": request.message
             })
             
-            # Get conversation history
+            # Get updated conversation history
             messages = conversation_manager.get_messages(request.conversation_id)
             
             # Call GPT-4 with conversation history about the specific plant
@@ -181,9 +185,10 @@ async def chat(request: ChatRequest):
                         1. Use the context from your previous image analysis
                         2. Answer questions about the specific plant you analyzed
                         3. Base your answers on what you observed in the image
-                        4. Format your responses in markdown"""
+                        4. Format your responses in markdown
+                        5. Maintain continuity with previous responses about this plant"""
                     },
-                    *messages
+                    *messages  # Include all previous messages
                 ],
                 max_tokens=1000,
                 temperature=0.7,
@@ -195,6 +200,8 @@ async def chat(request: ChatRequest):
                 "role": "assistant",
                 "content": response.choices[0].message.content
             })
+            
+            logger.info(f"Added response to conversation. Total messages now: {len(conversation_manager.get_messages(request.conversation_id))}")
             
             return {
                 "response": response.choices[0].message.content,
