@@ -780,6 +780,72 @@ def update_plant_url(plant_id, new_url):
         logger.error(traceback.format_exc())
         return False
 
+def remove_plant_from_locations(plant_name: str, locations_to_remove: List[str]) -> str:
+    """Remove a plant from specific locations"""
+    try:
+        # Get current values
+        result = sheets_client.values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range=RANGE_NAME
+        ).execute()
+        values = result.get('values', [])
+        header = values[0] if values else []
+        
+        # Find indices
+        name_idx = header.index('Plant Name') if 'Plant Name' in header else 1
+        location_idx = header.index('Location') if 'Location' in header else 3
+        
+        # Find the plant
+        plant_row = None
+        for i, row in enumerate(values[1:], start=1):
+            if row and len(row) > name_idx and row[name_idx].lower() == plant_name.lower():
+                plant_row = i
+                current_locations = [loc.strip() for loc in row[location_idx].split(',') if loc.strip()]
+                break
+        
+        if plant_row is None:
+            return f"Plant '{plant_name}' not found in database"
+            
+        # Convert locations to remove to lowercase for case-insensitive comparison
+        locations_to_remove = [loc.lower() for loc in locations_to_remove]
+        
+        # If '*' is in locations_to_remove, remove all locations
+        if '*' in locations_to_remove:
+            new_location = ''
+            removed = set(current_locations)
+        else:
+            # Filter out locations to remove
+            remaining_locations = [loc for loc in current_locations if loc.lower() not in locations_to_remove]
+            
+            if len(remaining_locations) == len(current_locations):
+                return f"None of the specified locations were found for plant '{plant_name}'"
+            
+            new_location = ', '.join(remaining_locations)
+            removed = set(current_locations) - set(remaining_locations)
+        
+        # Update the location field with remaining locations (or empty string)
+        range_name = f'Plants!{chr(65 + location_idx)}{plant_row + 1}'
+        
+        sheets_client.values().update(
+            spreadsheetId=SPREADSHEET_ID,
+            range=range_name,
+            valueInputOption='RAW',
+            body={'values': [[new_location]]}
+        ).execute()
+        
+        if removed:
+            if new_location:
+                return f"Removed plant '{plant_name}' from locations: {', '.join(removed)}. Still present in: {new_location}"
+            else:
+                return f"Removed plant '{plant_name}' from all locations. Plant remains in database with no location."
+        else:
+            return f"No locations were removed for plant '{plant_name}'"
+        
+    except Exception as e:
+        logger.error(f"Error removing plant from locations: {e}")
+        logger.error(traceback.format_exc())
+        return f"Error removing plant from locations: {str(e)}"
+
 def gardenbot_response(message):
     """Get a response from the chatbot"""
     try:
@@ -790,6 +856,30 @@ def gardenbot_response(message):
         if is_weather_query:
             logger.info("Processing weather-related query")
             return handle_weather_query(message)
+            
+        # Handle remove commands
+        lower_msg = message.lower().strip()
+        if lower_msg.startswith(('remove plant ', 'remove ')):
+            parts = message.split()
+            start_idx = 2 if lower_msg.startswith('remove plant ') else 1
+            
+            # Find the 'from' keyword that separates plant name from locations
+            try:
+                from_idx = parts.index('from', start_idx)
+                plant_name = ' '.join(parts[start_idx:from_idx])
+                locations = [loc.strip() for loc in ' '.join(parts[from_idx + 1:]).split(',')]
+                
+                if not plant_name or not locations:
+                    return "Please specify both plant name and locations. Example: 'remove plant Tomato from Garden Bed 1, Patio'"
+                
+                return remove_plant_from_locations(plant_name, locations)
+                
+            except ValueError:
+                # If 'from' not found, assume removing from all locations
+                plant_name = ' '.join(parts[start_idx:])
+                if not plant_name:
+                    return "Please specify the plant name to remove"
+                return remove_plant_from_locations(plant_name, ['*'])  # '*' indicates all locations
             
         # Handle update commands - must start with these exact phrases
         lower_msg = message.lower().strip()
