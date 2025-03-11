@@ -957,27 +957,43 @@ def gardenbot_response(message):
                 
         # Handle add plant command
         elif is_add_command:
-            # Extract location if provided in the command
-            explicit_location = ''
-            location_start = message.lower().find(' location ')
-            if location_start != -1:
-                # Find the end of location (either at 'url' or end of string)
-                location_text = message[location_start + 9:]  # Skip past ' location '
-                url_pos = location_text.lower().find(' url ')
-                if url_pos != -1:
-                    explicit_location = location_text[:url_pos].strip()
-                else:
-                    explicit_location = location_text.strip()
+            # Extract plant name and locations
+            command_parts = message.lower().split(' location')  # First try 'location'
+            if len(command_parts) != 2:
+                command_parts = message.lower().split(' locations')  # Then try 'locations'
             
-            # Create plant info request
+            if len(command_parts) != 2:
+                return "Please use the format: 'add plant [plant name] location [location1], [location2], ...'"
+            
+            # Get plant name by removing 'add plant ' from the first part
+            plant_name = command_parts[0].replace('add plant ', '').strip()
+            
+            # Get locations from the second part
+            location_text = command_parts[1]
+            # Split by comma and clean up each location
+            locations = [loc.strip() for loc in location_text.split(',') if loc.strip()]
+            
+            if not plant_name:
+                return "Please specify a plant name"
+            if not locations:
+                return "Please specify at least one location"
+            
+            # Join locations with proper formatting
+            explicit_location = ', '.join(locations)
+            
+            # Create plant info request - use the original case for plant name
+            original_plant_name = message.split(' location')[0].replace('add plant ', '').strip()
+            if not original_plant_name:
+                original_plant_name = message.split(' locations')[0].replace('add plant ', '').strip()
+            
             user_message = (
-                f"Create a detailed plant care guide for {message} in Houston, TX. "
+                f"Create a detailed plant care guide for {original_plant_name} in Houston, TX. "
                 "Format the response as a JSON object with these exact field names: "
                 "'Plant Name', 'Location', 'Description', 'Light Requirements', 'Frost Tolerance', "
                 "'Watering Needs', 'Soil Preferences', 'Pruning Instructions', 'Mulching Needs', "
                 "'Fertilizing Schedule', 'Winterizing Instructions', 'Spacing Requirements', "
                 "'Care Notes', 'Photo URL'. "
-                f"{'Use this specific location: ' + explicit_location if explicit_location else ''} "
+                f"Use this specific location: {explicit_location} "
                 "Wrap the response in ```json code blocks."
             )
             response = get_chat_response(user_message)
@@ -997,18 +1013,16 @@ def gardenbot_response(message):
                     logger.info(f"Extracted JSON: {json_str}")
                     plant_data = json.loads(json_str)
                     
-                    # Ensure location is set
-                    if explicit_location:
-                        plant_data['Location'] = explicit_location
-                    elif not plant_data.get('Location'):
-                        plant_data['Location'] = 'Garden'  # Default location if none specified
+                    # Ensure plant name and location are set correctly
+                    plant_data['Plant Name'] = original_plant_name
+                    plant_data['Location'] = explicit_location
                     
                     # Try to update the plant
-                    logger.info(f"Attempting to update plant: {plant_data.get('Plant Name')} at location: {plant_data.get('Location')}")
+                    logger.info(f"Attempting to update plant: {plant_data.get('Plant Name')} at locations: {plant_data.get('Location')}")
                     success = update_plant(plant_data)
                     if success:
                         logger.info("Plant updated successfully")
-                        return f"Successfully added/updated plant: {plant_data.get('Plant Name')} at location: {plant_data.get('Location')}"
+                        return f"Successfully added plant '{original_plant_name}' to locations: {explicit_location}"
                     else:
                         logger.error("Failed to update plant")
                         return "Failed to update the plant information"
