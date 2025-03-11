@@ -219,11 +219,14 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None, c
             conversation_manager.add_message(conversation_id, {
                 "role": "system",
                 "content": """You are a plant expert who analyzes plant images and provides detailed care recommendations. 
-                IMPORTANT: You must ONLY answer questions about the specific plant shown in the image that was analyzed.
-                DO NOT refer to any plants from a garden database.
-                If a user asks a follow-up question, it is about the plant you just analyzed in the image.
-                Always maintain context about the specific plant you identified in your analysis.
-                Format your responses in markdown."""
+                IMPORTANT RULES:
+                1. You will analyze the plant in the provided image
+                2. Store all details about this specific plant in your analysis
+                3. For any follow-up questions, use ONLY the information from your analysis
+                4. NEVER ask to check databases or plant lists
+                5. NEVER ask for plant names - you already analyzed the plant
+                6. If unsure about something, refer back to what you observed in the image
+                7. Format your responses in markdown"""
             })
 
             # Add context-setting message

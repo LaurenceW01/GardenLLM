@@ -21,11 +21,22 @@
     imageFile: null,
     imagePreview: null,
     conversationId: null,
+    useDatabase: true,  // Default to database mode
     
     clearImage() {
         this.imageFile = null;
         this.imagePreview = null;
         document.getElementById('image-input').value = '';
+        // Don't automatically switch mode when clearing image
+    },
+    
+    toggleMode() {
+        this.useDatabase = !this.useDatabase;
+        if (this.useDatabase) {
+            this.clearImage();
+            this.conversationId = null;
+        }
+        console.log('Mode switched to:', this.useDatabase ? 'Database' : 'Image Analysis');
     },
     
     handleImageSelect(event) {
@@ -35,6 +46,9 @@
             const reader = new FileReader();
             reader.onload = e => this.imagePreview = e.target.result;
             reader.readAsDataURL(file);
+            // When image is selected, automatically switch to image analysis mode
+            this.useDatabase = false;
+            console.log('Switched to Image Analysis mode due to image upload');
         }
     },
     
@@ -85,7 +99,7 @@
                 `;
                 chatHistory.appendChild(userDiv);
                 
-                // Send text message
+                // Send text message with mode indicator
                 response = await fetch('/chat', {
                     method: 'POST',
                     headers: {
@@ -93,17 +107,17 @@
                     },
                     body: JSON.stringify({ 
                         message: this.message,
-                        conversation_id: this.conversationId  // Include conversation ID if it exists
+                        conversation_id: this.useDatabase ? null : this.conversationId,
+                        use_database: this.useDatabase
                     })
                 });
             }
             
             const data = await response.json();
             
-            // Store or update conversation ID
+            // Store conversation ID if provided
             if (data.conversation_id) {
                 this.conversationId = data.conversation_id;
-                console.log('Conversation ID:', this.conversationId);  // For debugging
             }
             
             // Add bot response with markdown rendering
@@ -141,6 +155,24 @@
         <h1 class="text-3xl font-bold mb-4 text-green-700">Welcome to GardenLLM</h1>
         <p class="text-gray-600 mb-4">Your AI-powered garden assistant for Houston, TX.</p>
         
+        <!-- Mode Toggle Switch -->
+        <div class="flex items-center justify-end mb-4 gap-2">
+            <span class="text-sm text-gray-600" x-text="useDatabase ? 'Garden Database Mode' : 'Image Analysis Mode'"></span>
+            <button 
+                @click="toggleMode()" 
+                type="button"
+                :class="{'bg-green-600': useDatabase, 'bg-blue-600': !useDatabase}"
+                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
+                role="switch"
+                :aria-checked="useDatabase"
+            >
+                <span 
+                    :class="useDatabase ? 'translate-x-5' : 'translate-x-0'"
+                    class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                ></span>
+            </button>
+        </div>
+        
         <!-- Chat Interface -->
         <div class="bg-gray-50 rounded-lg p-4 mb-4 h-96 overflow-y-auto" id="chat-history">
             <div class="space-y-4">
@@ -161,7 +193,7 @@
             
             <div class="flex flex-col md:flex-row gap-2">
                 <!-- Image Upload -->
-                <label class="flex-none cursor-pointer bg-gray-100 hover:bg-gray-200 rounded-lg px-4 py-2 transition-colors">
+                <label x-show="!useDatabase" class="flex-none cursor-pointer bg-gray-100 hover:bg-gray-200 rounded-lg px-4 py-2 transition-colors">
                     <input 
                         type="file" 
                         id="image-input"
@@ -178,7 +210,7 @@
                     type="text" 
                     x-model="message" 
                     class="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    placeholder="Ask about your plants or upload a plant photo..."
+                    :placeholder="useDatabase ? 'Ask about plants in your garden...' : 'Ask about the plant in the image...'"
                     :disabled="loading"
                 >
                 

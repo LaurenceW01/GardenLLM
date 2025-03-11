@@ -35,6 +35,7 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     message: str
     conversation_id: Optional[str] = None
+    use_database: bool = True  # Default to database mode
 
 class WeatherResponse(BaseModel):
     forecast: List[Dict]
@@ -148,17 +149,17 @@ async def weather_page(request: Request):
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    logger.info(f"Chat endpoint accessed with message: {request.message} (conversation_id: {request.conversation_id})")
+    logger.info(f"Chat endpoint accessed with message: {request.message} (conversation_id: {request.conversation_id}, use_database: {request.use_database})")
     try:
-        # Check if there's an active conversation
-        if request.conversation_id and conversation_manager.get_messages(request.conversation_id):
-            logger.info("Using existing conversation context")
+        # If using database mode, always use garden database query
+        if request.use_database:
+            logger.info("Using garden database mode")
+            response = gardenbot_response(request.message)
+            return {"response": response}
             
-            # Add context reminder before user message
-            conversation_manager.add_message(request.conversation_id, {
-                "role": "system",
-                "content": "Remember: This conversation is about the specific plant shown in the previously analyzed image. Do not reference any other plants or garden databases."
-            })
+        # If not using database mode and there's an active conversation, continue it
+        elif request.conversation_id and conversation_manager.get_messages(request.conversation_id):
+            logger.info("Using existing conversation context about analyzed plant image")
             
             # Add user message to conversation
             conversation_manager.add_message(request.conversation_id, {
@@ -169,10 +170,21 @@ async def chat(request: ChatRequest):
             # Get conversation history
             messages = conversation_manager.get_messages(request.conversation_id)
             
-            # Call GPT-4 with conversation history
+            # Call GPT-4 with conversation history about the specific plant
             response = client.chat.completions.create(
                 model=MODEL_NAME,
-                messages=messages,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """You are a plant expert continuing a conversation about a specific plant from a previously shared image. 
+                        For this conversation:
+                        1. Use the context from your previous image analysis
+                        2. Answer questions about the specific plant you analyzed
+                        3. Base your answers on what you observed in the image
+                        4. Format your responses in markdown"""
+                    },
+                    *messages
+                ],
                 max_tokens=1000,
                 temperature=0.7,
                 response_format={ "type": "text" }
@@ -189,10 +201,12 @@ async def chat(request: ChatRequest):
                 "conversation_id": request.conversation_id
             }
         else:
-            logger.info("No active conversation, using garden database query")
-            # No active conversation, use regular garden database query
-            response = gardenbot_response(request.message)
-            return {"response": response}
+            # No active conversation and not using database
+            logger.info("No active conversation and not using database")
+            return {
+                "response": "Please upload an image first to start a conversation about a specific plant.",
+                "conversation_id": None
+            }
             
     except Exception as e:
         logger.error(f"Error in chat endpoint: {e}")
