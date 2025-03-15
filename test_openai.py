@@ -846,6 +846,80 @@ def remove_plant_from_locations(plant_name: str, locations_to_remove: List[str])
         logger.error(traceback.format_exc())
         return f"Error removing plant from locations: {str(e)}"
 
+def parse_care_guide(response_text):
+    """Parse the OpenAI response to extract plant care details"""
+    try:
+        # Extract sections from the response
+        sections = {}
+        current_section = None
+        current_text = []
+        
+        for line in response_text.split('\n'):
+            if line.startswith('**') and line.endswith('**'):
+                if current_section:
+                    sections[current_section] = '\n'.join(current_text).strip()
+                current_section = line.strip('*').strip(':')
+                current_text = []
+            elif current_section:
+                current_text.append(line)
+        
+        # Add the last section
+        if current_section:
+            sections[current_section] = '\n'.join(current_text).strip()
+        
+        # Map sections to spreadsheet columns
+        details = {
+            'Description': sections.get('Description', ''),
+            'Light Requirements': sections.get('Light', ''),
+            'Soil Preferences': sections.get('Soil', ''),
+            'Watering Needs': sections.get('Watering', ''),
+            'Frost Tolerance': '',  # Will be set based on Temperature info
+            'Pruning Instructions': sections.get('Pruning', ''),
+            'Mulching Needs': sections.get('Mulching', ''),
+            'Fertilizing Schedule': sections.get('Fertilizing', ''),
+            'Winterizing Instructions': sections.get('Winter Care', ''),
+            'Spacing Requirements': sections.get('Spacing', ''),
+            'Care Notes': response_text  # Keep full response
+        }
+        
+        # Special handling for frost tolerance based on temperature info
+        temp_info = sections.get('Temperature', '').lower()
+        if 'frost' in temp_info or 'freezing' in temp_info:
+            if 'protect' in temp_info or 'sensitive' in temp_info:
+                details['Frost Tolerance'] = 'Low - Protect from frost'
+            elif 'hardy' in temp_info or 'resistant' in temp_info:
+                details['Frost Tolerance'] = 'High - Frost hardy'
+            else:
+                details['Frost Tolerance'] = 'Medium - Some frost tolerance'
+        
+        # Clean up the extracted text
+        for key in details:
+            if isinstance(details[key], str):
+                # Remove bullet points and extra whitespace
+                cleaned = details[key].replace('- ', '').strip()
+                # Remove any remaining markdown
+                cleaned = cleaned.replace('*', '')
+                details[key] = cleaned
+        
+        return details
+    except Exception as e:
+        logger.error(f"Error parsing care guide: {e}")
+        logger.error(traceback.format_exc())
+        # Return empty strings for all fields except Care Notes
+        return {
+            'Description': '',
+            'Light Requirements': '',
+            'Soil Preferences': '',
+            'Watering Needs': '',
+            'Frost Tolerance': '',
+            'Pruning Instructions': '',
+            'Mulching Needs': '',
+            'Fertilizing Schedule': '',
+            'Winterizing Instructions': '',
+            'Spacing Requirements': '',
+            'Care Notes': response_text  # Keep the original response
+        }
+
 def gardenbot_response(message):
     """Get a response from the chatbot"""
     try:
@@ -856,6 +930,54 @@ def gardenbot_response(message):
         if is_weather_query:
             logger.info("Processing weather-related query")
             return handle_weather_query(message)
+            
+        # Handle add plant command
+        if message.lower().startswith('add plant '):
+            try:
+                # Split by 'location' keyword to separate plant name and locations
+                parts = message.split(' location ')
+                if len(parts) != 2:
+                    return "Please specify the plant name and location(s). Format: add plant [name] location [location1], [location2], ..."
+                
+                # Extract plant name by removing 'add plant' prefix and cleaning
+                plant_name = parts[0].replace('add plant', '', 1).strip()
+                
+                # Process locations
+                locations = [loc.strip() for loc in parts[1].split(',') if loc.strip()]
+                if not locations:
+                    return "Please specify at least one location for the plant."
+                
+                # Create plant info request
+                prompt = (
+                    f"Create a detailed plant care guide for {plant_name} in Houston, TX. "
+                    "Include care requirements, growing conditions, and maintenance tips. "
+                    "Focus on practical advice for the specified locations: " + 
+                    ', '.join(locations)
+                )
+                
+                # Get plant care information from OpenAI
+                response = get_chat_response(prompt)
+                
+                # Parse the care guide to extract details
+                care_details = parse_care_guide(response)
+                if not care_details:
+                    care_details = {'Care Notes': response}
+                
+                # Add plant to spreadsheet with all details
+                plant_data = {
+                    'Plant Name': plant_name,
+                    'Location': ', '.join(locations),
+                    **care_details  # Include all parsed details
+                }
+                
+                if update_plant(plant_data):
+                    return f"Added plant '{plant_name}' to locations: {', '.join(locations)}\n\nCare guide:\n{response}"
+                else:
+                    return f"Error adding plant '{plant_name}' to database"
+                
+            except Exception as e:
+                logger.error(f"Error adding plant: {e}")
+                return f"Error adding plant: {str(e)}"
             
         # Handle remove commands
         lower_msg = message.lower().strip()
@@ -955,49 +1077,6 @@ def gardenbot_response(message):
             else:
                 return f"Failed to update some fields for plant {identifier}"
                 
-        # Handle add plant command
-        elif is_add_command:
-            try:
-                # Split by 'location' keyword to separate plant name and locations
-                parts = message.split(' location ')
-                if len(parts) != 2:
-                    return "Please specify the plant name and location(s). Format: add plant [name] location [location1], [location2], ..."
-                
-                # Extract plant name by removing 'add plant' prefix and cleaning
-                plant_name = parts[0].replace('add plant', '', 1).strip()
-                
-                # Process locations
-                locations = [loc.strip() for loc in parts[1].split(',') if loc.strip()]
-                if not locations:
-                    return "Please specify at least one location for the plant."
-                
-                # Create plant info request
-                prompt = (
-                    f"Create a detailed plant care guide for {plant_name} in Houston, TX. "
-                    "Include care requirements, growing conditions, and maintenance tips. "
-                    "Focus on practical advice for the specified locations: " + 
-                    ', '.join(locations)
-                )
-                
-                # Get plant care information from OpenAI
-                response = get_chat_response(prompt)
-                
-                # Add plant to spreadsheet
-                plant_data = {
-                    'Plant Name': plant_name,
-                    'Location': ', '.join(locations),
-                    'Care Notes': response
-                }
-                
-                if update_plant(plant_data):
-                    return f"Added plant '{plant_name}' to locations: {', '.join(locations)}\n\nCare guide:\n{response}"
-                else:
-                    return f"Error adding plant '{plant_name}' to database"
-                
-            except Exception as e:
-                logger.error(f"Error adding plant: {e}")
-                return f"Error adding plant: {str(e)}"
-            
         # Regular chat response - anything that's not a command
         else:
             response = get_chat_response(message)
