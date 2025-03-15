@@ -106,10 +106,17 @@ try:
     if not api_key:
         raise ValueError("No OpenAI API key found in environment variables")
         
+    # Create httpx client without proxies
+    import httpx
+    http_client = httpx.Client(
+        timeout=60.0,
+        follow_redirects=True
+    )
+        
     client = OpenAI(
         api_key=api_key,
+        http_client=http_client,
         base_url="https://api.openai.com/v1",
-        timeout=60.0,
         max_retries=2
     )
 

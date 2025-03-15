@@ -12,14 +12,18 @@ from datetime import datetime
 import requests
 from typing import List, Dict
 from test_openai import (
-    gardenbot_response,
     get_all_plants,
     find_plant_by_id_or_name,
     update_plant_field,
     get_chat_response,
     display_weather_advice,
     setup_sheets_client,
-    initialize_sheet
+    initialize_sheet,
+    gardenbot_response,
+    SPREADSHEET_ID,
+    RANGE_NAME,
+    parse_care_guide,
+    update_plant
 )
 
 # Set up logging
@@ -29,16 +33,14 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# Constants
-SPREADSHEET_ID = '1zmKVuDTbgColGuoHJDF0ZJxXB6N2WfwLkp7LZ0vqOag'
-RANGE_NAME = 'Plants!A1:P'
-
 class GardenBotCLI:
     def __init__(self):
         """Initialize the CLI interface"""
         try:
-            # Load environment variables
-            load_dotenv()
+            # Initialize OpenAI client
+            api_key = os.getenv('OPENAI_API_KEY')
+            if not api_key:
+                raise ValueError("No OpenAI API key found in environment variables")
             
             # Initialize Google Sheets
             initialize_sheet()
@@ -71,6 +73,80 @@ class GardenBotCLI:
             if command.lower() == 'weather':
                 display_weather_advice()
                 return "Weather advice displayed above."
+            
+            # Handle add plant command
+            if command.lower().startswith('add plant '):
+                try:
+                    # Split command into parts
+                    parts = command.split(' location ')
+                    if len(parts) != 2:
+                        return "Please specify the plant name and location(s). Format: add plant [name] location [location1], [location2], ..."
+                    
+                    # Extract plant name and clean it
+                    plant_name = parts[0].replace('add plant', '', 1).strip()
+                    plant_name = ' '.join(word.capitalize() for word in plant_name.split())
+                    
+                    # Process locations and URL if present
+                    location_url_parts = parts[1].split(' url ')
+                    locations = [loc.strip() for loc in location_url_parts[0].split(',') if loc.strip()]
+                    if not locations:
+                        return "Please specify at least one location for the plant."
+                    
+                    # Extract URL if present
+                    photo_url = location_url_parts[1].strip() if len(location_url_parts) > 1 else ''
+                    
+                    # Create plant info request
+                    prompt = (
+                        f"Create a detailed plant care guide for {plant_name} in Houston, TX. "
+                        "Include care requirements, growing conditions, and maintenance tips. "
+                        "Focus on practical advice for the specified locations: " + 
+                        ', '.join(locations) + "\n\n" +
+                        "Please include sections for:\n" +
+                        "**Description:**\n" +
+                        "**Light:**\n" +
+                        "**Soil:**\n" +
+                        "**Watering:**\n" +
+                        "**Temperature:**\n" +
+                        "**Pruning:**\n" +
+                        "**Mulching:**\n" +
+                        "**Fertilizing:**\n" +
+                        "**Winter Care:**\n" +
+                        "**Spacing:**"
+                    )
+                    
+                    # Get plant care information from OpenAI
+                    response = get_chat_response(prompt)
+                    
+                    # Parse the care guide to extract details
+                    care_details = parse_care_guide(response)
+                    
+                    # Create plant data with all fields
+                    plant_data = {
+                        'Plant Name': plant_name,
+                        'Location': ', '.join(locations),
+                        'Description': care_details.get('Description', ''),
+                        'Light Requirements': care_details.get('Light Requirements', ''),
+                        'Soil Preferences': care_details.get('Soil Preferences', ''),
+                        'Watering Needs': care_details.get('Watering Needs', ''),
+                        'Frost Tolerance': care_details.get('Frost Tolerance', ''),
+                        'Pruning Instructions': care_details.get('Pruning Instructions', ''),
+                        'Mulching Needs': care_details.get('Mulching Needs', ''),
+                        'Fertilizing Schedule': care_details.get('Fertilizing Schedule', ''),
+                        'Winterizing Instructions': care_details.get('Winterizing Instructions', ''),
+                        'Spacing Requirements': care_details.get('Spacing Requirements', ''),
+                        'Care Notes': response,
+                        'Photo URL': photo_url
+                    }
+                    
+                    # Add the plant to the spreadsheet
+                    if update_plant(plant_data):
+                        return f"Added plant '{plant_name}' to locations: {', '.join(locations)}\n\nCare guide:\n{response}"
+                    else:
+                        return f"Error adding plant '{plant_name}' to database"
+                    
+                except Exception as e:
+                    logger.error(f"Error adding plant: {e}")
+                    return f"Error adding plant: {str(e)}"
             
             # For all other commands, use the existing gardenbot_response function
             response = gardenbot_response(command)
