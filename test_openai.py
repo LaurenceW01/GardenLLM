@@ -959,15 +959,12 @@ def gardenbot_response(message):
         elif is_add_command:
             try:
                 # Split by 'location' keyword to separate plant name and locations
-                parts = message.lower().split(' location ')
+                parts = message.split(' location ')
                 if len(parts) != 2:
                     return "Please specify the plant name and location(s). Format: add plant [name] location [location1], [location2], ..."
                 
                 # Extract plant name by removing 'add plant' prefix and cleaning
                 plant_name = parts[0].replace('add plant', '', 1).strip()
-                # Get original case for plant name from the original message
-                original_case_parts = message.split(' location ')
-                plant_name = original_case_parts[0].replace('add plant', '', 1).strip()
                 
                 # Process locations
                 locations = [loc.strip() for loc in parts[1].split(',') if loc.strip()]
@@ -987,13 +984,15 @@ def gardenbot_response(message):
                 
                 # Add plant to spreadsheet
                 plant_data = {
-                    'name': plant_name,
-                    'locations': ', '.join(locations),
-                    'care_info': response
+                    'Plant Name': plant_name,
+                    'Location': ', '.join(locations),
+                    'Care Notes': response
                 }
                 
-                add_or_update_plant(sheets_client, plant_data)
-                return f"Added plant '{plant_name}' to locations: {', '.join(locations)}\n\nCare guide:\n{response}"
+                if update_plant(plant_data):
+                    return f"Added plant '{plant_name}' to locations: {', '.join(locations)}\n\nCare guide:\n{response}"
+                else:
+                    return f"Error adding plant '{plant_name}' to database"
                 
             except Exception as e:
                 logger.error(f"Error adding plant: {e}")
