@@ -957,77 +957,47 @@ def gardenbot_response(message):
                 
         # Handle add plant command
         elif is_add_command:
-            # Extract plant name and locations
-            command_parts = message.lower().split(' location')  # First try 'location'
-            if len(command_parts) != 2:
-                command_parts = message.lower().split(' locations')  # Then try 'locations'
-            
-            if len(command_parts) != 2:
-                return "Please use the format: 'add plant [plant name] location [location1], [location2], ...'"
-            
-            # Get plant name by removing 'add plant ' from the first part
-            plant_name = command_parts[0].replace('add plant ', '').strip()
-            
-            # Get locations from the second part
-            location_text = command_parts[1]
-            # Split by comma and clean up each location
-            locations = [loc.strip() for loc in location_text.split(',') if loc.strip()]
-            
-            if not plant_name:
-                return "Please specify a plant name"
-            if not locations:
-                return "Please specify at least one location"
-            
-            # Join locations with proper formatting
-            explicit_location = ', '.join(locations)
-            
-            # Create plant info request - use the original case for plant name
-            original_plant_name = message.split(' location')[0].replace('add plant ', '').strip()
-            if not original_plant_name:
-                original_plant_name = message.split(' locations')[0].replace('add plant ', '').strip()
-            
-            user_message = (
-                f"Create a detailed plant care guide for {original_plant_name} in Houston, TX. "
-                "Format the response as a JSON object with these exact field names: "
-                "'Plant Name', 'Location', 'Description', 'Light Requirements', 'Frost Tolerance', "
-                "'Watering Needs', 'Soil Preferences', 'Pruning Instructions', 'Mulching Needs', "
-                "'Fertilizing Schedule', 'Winterizing Instructions', 'Spacing Requirements', "
-                "'Care Notes', 'Photo URL'. "
-                f"Use this specific location: {explicit_location} "
-                "Wrap the response in ```json code blocks."
-            )
-            response = get_chat_response(user_message)
-            
-            # Check if response contains JSON
-            if '```json' in response.lower() or response.strip().startswith('{'):
-                # Extract JSON data
-                if '```json' in response.lower():
-                    json_start = response.find('{')
-                    json_end = response.rfind('}') + 1
-                else:
-                    json_start = response.find('{')
-                    json_end = response.rfind('}') + 1
-                    
-                if json_start >= 0 and json_end > json_start:
-                    json_str = response[json_start:json_end]
-                    logger.info(f"Extracted JSON: {json_str}")
-                    plant_data = json.loads(json_str)
-                    
-                    # Ensure plant name and location are set correctly
-                    plant_data['Plant Name'] = original_plant_name
-                    plant_data['Location'] = explicit_location
-                    
-                    # Try to update the plant
-                    logger.info(f"Attempting to update plant: {plant_data.get('Plant Name')} at locations: {plant_data.get('Location')}")
-                    success = update_plant(plant_data)
-                    if success:
-                        logger.info("Plant updated successfully")
-                        return f"Successfully added plant '{original_plant_name}' to locations: {explicit_location}"
-                    else:
-                        logger.error("Failed to update plant")
-                        return "Failed to update the plant information"
-            
-            return response
+            try:
+                # Split by 'location' keyword to separate plant name and locations
+                parts = message.lower().split(' location ')
+                if len(parts) != 2:
+                    return "Please specify the plant name and location(s). Format: add plant [name] location [location1], [location2], ..."
+                
+                # Extract plant name by removing 'add plant' prefix and cleaning
+                plant_name = parts[0].replace('add plant', '', 1).strip()
+                # Get original case for plant name from the original message
+                original_case_parts = message.split(' location ')
+                plant_name = original_case_parts[0].replace('add plant', '', 1).strip()
+                
+                # Process locations
+                locations = [loc.strip() for loc in parts[1].split(',') if loc.strip()]
+                if not locations:
+                    return "Please specify at least one location for the plant."
+                
+                # Create plant info request
+                prompt = (
+                    f"Create a detailed plant care guide for {plant_name} in Houston, TX. "
+                    "Include care requirements, growing conditions, and maintenance tips. "
+                    "Focus on practical advice for the specified locations: " + 
+                    ', '.join(locations)
+                )
+                
+                # Get plant care information from OpenAI
+                response = get_chat_response(prompt)
+                
+                # Add plant to spreadsheet
+                plant_data = {
+                    'name': plant_name,
+                    'locations': ', '.join(locations),
+                    'care_info': response
+                }
+                
+                add_or_update_plant(sheets_client, plant_data)
+                return f"Added plant '{plant_name}' to locations: {', '.join(locations)}\n\nCare guide:\n{response}"
+                
+            except Exception as e:
+                logger.error(f"Error adding plant: {e}")
+                return f"Error adding plant: {str(e)}"
             
         # Regular chat response - anything that's not a command
         else:

@@ -1,0 +1,14 @@
+Fix issue adding plants in web interface
+    a Add plant xxxxx in name
+    b unfortunately, xxxx is not in the description
+Move photo column to column C in plant journal
+Add sample quesitons into initial interface
+    what can you do?
+    which plants prefer more acidic soil
+    which plant prefer more alkaline soil
+    which plant need the most water
+    which plants need the least water
+    Add your own favorite questions
+Make scrolling simpler
+Provide a way to save the conversation via download
+
