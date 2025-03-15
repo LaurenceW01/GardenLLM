@@ -940,7 +940,9 @@ def gardenbot_response(message):
                     return "Please specify the plant name and location(s). Format: add plant [name] location [location1], [location2], ..."
                 
                 # Extract plant name by removing 'add plant' prefix and cleaning
-                plant_name = parts[0].replace('add plant', '', 1).strip()
+                plant_name = parts[0].lower().replace('add plant', '', 1).strip()
+                # Properly capitalize the plant name
+                plant_name = ' '.join(word.capitalize() for word in plant_name.split())
                 
                 # Process locations
                 locations = [loc.strip() for loc in parts[1].split(',') if loc.strip()]
@@ -952,7 +954,18 @@ def gardenbot_response(message):
                     f"Create a detailed plant care guide for {plant_name} in Houston, TX. "
                     "Include care requirements, growing conditions, and maintenance tips. "
                     "Focus on practical advice for the specified locations: " + 
-                    ', '.join(locations)
+                    ', '.join(locations) + "\n\n" +
+                    "Please include sections for:\n" +
+                    "**Description:**\n" +
+                    "**Light:**\n" +
+                    "**Soil:**\n" +
+                    "**Watering:**\n" +
+                    "**Temperature:**\n" +
+                    "**Pruning:**\n" +
+                    "**Mulching:**\n" +
+                    "**Fertilizing:**\n" +
+                    "**Winter Care:**\n" +
+                    "**Spacing:**"
                 )
                 
                 # Get plant care information from OpenAI
@@ -965,9 +978,19 @@ def gardenbot_response(message):
                 
                 # Add plant to spreadsheet with all details
                 plant_data = {
-                    'Plant Name': plant_name,
+                    'Plant Name': plant_name,  # Use the properly formatted plant name
                     'Location': ', '.join(locations),
-                    **care_details  # Include all parsed details
+                    'Description': care_details.get('Description', ''),
+                    'Light Requirements': care_details.get('Light Requirements', ''),
+                    'Soil Preferences': care_details.get('Soil Preferences', ''),
+                    'Watering Needs': care_details.get('Watering Needs', ''),
+                    'Frost Tolerance': care_details.get('Frost Tolerance', ''),
+                    'Pruning Instructions': care_details.get('Pruning Instructions', ''),
+                    'Mulching Needs': care_details.get('Mulching Needs', ''),
+                    'Fertilizing Schedule': care_details.get('Fertilizing Schedule', ''),
+                    'Winterizing Instructions': care_details.get('Winterizing Instructions', ''),
+                    'Spacing Requirements': care_details.get('Spacing Requirements', ''),
+                    'Care Notes': care_details.get('Care Notes', response)
                 }
                 
                 if update_plant(plant_data):
