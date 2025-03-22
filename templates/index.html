@@ -45,8 +45,6 @@
                     this.conversationId = null;
                 }
             }
-            console.log('Mode switched to:', this.useDatabase ? 'Database' : 'Image Analysis');
-            console.log('Current conversation ID:', this.conversationId);
         },
         
         handleImageSelect(event) {
@@ -57,7 +55,6 @@
                 reader.onload = e => this.imagePreview = e.target.result;
                 reader.readAsDataURL(file);
                 this.useDatabase = false;
-                console.log('Switched to Image Analysis mode due to image upload');
             }
         },
         
@@ -70,7 +67,7 @@
             // Add loading indicator
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'flex justify-start';
-            loadingDiv.innerHTML = /* html */ `
+            loadingDiv.innerHTML = `
                 <div class='bg-gray-100 rounded-lg p-3 max-w-3/4 flex items-center space-x-2'>
                     <div class='typing-indicator'>
                         <span></span>
@@ -88,7 +85,7 @@
                 if (this.imageFile) {
                     const userDiv = document.createElement('div');
                     userDiv.className = 'flex justify-end';
-                    userDiv.innerHTML = /* html */ `
+                    userDiv.innerHTML = `
                         <div class='bg-green-600 text-white rounded-lg p-3 max-w-3/4'>
                             <img src='${this.imagePreview}' class='max-w-full h-auto rounded mb-2'>
                             ${this.message ? `<p>${this.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>` : ''}
@@ -114,16 +111,14 @@
                     
                     if (data.conversation_id) {
                         this.conversationId = data.conversation_id;
-                        console.log('New conversation started with ID:', this.conversationId);
                     }
                     
-                    // Remove loading indicator
                     loadingDiv.remove();
                     
                     const botDiv = document.createElement('div');
                     botDiv.className = 'flex justify-start';
                     const markdownContent = marked.parse(data.response);
-                    botDiv.innerHTML = /* html */ `
+                    botDiv.innerHTML = `
                         <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
                             ${markdownContent}
                         </div>
@@ -139,19 +134,17 @@
                 } else {
                     const userDiv = document.createElement('div');
                     userDiv.className = 'flex justify-end';
-                    userDiv.innerHTML = /* html */ `
+                    userDiv.innerHTML = `
                         <div class='bg-green-600 text-white rounded-lg p-3 max-w-3/4'>
                             ${this.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
                         </div>
                     `;
                     chatHistory.appendChild(userDiv);
                     
-                    console.log('Sending message with conversation ID:', this.conversationId);
-                    
                     response = await fetch('/chat', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
+                            'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({ 
                             message: this.message,
@@ -162,13 +155,12 @@
                     
                     const data = await response.json();
                     
-                    // Remove loading indicator
                     loadingDiv.remove();
                     
                     const botDiv = document.createElement('div');
                     botDiv.className = 'flex justify-start';
                     const markdownContent = marked.parse(data.response);
-                    botDiv.innerHTML = /* html */ `
+                    botDiv.innerHTML = `
                         <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
                             ${markdownContent}
                         </div>
@@ -177,22 +169,18 @@
                 }
                 
                 this.message = '';
+                this.updateMessageStatus();
                 
-                // Scroll to the new message
                 setTimeout(() => {
                     chatHistory.scrollTop = chatHistory.scrollHeight;
                 }, 100);
-
-                this.updateMessageStatus();
-
+                
             } catch (error) {
-                // Remove loading indicator on error
                 loadingDiv.remove();
                 
-                console.error('Error:', error);
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'flex justify-start';
-                errorDiv.innerHTML = /* html */ `
+                errorDiv.innerHTML = `
                     <div class='bg-red-100 text-red-700 rounded-lg p-3 max-w-3/4'>
                         Sorry, there was an error processing your request.
                     </div>
@@ -204,38 +192,31 @@
         },
 
         saveConversation() {
-            // Get all messages from the chat history
             const chatHistory = document.querySelector('#chat-history .space-y-4');
             const messages = [];
             
-            // Convert chat history to text format
             chatHistory.querySelectorAll('.flex').forEach(messageDiv => {
                 const isUser = messageDiv.classList.contains('justify-end');
                 const content = messageDiv.querySelector('div > div').cloneNode(true);
                 
-                // Handle images in messages
                 const image = content.querySelector('img');
                 let messageText = '';
                 let imageData = '';
                 
                 if (image) {
-                    // Get the image source (base64 or URL)
                     imageData = image.src;
                     messageText = '[Image included below]\n';
                 }
                 
-                // Get the text content, preserving markdown formatting
                 if (content.classList.contains('prose')) {
-                    // For assistant messages, get the HTML to preserve formatting
                     messageText += content.innerHTML
                         .replace(/<div>/g, '\n')
                         .replace(/<\/div>/g, '')
                         .replace(/<p>/g, '')
                         .replace(/<\/p>/g, '\n')
                         .replace(/<br>/g, '\n')
-                        .replace(/<[^>]*>/g, ''); // Remove any remaining HTML tags
+                        .replace(/<[^>]*>/g, '');
                 } else {
-                    // For user messages, get plain text
                     messageText += content.textContent;
                 }
                 
@@ -247,7 +228,6 @@
                 });
             });
             
-            // Create a human-readable format with image data
             let conversationText = `GardenLLM Conversation\n`;
             conversationText += `======================\n\n`;
             conversationText += `Date: ${new Date().toLocaleString()}\n`;
@@ -256,7 +236,7 @@
             conversationText += `Chat History\n`;
             conversationText += `------------\n\n`;
             
-            messages.forEach((msg, index) => {
+            messages.forEach(msg => {
                 conversationText += `[${msg.role} - ${msg.timestamp}]\n`;
                 conversationText += `${msg.content}\n`;
                 
@@ -269,10 +249,8 @@
                 conversationText += `\n`;
             });
             
-            // Fix the note text and file creation
-            conversationText += '\nNote: Image data is preserved in base64 format and can be viewed by copying the data between "Image Data" markers into a web browser\'s address bar.\n';
+            conversationText += `\nNote: Image data is preserved in base64 format and can be viewed by copying the data between "Image Data" markers into a web browser's address bar.\n`;
             
-            // Create download link for text file
             const blob = new Blob([conversationText], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
