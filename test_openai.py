@@ -621,47 +621,43 @@ def get_plant_data(plant_names=None):
         return f"Error accessing plant database: {str(e)}"  # Return error message
 
 def find_similar_plants(search_name):
-    """Find plants with similar names
-    
-    Args:
-        search_name (str): Name to search for
-        
-    Returns:
-        list: List of dictionaries containing matching plants with IDs and match type
     """
-    try:
-        # Get all values from sheet
-        result = sheets_client.values().get(  # Retrieve plant IDs and names
-            spreadsheetId=SPREADSHEET_ID,
-            range='Plants!A:B'  # Get ID and Name columns
-        ).execute()
+    Find plants with names similar to the search term, including partial matches.
+    Args:
+        search_name (str): The name to search for
+    Returns:
+        list: List of matching plant names
+    """
+    # Normalize the search term
+    search_term = search_name.lower().strip()
+    
+    # Get all plants from the sheet
+    plants = get_all_plants()
+    matches = []
+    
+    for plant in plants:
+        plant_name = plant['name'].lower()
         
-        values = result.get('values', [])  # Get values or empty list
-        if not values:  # Check if sheet is empty
-            return []  # Return empty list
+        # Exact match
+        if plant_name == search_term:
+            matches.append(plant['name'])
+            continue
             
-        matches = []  # Initialize matches list
-        search_name = search_name.lower()  # Convert search term to lowercase
+        # Check if search term is a substring of plant name
+        if search_term in plant_name:
+            matches.append(plant['name'])
+            continue
+            
+        # Check if any word in the search term matches any word in the plant name
+        search_words = set(search_term.split())
+        plant_words = set(plant_name.split())
         
-        # Look for exact and partial matches
-        for row in values[1:]:  # Skip header row
-            if len(row) > 1:  # Ensure row has both ID and name
-                plant_name = row[1].lower()  # Get plant name in lowercase
-                
-                # Check for different types of matches
-                if plant_name == search_name:  # Exact match
-                    matches.insert(0, {'id': row[0], 'name': row[1], 'exact': True})  # Add to start of list
-                elif search_name in plant_name or plant_name in search_name:  # Partial match
-                    matches.append({'id': row[0], 'name': row[1], 'exact': False})  # Add to end of list
-                # Check for word-level matches
-                elif any(word in plant_name.split() for word in search_name.split()):  # Word match
-                    matches.append({'id': row[0], 'name': row[1], 'exact': False})  # Add to end of list
-        
-        return matches  # Return list of matches
-        
-    except Exception as e:
-        print(f"Error finding similar plants: {e}")  # Log error
-        return []  # Return empty list on error
+        # If any word matches (e.g., "cypress" matches both "Italian cypress" and "Leyland cypress")
+        if search_words & plant_words:  # Using set intersection
+            matches.append(plant['name'])
+
+    # Remove duplicates while preserving order
+    return list(dict.fromkeys(matches))
 
 def verify_plant_name(plant_name):
     """Use LLM to verify plant name spelling
@@ -718,13 +714,12 @@ def find_plant_id_by_name(plant_name):
             return f"No plants found matching '{verified_name}'"  # Return error
         
         if len(matches) == 1:  # Check if single match
-            return matches[0]['id']  # Return ID
+            return matches[0]  # Return ID
         
         # Multiple matches found - format response
         response = "Multiple matching plants found:\n"  # Start response
         for i, match in enumerate(matches, 1):  # Process each match
-            match_type = "Exact match" if match['exact'] else "Similar match"  # Get match type
-            response += f"{i}. {match['name']} (ID: {match['id']}) - {match_type}\n"  # Add match info
+            response += f"{i}. {match}\n"  # Add match info
         response += "\nPlease specify which plant using its ID (e.g., 'update 3 location: patio')"  # Add instructions
         return response  # Return formatted response
         
