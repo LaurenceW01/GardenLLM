@@ -291,23 +291,44 @@
     class="max-w-4xl mx-auto" 
     x-data="chatInterface"
 >
+    <!-- New Menu Bar -->
+    <div class="bg-white shadow-lg rounded-t-lg mb-2">
+        <div class="max-w-4xl mx-auto px-6 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <a href="/" class="text-xl font-bold text-green-700 hover:text-green-800">
+                        GardenLLM
+                    </a>
+                    <nav class="flex space-x-4">
+                        <a href="/" class="text-gray-600 hover:text-green-700 px-3 py-2 rounded-md text-sm font-medium" 
+                           :class="{'text-green-700': window.location.pathname === '/'}">
+                            Chat
+                        </a>
+                        <a href="/weather" class="text-gray-600 hover:text-green-700 px-3 py-2 rounded-md text-sm font-medium"
+                           :class="{'text-green-700': window.location.pathname === '/weather'}">
+                            Weather
+                        </a>
+                        <button 
+                            x-show="window.location.pathname === '/'"
+                            @click="saveConversation()" 
+                            type="button"
+                            class="text-gray-600 hover:text-green-700 px-3 py-2 rounded-md text-sm font-medium flex items-center gap-1"
+                            :disabled="!hasMessages"
+                        >
+                            <span>💾</span> Save Chat
+                        </button>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
         <h1 class="text-3xl font-bold mb-4 text-green-700">Welcome to GardenLLM</h1>
         <p class="text-gray-600 mb-4">Your AI-powered garden assistant for Houston, TX.</p>
         
         <!-- Mode Toggle Switch -->
-        <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-2">
-                <button 
-                    @click="saveConversation()" 
-                    type="button"
-                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-                    :disabled="!hasMessages"
-                >
-                    <span>💾</span> Save Chat
-                </button>
-            </div>
-            
+        <div class="flex items-center justify-end mb-4">
             <div class="flex items-center gap-2">
                 <span class="text-sm text-gray-600" x-text="useDatabase ? 'Garden Database Mode' : 'Image Analysis Mode'"></span>
                 <button 
