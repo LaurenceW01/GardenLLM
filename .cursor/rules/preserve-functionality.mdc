@@ -1,0 +1,11 @@
+---
+description: Do not break existing code
+globs: 
+alwaysApply: false
+---
+
+# Your rule content
+
+Whenever making changes to code, always preserve existing functionality and do not modify unrelated code.
+Only modify code without changing existing functionality.
+If it is necessary to modify existing functionality to fix an error, tell me what functionality will be impacted and ask for approval before proceeding. 

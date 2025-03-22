@@ -1,5 +1,5 @@
 Fix issue adding plants in web interface
-    a Add plant xxxxx in name
+    a Add plant xxxxx in name - Done
     b unfortunately, xxxx is not in the description
 Move photo column to column C in plant journal
 Add sample quesitons into initial interface

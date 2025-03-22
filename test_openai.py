@@ -103,79 +103,78 @@ if sheets_client is None:
 
 # Initialize OpenAI client with API key from environment
 try:
-    if not api_key:
-        raise ValueError("No OpenAI API key found in environment variables")
+    if not api_key:  # Verify API key exists
+        raise ValueError("No OpenAI API key found in environment variables")  # Raise error if missing
         
-    # Create httpx client without proxies
-    import httpx
-    http_client = httpx.Client(
-        timeout=60.0,
-        follow_redirects=True
+    # Create httpx client without proxies for direct connection
+    import httpx  # Import for HTTP client
+    http_client = httpx.Client(  # Create HTTP client
+        timeout=60.0,  # Set timeout to 60 seconds
+        follow_redirects=True  # Enable redirect following
     )
         
-    client = OpenAI(
-        api_key=api_key,
-        http_client=http_client,
-        base_url="https://api.openai.com/v1",
-        max_retries=2
+    client = OpenAI(  # Initialize OpenAI client
+        api_key=api_key,  # Set API key
+        http_client=http_client,  # Set custom HTTP client
+        base_url="https://api.openai.com/v1",  # Set API base URL
+        max_retries=2  # Set maximum retry attempts
     )
 
-    # Test the client with a simple request
-    logger.info("Testing OpenAI connection...")
-    test_response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": "test"}],
-        max_tokens=5
+    # Test the OpenAI connection
+    logger.info("Testing OpenAI connection...")  # Log connection test
+    test_response = client.chat.completions.create(  # Send test request
+        model="gpt-3.5-turbo",  # Use GPT-3.5 Turbo model
+        messages=[{"role": "user", "content": "test"}],  # Simple test message
+        max_tokens=5  # Request small response
     )
-    logger.info(f"OpenAI connection successful. Test response: {test_response}")
+    logger.info(f"OpenAI connection successful. Test response: {test_response}")  # Log successful test
 except Exception as e:
-    logger.error(f"OpenAI connection failed: {str(e)}")
-    logger.error(traceback.format_exc())
-    raise RuntimeError(f"Failed to initialize OpenAI client: {str(e)}")
+    logger.error(f"OpenAI connection failed: {str(e)}")  # Log connection failure
+    logger.error(traceback.format_exc())  # Log full error traceback
+    raise RuntimeError(f"Failed to initialize OpenAI client: {str(e)}")  # Raise runtime error
 
 def initialize_sheet(start_cli=False):
-    """Initialize the sheet and optionally start the CLI"""
-    print("Initializing sheet with new headers including ID...")
-    # First, get the spreadsheet metadata to find the sheet ID
-    spreadsheet = sheets_client.get(spreadsheetId=SPREADSHEET_ID).execute()
+    """Initialize the Google Sheet with headers and formatting
+    
+    Args:
+        start_cli (bool): Whether to start CLI after initialization
+    """
+    print("Initializing sheet with new headers including ID...")  # Log initialization start
+    # Get the spreadsheet metadata to find the sheet ID
+    spreadsheet = sheets_client.get(spreadsheetId=SPREADSHEET_ID).execute()  # Retrieve spreadsheet metadata
     
     # Use the correct sheet ID from the URL
-    sheet_id = int(SHEET_GID)
+    sheet_id = int(SHEET_GID)  # Convert sheet GID to integer
     
-    # Remove the clear operation
-    # sheets_client.values().clear(
-    #     spreadsheetId=SPREADSHEET_ID,
-    #     range='Plants!A:Z'  # Clear all columns
-    # ).execute()
-    
+    # Define column headers for the sheet
     headers = [
-        'ID',
-        'Plant Name',
-        'Description',
-        'Location',
-        'Light Requirements',
-        'Frost Tolerance',
-        'Watering Needs',
-        'Soil Preferences',
-        'Pruning Instructions',
-        'Mulching Needs',
-        'Fertilizing Schedule',
-        'Winterizing Instructions',
-        'Spacing Requirements',
-        'Care Notes',
-        'Photo URL',
-        'Last Updated'
+        'ID',  # Unique identifier for each plant
+        'Plant Name',  # Name of the plant
+        'Description',  # Plant description
+        'Location',  # Plant location(s)
+        'Light Requirements',  # Light needs
+        'Frost Tolerance',  # Cold tolerance
+        'Watering Needs',  # Watering requirements
+        'Soil Preferences',  # Soil preferences
+        'Pruning Instructions',  # Pruning guidance
+        'Mulching Needs',  # Mulching requirements
+        'Fertilizing Schedule',  # Fertilization timing
+        'Winterizing Instructions',  # Winter care
+        'Spacing Requirements',  # Spacing needs
+        'Care Notes',  # Additional care notes
+        'Photo URL',  # Plant photo URL
+        'Last Updated'  # Last modification timestamp
     ]
     
-    # Only create headers if the sheet is empty
-    result = sheets_client.values().get(
+    # Check if headers already exist
+    result = sheets_client.values().get(  # Get existing headers
         spreadsheetId=SPREADSHEET_ID,
         range='Plants!A1:P1'
     ).execute()
     
-    if not result.get('values'):
+    if not result.get('values'):  # Check if headers are missing
         # Create headers only if they don't exist
-        sheets_client.values().update(
+        sheets_client.values().update(  # Add headers to sheet
             spreadsheetId=SPREADSHEET_ID,
             range='Plants!A1',
             valueInputOption='RAW',
@@ -184,7 +183,7 @@ def initialize_sheet(start_cli=False):
     
     # Format headers and set column/row dimensions
     requests = [{
-        'updateSheetProperties': {
+        'updateSheetProperties': {  # Freeze top row
             'properties': {
                 'sheetId': sheet_id,
                 'gridProperties': {
@@ -194,7 +193,7 @@ def initialize_sheet(start_cli=False):
             'fields': 'gridProperties.frozenRowCount'
         }
     }, {
-        'repeatCell': {
+        'repeatCell': {  # Format header row
             'range': {
                 'sheetId': sheet_id,
                 'startRowIndex': 0,
@@ -202,7 +201,7 @@ def initialize_sheet(start_cli=False):
             },
             'cell': {
                 'userEnteredFormat': {
-                    'backgroundColor': {
+                    'backgroundColor': {  # Set light gray background
                         'red': 0.95,
                         'green': 0.95,
                         'blue': 0.95
@@ -240,102 +239,110 @@ def initialize_sheet(start_cli=False):
         }
     }]
     
-    sheets_client.batchUpdate(
+    # Apply formatting requests
+    sheets_client.batchUpdate(  # Send batch update request
         spreadsheetId=SPREADSHEET_ID,
         body={'requests': requests}
     ).execute()
     
-    print("Sheet initialized successfully!")
+    print("Sheet initialized successfully!")  # Log successful initialization
     
-    if start_cli:
-        print("GardenBot is ready! Type 'exit' to end the conversation.")
-        print(">>>")
+    if start_cli:  # Check if CLI should be started
+        print("GardenBot is ready! Type 'exit' to end the conversation.")  # Display CLI ready message
+        print(">>>")  # Display prompt
 
 # Initialize the sheet
-initialize_sheet()
+initialize_sheet()  # Call initialization function
 
 def get_all_plants():
-    """Get all plants from the Google Sheet"""
+    """Get all plants from the Google Sheet
+    
+    Returns:
+        list: List of dictionaries containing plant information
+    """
     try:
-        result = sheets_client.values().get(
+        # Retrieve all values from the sheet
+        result = sheets_client.values().get(  # Get all plant data
             spreadsheetId=SPREADSHEET_ID,
             range=RANGE_NAME
         ).execute()
         
-        values = result.get('values', [])
+        values = result.get('values', [])  # Get values or empty list if none
         header = values[0] if values else []  # Get header row
-        plants = []
+        plants = []  # Initialize plants list
         
         # Find the indices for name and location columns
-        name_idx = header.index('Plant Name') if 'Plant Name' in header else 1
-        location_idx = header.index('Location') if 'Location' in header else 3
+        name_idx = header.index('Plant Name') if 'Plant Name' in header else 1  # Get plant name column index
+        location_idx = header.index('Location') if 'Location' in header else 3  # Get location column index
         
-        for row in values[1:]:  # Skip header row
-            if len(row) > max(name_idx, location_idx):  # Ensure row has enough columns
+        for row in values[1:]:  # Process each data row (skip header)
+            if len(row) > max(name_idx, location_idx):  # Ensure row has required columns
                 # Get all locations as a list, convert to lowercase for consistency
-                raw_locations = row[location_idx].split(',')
-                locations = [loc.strip().lower() for loc in raw_locations if loc.strip()]
-                plants.append({
-                    'name': row[name_idx],
-                    'location': row[location_idx],
-                    'locations': locations,  # Store lowercase locations
-                    'frost_tolerance': row[5] if len(row) > 5 else '',
-                    'watering_needs': row[6] if len(row) > 6 else ''
+                raw_locations = row[location_idx].split(',')  # Split locations by comma
+                locations = [loc.strip().lower() for loc in raw_locations if loc.strip()]  # Clean and normalize locations
+                plants.append({  # Add plant data to list
+                    'name': row[name_idx],  # Plant name
+                    'location': row[location_idx],  # Original location string
+                    'locations': locations,  # Processed location list
+                    'frost_tolerance': row[5] if len(row) > 5 else '',  # Frost tolerance
+                    'watering_needs': row[6] if len(row) > 6 else ''  # Watering needs
                 })
-                if len(locations) > 1:
+                if len(locations) > 1:  # Log plants with multiple locations
                     logger.info(f"Multi-location plant: {row[name_idx]} in {row[location_idx]}")
         
-        logger.info(f"Retrieved {len(plants)} plants from sheet")
+        logger.info(f"Retrieved {len(plants)} plants from sheet")  # Log total plants retrieved
         # Log examples of plants with multiple locations
-        multi_loc_plants = [p for p in plants if len(p['locations']) > 1]
-        for plant in sorted(multi_loc_plants, key=lambda x: len(x['locations']), reverse=True)[:5]:
+        multi_loc_plants = [p for p in plants if len(p['locations']) > 1]  # Get plants with multiple locations
+        for plant in sorted(multi_loc_plants, key=lambda x: len(x['locations']), reverse=True)[:5]:  # Log top 5
             logger.info(f"Plant in {len(plant['locations'])} locations: {plant['name']} in {plant['location']}")
         
-        return plants
+        return plants  # Return list of plants
     except Exception as e:
-        logger.error(f"Error getting plants: {e}")
-        logger.error(traceback.format_exc())
-        return []
+        logger.error(f"Error getting plants: {e}")  # Log error
+        logger.error(traceback.format_exc())  # Log full error traceback
+        return []  # Return empty list on error
 
 def update_system_prompt():
-    """Update the system prompt with current plant list"""
-    global conversation_history
+    """Update the system prompt with current plant list and locations"""
+    global conversation_history  # Access global conversation history
     
-    plants = get_all_plants()
+    plants = get_all_plants()  # Get current plant data
     
     # Create a reverse lookup from plant name to locations
-    plant_locations = {}
-    for plant in plants:
-        name = plant['name']
-        locations = plant['locations']  # These are already lowercase from get_all_plants
-        plant_locations[name] = locations
+    plant_locations = {}  # Initialize plant locations dictionary
+    for plant in plants:  # Process each plant
+        name = plant['name']  # Get plant name
+        locations = plant['locations']  # Get normalized locations
+        plant_locations[name] = locations  # Map name to locations
     
     # Group plants by location (case-insensitive)
-    plants_by_location = {}
-    for plant in plants:
-        for location in plant['locations']:  # Locations are already lowercase
-            if location not in plants_by_location:
-                plants_by_location[location] = []
-            plants_by_location[location].append(plant['name'])
+    plants_by_location = {}  # Initialize location-based grouping
+    for plant in plants:  # Process each plant
+        for location in plant['locations']:  # Process each location
+            if location not in plants_by_location:  # Create location entry if needed
+                plants_by_location[location] = []  # Initialize plant list for location
+            plants_by_location[location].append(plant['name'])  # Add plant to location
     
     # Create location-based plant list, preserving original location capitalization
-    location_list = []
-    original_locations = {loc.lower(): loc for plant in plants for loc in plant['location'].split(',') if loc.strip()}
+    location_list = []  # Initialize formatted location list
+    original_locations = {loc.lower(): loc for plant in plants  # Map lowercase to original case
+                        for loc in plant['location'].split(',') if loc.strip()}
     
-    for location_lower, plant_names in plants_by_location.items():
-        original_location = original_locations.get(location_lower, location_lower.title())
-        plant_bullets = [f"- {name}" for name in sorted(set(plant_names))]
-        location_list.append(f"### {original_location}\n" + "\n".join(plant_bullets))
+    for location_lower, plant_names in plants_by_location.items():  # Process each location
+        original_location = original_locations.get(location_lower, location_lower.title())  # Get original case
+        plant_bullets = [f"- {name}" for name in sorted(set(plant_names))]  # Create bullet points
+        location_list.append(f"### {original_location}\n" + "\n".join(plant_bullets))  # Format location section
     
-    location_text = "\n\n".join(location_list)
+    location_text = "\n\n".join(location_list)  # Combine all location sections
     
     # Add examples of multi-location plants, sorted by number of locations
-    multi_location_examples = [
+    multi_location_examples = [  # Create list of multi-location examples
         f"- {name}: {', '.join(locs)}"
         for name, locs in sorted(plant_locations.items(), key=lambda x: len(x[1]), reverse=True)
         if len(locs) > 1
     ][:5]  # Show top 5 plants with most locations
     
+    # Create comprehensive system prompt
     system_prompt = (
         "You are a helpful gardening assistant that helps manage a plant journal for a garden in Houston, Texas.\n\n"
         f"Current plants in the garden:\n{location_text}\n\n"
@@ -359,94 +366,105 @@ def update_system_prompt():
         "mention that it's not currently in the garden database."
     )
 
-    # Update the system prompt
-    conversation_history[0]['content'] = system_prompt
+    # Update the system prompt in conversation history
+    conversation_history[0]['content'] = system_prompt  # Set new system prompt
 
 # Initialize conversation history with system prompt
-conversation_history = [
+conversation_history = [  # Initialize conversation history
     {
-        "role": "system",
-        "content": ""  # Will be updated by update_system_prompt()
+        "role": "system",  # Set system role
+        "content": ""  # Empty content to be updated by update_system_prompt()
     }
 ]
 
 # Update the system prompt initially
-update_system_prompt()
+update_system_prompt()  # Perform initial system prompt update
 
 def get_next_id():
-    """Get next available ID from sheet"""
+    """Get next available ID from sheet
+    
+    Returns:
+        str: Next available ID number as string, or None if error occurs
+    """
     try:
-        # Get all values from sheet
-        values = sheets_client.values().get(
+        # Get all values from sheet's ID column
+        values = sheets_client.values().get(  # Retrieve all IDs
             spreadsheetId=SPREADSHEET_ID,
             range='Plants!A:A'  # Get all IDs from first column
         ).execute()
         
-        # Skip header row and get IDs from first column
-        ids = [row[0] for row in values.get('values', [])[1:] if row and row[0]]
+        # Extract existing IDs, skipping header row
+        ids = [row[0] for row in values.get('values', [])[1:] if row and row[0]]  # Get non-empty IDs
         
-        if not ids:
+        if not ids:  # Check if no IDs exist
             return "1"  # Start with 1 if no existing IDs
             
-        # Convert existing IDs to integers and find max
-        numeric_ids = []
-        for id_str in ids:
+        # Convert existing IDs to integers for comparison
+        numeric_ids = []  # Initialize list for numeric IDs
+        for id_str in ids:  # Process each ID string
             try:
-                numeric_ids.append(int(id_str))
-            except ValueError:
+                numeric_ids.append(int(id_str))  # Convert to integer
+            except ValueError:  # Skip invalid numeric strings
                 continue
                 
-        if not numeric_ids:
-            return "1"
+        if not numeric_ids:  # Check if no valid numeric IDs
+            return "1"  # Start with 1 if no valid numeric IDs
             
-        # Return next available ID
-        return str(max(numeric_ids) + 1)
+        # Calculate and return next available ID
+        return str(max(numeric_ids) + 1)  # Increment highest existing ID
         
     except Exception as e:
-        print(f"Error getting next ID: {e}")
-        return None
+        print(f"Error getting next ID: {e}")  # Log error
+        return None  # Return None on error
 
 def log_plant_to_sheets(plant_data):
-    """Add or update plant data in Google Sheets"""
+    """Add or update plant data in Google Sheets
+    
+    Args:
+        plant_data (dict): Dictionary containing plant information
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
     try:
-        print("\n=== Starting log_plant_to_sheets ===")
-        date = datetime.datetime.now().strftime("%Y-%m-%d")
+        print("\n=== Starting log_plant_to_sheets ===")  # Log function start
+        date = datetime.now().strftime("%Y-%m-%d")  # Get current date
         
         # Get next available ID
-        next_id = get_next_id()
-        if not next_id:
-            print("Could not generate ID")
-            return False
+        next_id = get_next_id()  # Generate new ID
+        if not next_id:  # Verify ID generation
+            print("Could not generate ID")  # Log error
+            return False  # Return failure
         
-        # Handle photo URL
-        photo_url = plant_data.get('Photo URL', '')
-        if photo_url:
-            photo_url = f'=IMAGE("{photo_url}")'
+        # Handle photo URL formatting
+        photo_url = plant_data.get('Photo URL', '')  # Get photo URL if exists
+        if photo_url:  # Check if URL provided
+            photo_url = f'=IMAGE("{photo_url}")'  # Create Google Sheets image formula
             
         # Create row with all fields
-        row = [
-            str(next_id),
-            plant_data.get('Plant Name', ''),
-            plant_data.get('Description', ''),
-            plant_data.get('Location', ''),
-            plant_data.get('Light Requirements', ''),
-            plant_data.get('Frost Tolerance', ''),
-            plant_data.get('Watering Needs', ''),
-            plant_data.get('Soil Preferences', ''),
-            plant_data.get('Pruning Instructions', ''),
-            plant_data.get('Mulching Needs', ''),
-            plant_data.get('Fertilizing Schedule', ''),
-            plant_data.get('Winterizing Instructions', ''),
-            plant_data.get('Spacing Requirements', ''),
-            plant_data.get('Care Notes', ''),
-            photo_url,  # Use the formatted photo URL
-            date
+        row = [  # Create list of values for new row
+            str(next_id),  # Plant ID
+            plant_data.get('Plant Name', ''),  # Plant name
+            plant_data.get('Description', ''),  # Description
+            plant_data.get('Location', ''),  # Location
+            plant_data.get('Light Requirements', ''),  # Light needs
+            plant_data.get('Frost Tolerance', ''),  # Frost tolerance
+            plant_data.get('Watering Needs', ''),  # Watering needs
+            plant_data.get('Soil Preferences', ''),  # Soil preferences
+            plant_data.get('Pruning Instructions', ''),  # Pruning info
+            plant_data.get('Mulching Needs', ''),  # Mulching needs
+            plant_data.get('Fertilizing Schedule', ''),  # Fertilizing schedule
+            plant_data.get('Winterizing Instructions', ''),  # Winter care
+            plant_data.get('Spacing Requirements', ''),  # Spacing needs
+            plant_data.get('Care Notes', ''),  # Care notes
+            photo_url,  # Photo URL formula
+            date  # Last updated date
         ]
         
-        print("\nRow to be written:", row)
+        print("\nRow to be written:", row)  # Log row data
         
-        # Append the row
-        result = sheets_client.values().append(
+        # Append the row to sheet
+        result = sheets_client.values().append(  # Add new row
             spreadsheetId=SPREADSHEET_ID,
             range='Plants!A:P',
             valueInputOption='USER_ENTERED',
@@ -454,62 +472,70 @@ def log_plant_to_sheets(plant_data):
             body={'values': [row]}
         ).execute()
         
-        print("\nAPI Response:", result)
-        if 'updates' in result:
-            print(f"Updated range: {result['updates'].get('updatedRange')}")
-            print(f"Updated rows: {result['updates'].get('updatedRows')}")
-            print(f"Updated cells: {result['updates'].get('updatedCells')}")
+        # Verify write operation
+        print("\nAPI Response:", result)  # Log API response
+        if 'updates' in result:  # Check if update info exists
+            print(f"Updated range: {result['updates'].get('updatedRange')}")  # Log updated range
+            print(f"Updated rows: {result['updates'].get('updatedRows')}")  # Log row count
+            print(f"Updated cells: {result['updates'].get('updatedCells')}")  # Log cell count
             
-            if result['updates'].get('updatedRows', 0) > 0:
-                print("Write verified successfully!")
-                return True
+            if result['updates'].get('updatedRows', 0) > 0:  # Verify rows updated
+                print("Write verified successfully!")  # Log success
+                return True  # Return success
             else:
-                print("Write verification failed - no rows updated")
-                return False
+                print("Write verification failed - no rows updated")  # Log failure
+                return False  # Return failure
         else:
-            print("No update information in response")
-            return False
+            print("No update information in response")  # Log missing update info
+            return False  # Return failure
             
     except Exception as e:
-        print(f"Error in log_plant_to_sheets: {e}")
-        print("Full traceback:")
+        print(f"Error in log_plant_to_sheets: {e}")  # Log error
+        print("Full traceback:")  # Log error details
         import traceback
-        traceback.print_exc()
-        return False
+        traceback.print_exc()  # Print full error traceback
+        return False  # Return failure
 
 def find_plant_by_id_or_name(identifier):
-    """Find a plant by ID or name"""
+    """Find a plant by ID or name
+    
+    Args:
+        identifier (str): Plant ID or name to search for
+        
+    Returns:
+        tuple: (row_index, row_data) or (None, None) if not found
+    """
     try:
-        # Get current values
-        result = sheets_client.values().get(
+        # Get current sheet values
+        result = sheets_client.values().get(  # Retrieve all plant data
             spreadsheetId=SPREADSHEET_ID,
             range=RANGE_NAME
         ).execute()
-        values = result.get('values', [])
-        header = values[0] if values else []
+        values = result.get('values', [])  # Get values or empty list
+        header = values[0] if values else []  # Get header row
         
-        # Find indices
-        name_idx = header.index('Plant Name') if 'Plant Name' in header else 1
+        # Find name column index
+        name_idx = header.index('Plant Name') if 'Plant Name' in header else 1  # Get name column index
         
         # Try to find by ID first
         try:
-            plant_id = str(int(identifier))  # Check if it's a valid number
-            for i, row in enumerate(values[1:], start=1):
-                if row and row[0] == plant_id:
-                    return i, row
-        except ValueError:
-            # If not an ID, search by name
-            search_name = identifier.lower()
-            for i, row in enumerate(values[1:], start=1):
-                if row and len(row) > name_idx and row[name_idx].lower() == search_name:
-                    return i, row
+            plant_id = str(int(identifier))  # Convert identifier to numeric ID
+            for i, row in enumerate(values[1:], start=1):  # Search rows (skip header)
+                if row and row[0] == plant_id:  # Check ID match
+                    return i, row  # Return row index and data
+        except ValueError:  # Handle non-numeric identifiers
+            # Search by name if ID search fails
+            search_name = identifier.lower()  # Convert to lowercase for comparison
+            for i, row in enumerate(values[1:], start=1):  # Search rows (skip header)
+                if row and len(row) > name_idx and row[name_idx].lower() == search_name:  # Check name match
+                    return i, row  # Return row index and data
         
-        return None, None
+        return None, None  # Return None if not found
         
     except Exception as e:
-        logger.error(f"Error finding plant: {e}")
-        logger.error(traceback.format_exc())
-        return None, None
+        logger.error(f"Error finding plant: {e}")  # Log error
+        logger.error(traceback.format_exc())  # Log full error traceback
+        return None, None  # Return None on error
 
 def update_plant_field(plant_row, field_name, new_value):
     """Update a specific field for a plant"""
@@ -553,194 +579,251 @@ def update_plant_field(plant_row, field_name, new_value):
         return False
 
 def get_plant_data(plant_names=None):
-    """Get data for specified plants or all plants if none specified"""
+    """Get data for specified plants or all plants if none specified
+    
+    Args:
+        plant_names (list, optional): List of plant names to retrieve data for
+        
+    Returns:
+        list/str: List of plant dictionaries or error message string
+    """
     try:
         # Get all values from sheet
-        result = sheets_client.values().get(
+        result = sheets_client.values().get(  # Retrieve all plant data
             spreadsheetId=SPREADSHEET_ID,
-            range='Plants!A:P'
+            range='Plants!A:P'  # Get all columns
         ).execute()
         
-        values = result.get('values', [])
-        if not values:
-            return "No plants found in the database"
+        values = result.get('values', [])  # Get values or empty list
+        if not values:  # Check if sheet is empty
+            return "No plants found in the database"  # Return error message
             
-        headers = values[0]
-        plants_data = []
+        headers = values[0]  # Get column headers
+        plants_data = []  # Initialize list for plant data
         
         # Convert sheet rows to list of dictionaries
         for row in values[1:]:  # Skip header row
-            # Pad row with empty strings if it's shorter than headers
-            row_data = row + [''] * (len(headers) - len(row))
-            plant_dict = dict(zip(headers, row_data))
+            # Pad row with empty strings if shorter than headers
+            row_data = row + [''] * (len(headers) - len(row))  # Ensure row matches header length
+            plant_dict = dict(zip(headers, row_data))  # Create dictionary from row data
             
-            # If specific plants requested, only include those
-            if plant_names:
-                if any(name.lower() in plant_dict['Plant Name'].lower() for name in plant_names):
-                    plants_data.append(plant_dict)
+            # Filter by plant names if specified
+            if plant_names:  # Check if specific plants requested
+                if any(name.lower() in plant_dict['Plant Name'].lower() for name in plant_names):  # Case-insensitive name match
+                    plants_data.append(plant_dict)  # Add matching plant
             else:
-                plants_data.append(plant_dict)
+                plants_data.append(plant_dict)  # Add all plants if no filter
         
-        return plants_data
+        return plants_data  # Return list of plant dictionaries
         
     except Exception as e:
-        print(f"Error getting plant data: {e}")
-        return f"Error accessing plant database: {str(e)}"
+        print(f"Error getting plant data: {e}")  # Log error
+        return f"Error accessing plant database: {str(e)}"  # Return error message
 
 def find_similar_plants(search_name):
-    """Find plants with similar names"""
+    """Find plants with similar names
+    
+    Args:
+        search_name (str): Name to search for
+        
+    Returns:
+        list: List of dictionaries containing matching plants with IDs and match type
+    """
     try:
         # Get all values from sheet
-        result = sheets_client.values().get(
+        result = sheets_client.values().get(  # Retrieve plant IDs and names
             spreadsheetId=SPREADSHEET_ID,
             range='Plants!A:B'  # Get ID and Name columns
         ).execute()
         
-        values = result.get('values', [])
-        if not values:
-            return []
+        values = result.get('values', [])  # Get values or empty list
+        if not values:  # Check if sheet is empty
+            return []  # Return empty list
             
-        matches = []
-        search_name = search_name.lower()
+        matches = []  # Initialize matches list
+        search_name = search_name.lower()  # Convert search term to lowercase
         
         # Look for exact and partial matches
-        for row in values[1:]:  # Skip header
-            if len(row) > 1:
-                plant_name = row[1].lower()
+        for row in values[1:]:  # Skip header row
+            if len(row) > 1:  # Ensure row has both ID and name
+                plant_name = row[1].lower()  # Get plant name in lowercase
+                
+                # Check for different types of matches
                 if plant_name == search_name:  # Exact match
-                    matches.insert(0, {'id': row[0], 'name': row[1], 'exact': True})
+                    matches.insert(0, {'id': row[0], 'name': row[1], 'exact': True})  # Add to start of list
                 elif search_name in plant_name or plant_name in search_name:  # Partial match
-                    matches.append({'id': row[0], 'name': row[1], 'exact': False})
+                    matches.append({'id': row[0], 'name': row[1], 'exact': False})  # Add to end of list
                 # Check for word-level matches
-                elif any(word in plant_name.split() for word in search_name.split()):
-                    matches.append({'id': row[0], 'name': row[1], 'exact': False})
+                elif any(word in plant_name.split() for word in search_name.split()):  # Word match
+                    matches.append({'id': row[0], 'name': row[1], 'exact': False})  # Add to end of list
         
-        return matches
+        return matches  # Return list of matches
         
     except Exception as e:
-        print(f"Error finding similar plants: {e}")
-        return []
+        print(f"Error finding similar plants: {e}")  # Log error
+        return []  # Return empty list on error
 
 def verify_plant_name(plant_name):
-    """Use LLM to verify plant name spelling"""
+    """Use LLM to verify plant name spelling
+    
+    Args:
+        plant_name (str): Plant name to verify
+        
+    Returns:
+        str: Corrected plant name or None if invalid
+    """
     try:
-        messages = [
-            {"role": "system", "content": "You are a gardening expert. Verify if this plant name is spelled correctly. If it's misspelled, suggest the correct spelling. Only respond with the correct spelling or 'invalid' if it's not a real plant name."},
-            {"role": "user", "content": f"Is '{plant_name}' spelled correctly?"}
+        # Set up messages for OpenAI query
+        messages = [  # Create message list
+            {"role": "system", "content": "You are a gardening expert. Verify if this plant name is spelled correctly. If it's misspelled, suggest the correct spelling. Only respond with the correct spelling or 'invalid' if it's not a real plant name."},  # System role
+            {"role": "user", "content": f"Is '{plant_name}' spelled correctly?"}  # User query
         ]
         
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=messages
+        # Get response from OpenAI
+        response = client.chat.completions.create(  # Send request to OpenAI
+            model="gpt-4",  # Use GPT-4 model
+            messages=messages  # Pass messages
         )
         
-        suggested_name = response.choices[0].message.content.strip()
-        return suggested_name if suggested_name.lower() != 'invalid' else None
+        # Process response
+        suggested_name = response.choices[0].message.content.strip()  # Get suggested name
+        return suggested_name if suggested_name.lower() != 'invalid' else None  # Return name or None
         
     except Exception as e:
-        print(f"Error verifying plant name: {e}")
-        return plant_name  # Return original name if verification fails
+        print(f"Error verifying plant name: {e}")  # Log error
+        return plant_name  # Return original name on error
 
 def find_plant_id_by_name(plant_name):
-    """Find a plant's ID by its name with intelligent matching"""
+    """Find a plant's ID by its name with intelligent matching
+    
+    Args:
+        plant_name (str): Name of plant to find
+        
+    Returns:
+        str: Plant ID, error message, or list of possible matches
+    """
     try:
         # First verify the plant name with LLM
-        verified_name = verify_plant_name(plant_name)
-        if not verified_name:
-            return f"'{plant_name}' doesn't appear to be a valid plant name."
+        verified_name = verify_plant_name(plant_name)  # Get verified name
+        if not verified_name:  # Check if name is invalid
+            return f"'{plant_name}' doesn't appear to be a valid plant name."  # Return error
         
-        if verified_name != plant_name:
-            print(f"Suggested spelling: {verified_name}")
+        if verified_name != plant_name:  # Check if name was corrected
+            print(f"Suggested spelling: {verified_name}")  # Log correction
         
         # Find similar plants
-        matches = find_similar_plants(verified_name)
+        matches = find_similar_plants(verified_name)  # Search for matches
         
-        if not matches:
-            return f"No plants found matching '{verified_name}'"
+        if not matches:  # Check if no matches found
+            return f"No plants found matching '{verified_name}'"  # Return error
         
-        if len(matches) == 1:
-            return matches[0]['id']
+        if len(matches) == 1:  # Check if single match
+            return matches[0]['id']  # Return ID
         
-        # Multiple matches found
-        response = "Multiple matching plants found:\n"
-        for i, match in enumerate(matches, 1):
-            match_type = "Exact match" if match['exact'] else "Similar match"
-            response += f"{i}. {match['name']} (ID: {match['id']}) - {match_type}\n"
-        response += "\nPlease specify which plant using its ID (e.g., 'update 3 location: patio')"
-        return response
+        # Multiple matches found - format response
+        response = "Multiple matching plants found:\n"  # Start response
+        for i, match in enumerate(matches, 1):  # Process each match
+            match_type = "Exact match" if match['exact'] else "Similar match"  # Get match type
+            response += f"{i}. {match['name']} (ID: {match['id']}) - {match_type}\n"  # Add match info
+        response += "\nPlease specify which plant using its ID (e.g., 'update 3 location: patio')"  # Add instructions
+        return response  # Return formatted response
         
     except Exception as e:
-        print(f"Error in find_plant_id_by_name: {e}")
-        return None
+        print(f"Error in find_plant_id_by_name: {e}")  # Log error
+        return None  # Return None on error
 
 def get_chat_response(message):
-    """Get a chat response from OpenAI"""
+    """Get a chat response from OpenAI's API
+    
+    Args:
+        message (str): The user's message to process
+        
+    Returns:
+        str: The AI's response or error message
+    """
     global conversation_history, client
     
     try:
+        # Verify OpenAI client is initialized
         if not client:
             logger.error("OpenAI client is not initialized")
             raise ValueError("OpenAI client is not initialized")
             
-        # Update system prompt to get current plant list
+        # Update system prompt with current plant list
         update_system_prompt()
         
         # Get complete plant data for context
         plants_data = get_plant_data()
         if isinstance(plants_data, list):
+            # Build detailed plant information string
             plant_details = "\n\nDetailed plant information:\n"
             for plant in plants_data:
+                # Add each plant's details to the context
                 plant_details += f"\nPlant: {plant.get('Plant Name', '')}\n"
                 plant_details += f"Location: {plant.get('Location', '')}\n"
                 plant_details += f"Description: {plant.get('Description', '')}\n"
                 plant_details += f"Care Notes: {plant.get('Care Notes', '')}\n"
             
-            # Add detailed plant data to system prompt
+            # Add plant details to system prompt
             conversation_history[0]['content'] += plant_details
         
-        # Limit conversation history
-        if len(conversation_history) > 6:  # System prompt + 5 messages
+        # Manage conversation history length
+        if len(conversation_history) > 6:  # Keep system prompt + 5 messages
             conversation_history = [
-                conversation_history[0],  # System prompt
-                *conversation_history[-5:]  # Last 5 messages
+                conversation_history[0],  # Preserve system prompt
+                *conversation_history[-5:]  # Keep last 5 messages
             ]
         
-        # Add user message to history
+        # Add user message to conversation history
         conversation_history.append({"role": "user", "content": message})
         
+        # Log request details
         logger.info(f"Sending request to OpenAI with message: {message}")
         logger.info(f"Conversation history length: {len(conversation_history)}")
         
         try:
+            # Send request to OpenAI API
             response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=conversation_history,
-                temperature=0.7,
-                max_tokens=2000
+                model="gpt-3.5-turbo",  # Use GPT-3.5 Turbo model
+                messages=conversation_history,  # Pass conversation context
+                temperature=0.7,  # Set response creativity
+                max_tokens=2000  # Limit response length
             )
             logger.info(f"Received response from OpenAI: {response}")
             
+            # Extract and store assistant's response
             assistant_response = response.choices[0].message.content
             conversation_history.append({"role": "assistant", "content": assistant_response})
             
             return assistant_response
             
         except Exception as api_error:
+            # Handle OpenAI API errors
             logger.error(f"OpenAI API error: {str(api_error)}")
             logger.error(traceback.format_exc())
             return f"I encountered an error while processing your request: {str(api_error)}"
         
     except Exception as e:
+        # Handle general errors
         logger.error(f"Error in get_chat_response: {str(e)}")
         logger.error(traceback.format_exc())
         return f"I apologize, but I encountered an error: {str(e)}. Please try again or contact support if the issue persists."
 
 def update_plant_url(plant_id, new_url):
-    """Update a plant's photo URL in the Google Sheet"""
+    """Update a plant's photo URL in the Google Sheet
+    
+    Args:
+        plant_id (str): ID of the plant to update
+        new_url (str): New photo URL to set
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
     try:
+        # Log start of update process
         logger.info(f"Starting URL update for plant ID: {plant_id}")
         
-        # Get current values
+        # Get current sheet values
         result = sheets_client.values().get(
             spreadsheetId=SPREADSHEET_ID,
             range=RANGE_NAME
@@ -752,19 +835,20 @@ def update_plant_url(plant_id, new_url):
         photo_idx = header.index('Photo URL') if 'Photo URL' in header else 14
         logger.info(f"Photo URL column index: {photo_idx}")
         
-        # Find the plant row by ID (first column)
+        # Find the plant row by ID
         plant_row = None
-        for i, row in enumerate(values[1:], start=1):  # Skip header, use 1-based index
+        for i, row in enumerate(values[1:], start=1):  # Skip header row
             if row and len(row) > 0 and row[0] == plant_id:
                 plant_row = i
                 logger.info(f"Found plant at row {i + 1}")
                 break
         
         if plant_row is None:
+            # Plant not found
             logger.error(f"Plant ID {plant_id} not found in sheet")
             return False
             
-        # Create image formula
+        # Create image formula for Google Sheets
         photo_formula = f'=IMAGE("{new_url}")'
         logger.info(f"Created image formula: {photo_formula}")
         
@@ -772,6 +856,7 @@ def update_plant_url(plant_id, new_url):
         range_name = f'Plants!{chr(65 + photo_idx)}{plant_row + 1}'
         logger.info(f"Updating cell at {range_name}")
         
+        # Execute update request
         result = sheets_client.values().update(
             spreadsheetId=SPREADSHEET_ID,
             range=range_name,
@@ -783,14 +868,23 @@ def update_plant_url(plant_id, new_url):
         return True
         
     except Exception as e:
+        # Handle errors
         logger.error(f"Error updating plant URL: {e}")
         logger.error(traceback.format_exc())
         return False
 
 def remove_plant_from_locations(plant_name: str, locations_to_remove: List[str]) -> str:
-    """Remove a plant from specific locations"""
+    """Remove a plant from specified locations
+    
+    Args:
+        plant_name (str): Name of the plant to update
+        locations_to_remove (List[str]): List of locations to remove
+        
+    Returns:
+        str: Status message describing the result
+    """
     try:
-        # Get current values
+        # Get current sheet values
         result = sheets_client.values().get(
             spreadsheetId=SPREADSHEET_ID,
             range=RANGE_NAME
@@ -798,12 +892,13 @@ def remove_plant_from_locations(plant_name: str, locations_to_remove: List[str])
         values = result.get('values', [])
         header = values[0] if values else []
         
-        # Find indices
+        # Find column indices
         name_idx = header.index('Plant Name') if 'Plant Name' in header else 1
         location_idx = header.index('Location') if 'Location' in header else 3
         
-        # Find the plant
+        # Find the plant row
         plant_row = None
+        current_locations = []
         for i, row in enumerate(values[1:], start=1):
             if row and len(row) > name_idx and row[name_idx].lower() == plant_name.lower():
                 plant_row = i
@@ -816,7 +911,7 @@ def remove_plant_from_locations(plant_name: str, locations_to_remove: List[str])
         # Convert locations to remove to lowercase for case-insensitive comparison
         locations_to_remove = [loc.lower() for loc in locations_to_remove]
         
-        # If '*' is in locations_to_remove, remove all locations
+        # Handle removing all locations
         if '*' in locations_to_remove:
             new_location = ''
             removed = set(current_locations)
@@ -830,9 +925,10 @@ def remove_plant_from_locations(plant_name: str, locations_to_remove: List[str])
             new_location = ', '.join(remaining_locations)
             removed = set(current_locations) - set(remaining_locations)
         
-        # Update the location field with remaining locations (or empty string)
+        # Update the location field
         range_name = f'Plants!{chr(65 + location_idx)}{plant_row + 1}'
         
+        # Execute update request
         sheets_client.values().update(
             spreadsheetId=SPREADSHEET_ID,
             range=range_name,
@@ -840,6 +936,7 @@ def remove_plant_from_locations(plant_name: str, locations_to_remove: List[str])
             body={'values': [[new_location]]}
         ).execute()
         
+        # Return appropriate status message
         if removed:
             if new_location:
                 return f"Removed plant '{plant_name}' from locations: {', '.join(removed)}. Still present in: {new_location}"
@@ -849,6 +946,7 @@ def remove_plant_from_locations(plant_name: str, locations_to_remove: List[str])
             return f"No locations were removed for plant '{plant_name}'"
         
     except Exception as e:
+        # Handle errors
         logger.error(f"Error removing plant from locations: {e}")
         logger.error(traceback.format_exc())
         return f"Error removing plant from locations: {str(e)}"
@@ -1161,12 +1259,20 @@ def update_plant_photo(plant_name, photo_url):
         return False
 
 def update_plant(plant_data):
-    """Update or add a plant in the Google Sheet"""
+    """Update or add a plant in the Google Sheet
+    
+    Args:
+        plant_data (dict): Dictionary containing plant information
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
     try:
+        # Log start of update process
         logger.info("Starting plant update process")
         logger.info(f"Plant data received: {plant_data}")
         
-        # Get current values
+        # Get current sheet values
         result = sheets_client.values().get(
             spreadsheetId=SPREADSHEET_ID,
             range=RANGE_NAME
@@ -1180,11 +1286,12 @@ def update_plant(plant_data):
         logger.info(f"Looking for existing plant: {plant_name}")
         plant_row = None
         
+        # Search for existing plant by name
         for i, row in enumerate(values[1:], start=1):
-            if len(row) > 1 and row[1].lower() == plant_name.lower():  # Check Plant Name column
+            if len(row) > 1 and row[1].lower() == plant_name.lower():
                 plant_row = i
                 logger.info(f"Found existing plant at row {i + 1}")
-                break
+                break  # Exit loop after finding the plant
         
         # Format photo URL as image formula if URL exists
         photo_url = plant_data.get('Photo URL', '')
@@ -1198,7 +1305,7 @@ def update_plant(plant_data):
         est = pytz.timezone('US/Eastern')
         timestamp = datetime.now(est).strftime('%Y-%m-%d %H:%M:%S')
         
-        # Convert plant_data to row format (16 columns including Last Updated)
+        # Convert plant_data to row format
         new_row = [
             str(len(values) if plant_row is None else values[plant_row][0]),  # ID
             plant_data.get('Plant Name', ''),
@@ -1246,36 +1353,47 @@ def update_plant(plant_data):
             return True
             
         except Exception as e:
+            # Handle Sheet API errors
             logger.error(f"Sheet API error: {e}")
             logger.error(traceback.format_exc())
             return False
         
     except Exception as e:
+        # Handle general errors
         logger.error(f"Error updating plant: {e}")
         logger.error(traceback.format_exc())
         return False
 
 def get_weather_forecast() -> List[Dict]:
-    """Get 5-day weather forecast for Houston using OpenWeatherMap API"""
+    """Get 5-day weather forecast for Houston using OpenWeatherMap API
+    
+    Returns:
+        List[Dict]: List of daily forecasts with weather details
+    """
     try:
+        # Get API key from environment
         api_key = os.getenv('OPENWEATHER_API_KEY')
         if not api_key:
             logger.error("OpenWeather API key not found in environment variables")
             return []
 
-        # Houston coordinates
-        lat = 29.7604
-        lon = -95.3698
+        # Set Houston coordinates
+        lat = 29.7604  # Houston latitude
+        lon = -95.3698  # Houston longitude
 
-        # Get 5-day forecast data (3-hour intervals)
+        # Build API request URL
         url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=imperial&appid={api_key}"
         logger.info(f"Requesting weather data from: {url}")
+        
+        # Make API request
         response = requests.get(url)
         
+        # Check response status
         if response.status_code != 200:
             logger.error(f"Weather API error: {response.status_code} - {response.text}")
             return []
 
+        # Parse response data
         data = response.json()
         
         # Process 3-hour forecasts into daily forecasts
@@ -1294,7 +1412,7 @@ def get_weather_forecast() -> List[Dict]:
                     'rain': 0,
                     'wind_speed': [],
                     'descriptions': set(),
-                    'uvi': 0  # UV index not available in standard API
+                    'uvi': 0  # UV index placeholder
                 }
             
             # Update daily values
@@ -1305,25 +1423,26 @@ def get_weather_forecast() -> List[Dict]:
             daily_forecasts[date]['rain'] += float(item.get('rain', {}).get('3h', 0))
             daily_forecasts[date]['descriptions'].add(item['weather'][0]['description'])
 
-        # Convert daily_forecasts to list and format final values
+        # Convert daily_forecasts to list format
         forecast = []
         for date, data in daily_forecasts.items():
+            # Create forecast entry with averaged/formatted values
             forecast.append({
                 'date': date,
                 'temp_max': round(data['temp_max'], 1),
                 'temp_min': round(data['temp_min'], 1),
-                'humidity': round(sum(data['humidity']) / len(data['humidity'])),  # average humidity
+                'humidity': round(sum(data['humidity']) / len(data['humidity'])),
                 'rain': round(data['rain'], 2),
-                'wind_speed': round(sum(data['wind_speed']) / len(data['wind_speed']), 1),  # average wind speed
+                'wind_speed': round(sum(data['wind_speed']) / len(data['wind_speed']), 1),
                 'description': ', '.join(data['descriptions']),
-                'uvi': 0  # UV index not available in standard API
+                'uvi': 0
             })
         
-        # Sort by date
+        # Sort forecast by date
         forecast.sort(key=lambda x: x['date'])
         logger.info(f"Successfully retrieved forecast for {len(forecast)} days")
         
-        # Log the first day's forecast as a sample
+        # Log sample forecast data
         if forecast:
             logger.info(f"Sample forecast for {forecast[0]['date']}: "
                        f"High: {forecast[0]['temp_max']}°F, "
@@ -1334,67 +1453,79 @@ def get_weather_forecast() -> List[Dict]:
         return forecast
         
     except Exception as e:
+        # Handle errors
         logger.error(f"Error getting weather forecast: {e}")
         logger.error(traceback.format_exc())
         return []
 
 def analyze_forecast_for_plants(forecast: List[Dict]) -> str:
-    """Analyze weather forecast and provide plant care advice"""
+    """Analyze weather forecast and generate plant care advice
+    
+    Args:
+        forecast (List[Dict]): List of daily weather forecasts
+        
+    Returns:
+        str: Formatted plant care advice based on weather conditions
+    """
     try:
+        # Validate forecast data
         if not forecast:
             return "Unable to get weather forecast. Please check plants according to regular care schedule."
 
+        # Get plant data for context
         plants = get_all_plants()
-        advice = []
+        advice = []  # Initialize advice list
         
-        # Get the weather conditions for each day
-        frost_days = []
-        hot_days = []
-        dry_days = []
-        rainy_days = []
-        humid_days = []
-        high_uv_days = []
-        windy_days = []
+        # Initialize condition tracking lists
+        frost_days = []  # Days with freezing temperatures
+        hot_days = []    # Days with high temperatures
+        dry_days = []    # Days with low humidity
+        rainy_days = []  # Days with significant rain
+        humid_days = []  # Days with high humidity
+        high_uv_days = [] # Days with high UV index
+        windy_days = []  # Days with strong winds
         
+        # Analyze each day's forecast
         for day in forecast:
             date = day['date']
-            conditions = []
+            conditions = []  # Track conditions for this day
             
             # Check temperature conditions
-            if day['temp_min'] <= 32:
+            if day['temp_min'] <= 32:  # Freezing temperature
                 frost_days.append(date)
                 conditions.append('frost')
-            if day['temp_max'] >= 90:
+            if day['temp_max'] >= 90:  # Hot temperature
                 hot_days.append(date)
                 conditions.append('heat')
             
             # Check moisture conditions
-            if day['rain'] > 0.1:  # More than 0.1 inches of rain
+            if day['rain'] > 0.1:  # Significant rain
                 rainy_days.append(date)
                 conditions.append('rain')
-            elif day['humidity'] < 50:
+            elif day['humidity'] < 50:  # Low humidity
                 dry_days.append(date)
                 conditions.append('dry')
             
-            # Check humidity
-            if day['humidity'] > 80:
+            # Check humidity levels
+            if day['humidity'] > 80:  # High humidity
                 humid_days.append(date)
                 conditions.append('humid')
             
             # Check UV index
-            if day['uvi'] > 8:
+            if day['uvi'] > 8:  # High UV
                 high_uv_days.append(date)
                 conditions.append('high UV')
             
             # Check wind conditions
-            if day['wind_speed'] > 15:
+            if day['wind_speed'] > 15:  # Strong winds
                 windy_days.append(date)
                 conditions.append('windy')
             
+            # Log conditions for this day
             if conditions:
                 logger.info(f"Date: {date} - Conditions: {', '.join(conditions)}")
 
-        # Generate advice based on conditions
+        # Generate frost advice if needed
         if frost_days:
             advice.append("\n🌡️ Frost Alert:")
             frost_sensitive = [p['name'] for p in plants if p.get('frost_tolerance', '').lower().strip() in ['low', 'poor', 'sensitive']]
@@ -1404,6 +1535,7 @@ def analyze_forecast_for_plants(forecast: List[Dict]) -> str:
                 advice.append("- Consider using frost cloth or moving potted plants indoors")
                 advice.append("- Water plants before freezing temperatures to help protect roots")
 
+        # Generate heat advice if needed
         if hot_days:
             advice.append("\n☀️ Heat Alert:")
             advice.append(f"- High temperatures expected on {', '.join(hot_days)}")
@@ -1415,6 +1547,7 @@ def analyze_forecast_for_plants(forecast: List[Dict]) -> str:
             advice.append("- Consider using shade cloth during peak heat")
             advice.append("- Monitor for signs of heat stress (wilting, leaf scorch)")
 
+        # Generate UV advice if needed
         if high_uv_days:
             advice.append("\n☀️ High UV Alert:")
             advice.append(f"- Strong sun exposure on {', '.join(high_uv_days)}")
@@ -1423,6 +1556,7 @@ def analyze_forecast_for_plants(forecast: List[Dict]) -> str:
             advice.append("  • Water in early morning to prepare plants")
             advice.append("  • Monitor leaf burn on exposed plants")
 
+        # Generate drought advice if needed
         if len(dry_days) >= 2:
             advice.append("\n💧 Drought Alert:")
             high_water_needs = [p['name'] for p in plants if 'high' in p.get('watering_needs', '').lower()]
@@ -1434,6 +1568,7 @@ def analyze_forecast_for_plants(forecast: List[Dict]) -> str:
             advice.append("  • Apply or refresh mulch to retain moisture")
             advice.append("  • Check soil moisture before watering")
 
+        # Generate rain advice if needed
         if rainy_days:
             advice.append("\n🌧️ Rain Alert:")
             advice.append(f"- Rain expected on {', '.join(rainy_days)}")
@@ -1444,6 +1579,7 @@ def analyze_forecast_for_plants(forecast: List[Dict]) -> str:
             if humid_days:
                 advice.append("  • Monitor plants for fungal issues due to high humidity")
 
+        # Generate wind advice if needed
         if windy_days:
             advice.append("\n💨 Wind Alert:")
             advice.append(f"- High winds expected on {', '.join(windy_days)}")
@@ -1454,28 +1590,28 @@ def analyze_forecast_for_plants(forecast: List[Dict]) -> str:
 
         # Add seasonal advice based on current month
         current_month = datetime.now().month
-        if current_month in [3, 4, 5]:  # Spring
+        if current_month in [3, 4, 5]:  # Spring months
             advice.append("\n🌱 Spring Care Tips:")
             advice.append("- Begin fertilizing as new growth appears")
             advice.append("- Start pruning winter damage")
             advice.append("- Watch for early pest issues")
-        elif current_month in [6, 7, 8]:  # Summer
+        elif current_month in [6, 7, 8]:  # Summer months
             advice.append("\n☀️ Summer Care Tips:")
             advice.append("- Maintain regular watering schedule")
             advice.append("- Monitor for heat stress")
             advice.append("- Continue pest monitoring")
-        elif current_month in [9, 10, 11]:  # Fall
+        elif current_month in [9, 10, 11]:  # Fall months
             advice.append("\n🍂 Fall Care Tips:")
             advice.append("- Reduce watering frequency")
             advice.append("- Begin preparing for winter")
             advice.append("- Consider winter protection needs")
-        else:  # Winter
+        else:  # Winter months
             advice.append("\n❄️ Winter Care Tips:")
             advice.append("- Reduce watering frequency")
             advice.append("- Protect sensitive plants from frost")
             advice.append("- Monitor for winter damage")
 
-        # Add general advice
+        # Add general daily care advice
         advice.append("\n📋 Daily Monitoring:")
         advice.append("- Check soil moisture levels")
         advice.append("- Look for signs of pest issues")
@@ -1484,17 +1620,22 @@ def analyze_forecast_for_plants(forecast: List[Dict]) -> str:
         
         return "\n".join(advice)
     except Exception as e:
+        # Handle errors
         logger.error(f"Error analyzing forecast: {e}")
         logger.error(traceback.format_exc())
         return "Error generating plant care advice. Please check plants according to regular care schedule."
 
 def display_weather_advice():
-    """Get weather forecast and display plant care advice"""
+    """Display weather forecast and plant care advice to the user"""
     try:
+        # Log start of advice generation
         logger.info("Getting weather forecast and generating plant care advice...")
+        
+        # Get weather data and generate advice
         forecast = get_weather_forecast()
         advice = analyze_forecast_for_plants(forecast)
         
+        # Display formatted advice
         print("\n=== 🌿 10-Day Plant Care Forecast 🌿 ===")
         print(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print("\nBased on the weather forecast for Houston, here are your plant care recommendations:")
@@ -1502,29 +1643,39 @@ def display_weather_advice():
         print("\n=====================================")
         
     except Exception as e:
+        # Handle errors
         logger.error(f"Error displaying weather advice: {e}")
         print("\nUnable to generate weather-based plant care advice.")
         print("Please follow regular plant care schedule.")
 
 def handle_weather_query(message: str) -> str:
-    """Handle weather-related queries and return formatted response"""
+    """Handle weather-related queries and return formatted response
+    
+    Args:
+        message (str): User's weather-related query
+        
+    Returns:
+        str: Formatted response with weather forecast and plant care advice
+    """
     try:
+        # Get weather forecast
         logger.info("Getting weather forecast...")
         forecast = get_weather_forecast()
         if not forecast:
             return "I'm sorry, I couldn't retrieve the weather forecast at this time."
 
-        # Determine which days to include based on the query
-        days_to_show = 1  # default to tomorrow
+        # Determine forecast period based on query
+        days_to_show = 1  # Default to tomorrow
         if 'week' in message.lower():
-            days_to_show = 5
+            days_to_show = 5  # Show full week
         elif 'today' in message.lower():
-            days_to_show = 1
+            days_to_show = 1  # Show today only
         elif 'tomorrow' in message.lower():
-            days_to_show = 2
+            days_to_show = 2  # Show today and tomorrow
         else:
-            days_to_show = 3  # default to next few days
+            days_to_show = 3  # Default to next few days
 
+        # Get plant care advice
         advice = analyze_forecast_for_plants(forecast)
         
         # Format the response
@@ -1532,7 +1683,8 @@ def handle_weather_query(message: str) -> str:
         
         # Add forecast summary
         response += "Weather Forecast:\n"
-        for day in forecast[:days_to_show]:  # Show requested days
+        for day in forecast[:days_to_show]:
+            # Format each day's forecast
             response += f"\n📅 {day['date']}:\n"
             response += f"• Temperature: {day['temp_min']}°F to {day['temp_max']}°F\n"
             response += f"• Conditions: {day['description']}\n"
@@ -1540,10 +1692,10 @@ def handle_weather_query(message: str) -> str:
             response += f"• Humidity: {day['humidity']}%\n"
             response += f"• Wind: {day['wind_speed']} mph\n"
         
-        # Add plant care advice
+        # Add plant care advice section
         response += "\n🌱 Plant Care Recommendations:\n"
         
-        # Get all plants for context
+        # Get current plants for context
         plants = get_all_plants()
         plant_names = [p['name'] for p in plants]
         
@@ -1551,13 +1703,15 @@ def handle_weather_query(message: str) -> str:
         if plant_names:
             response += f"\nBased on your {len(plant_names)} plants in the garden, here are specific recommendations:\n"
         
+        # Add the generated advice
         response += advice
         
         return response
     except Exception as e:
+        # Handle errors
         logger.error(f"Error handling weather query: {e}")
         logger.error(traceback.format_exc())
         return "I'm sorry, I encountered an error while processing the weather information."
 
-# Display weather-based plant care advice
-# display_weather_advice()  # Removing this line so it only runs when called from CLI
+# Remove the automatic weather advice display
+# display_weather_advice()  # Only run when called from CLI
