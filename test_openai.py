@@ -810,7 +810,7 @@ def get_chat_response(message):
                     description = plant.get('Description', '').strip()
                     location = plant.get('Location', '').strip()
                     
-                    # Extract and format URL
+                    # Extract URL from IMAGE formula
                     url = ''
                     if photo_url:
                         if '=IMAGE("' in photo_url:
@@ -820,29 +820,23 @@ def get_chat_response(message):
                                 url_end = photo_url.find('")', url_start)
                                 if url_start > 7 and url_end > url_start:
                                     url = photo_url[url_start:url_end]
+                                    
+                                    # Modify Google Photos URL for public access
+                                    if 'googleusercontent.com' in url:
+                                        # Remove any existing parameters
+                                        base_url = url.split('?')[0]
+                                        # Add required parameters for public access
+                                        url = f"{base_url}?authuser=0"
+                                        
                             except Exception as e:
                                 logger.error(f"Error extracting URL from IMAGE formula: {e}")
                         else:
                             url = photo_url.strip('="')  # Remove any remaining formula characters
-                        
-                        # Format Google Photos URL for public access
-                        if url and 'photos.google.com' in url:
-                            # Convert to direct sharing URL
-                            if '/share/' not in url:
-                                # Try to convert to sharing URL format
-                                parts = url.split('/')
-                                if len(parts) > 4:
-                                    album_id = parts[-2]
-                                    photo_id = parts[-1]
-                                    url = f"https://photos.google.com/share/{album_id}/photo/{photo_id}"
-                            
-                            # Add sharing parameters
-                            if '?' not in url:
-                                url += '?'
-                            if 'share=' not in url:
-                                url += '&share=true'
-                            if 'key=' not in url:
-                                url += '&key=public'
+                            if 'googleusercontent.com' in url:
+                                # Remove any existing parameters
+                                base_url = url.split('?')[0]
+                                # Add required parameters for public access
+                                url = f"{base_url}?authuser=0"
                     
                     # Log URL processing
                     logger.info(f"Plant: {plant.get('Plant Name')}")
