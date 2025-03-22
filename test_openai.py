@@ -745,80 +745,81 @@ def get_chat_response(message):
             if isinstance(plants_data, str):  # Error message
                 return plants_data
                 
-            # Filter plants with photos
-            plants_with_photos = []
-            for plant in plants_data:
-                photo_url = plant.get('Photo URL', '').strip()
-                if photo_url:
-                    # Extract actual URL from IMAGE formula or use direct URL
-                    if '=IMAGE' in photo_url:
-                        url = photo_url.split('"')[1] if '"' in photo_url else ''
-                    else:
-                        url = photo_url
-                    if url:
-                        plants_with_photos.append({
-                            'name': plant.get('Plant Name', ''),
-                            'location': plant.get('Location', ''),
-                            'url': url
-                        })
-            
-            # If looking for specific plant(s)
-            search_terms = []
-            msg_lower = message.lower()
-            
             # Extract search terms based on different query patterns
+            msg_lower = message.lower()
+            search_terms = []
+            
             if 'look like' in msg_lower:
-                search_terms = msg_lower.split('look like')[0].strip().split()
+                search_text = msg_lower.split('look like')[0].strip()
             elif 'show me' in msg_lower:
-                search_terms = msg_lower.split('show me')[1].strip().split()
+                search_text = msg_lower.split('show me')[1].strip()
             elif 'picture of' in msg_lower or 'photo of' in msg_lower:
                 for phrase in ['picture of', 'photo of']:
                     if phrase in msg_lower:
-                        search_terms = msg_lower.split(phrase)[1].strip().split()
+                        search_text = msg_lower.split(phrase)[1].strip()
                         break
-            
-            # Clean up search terms
-            if search_terms:
-                # Remove common words that shouldn't be part of the search
-                stop_words = ['what', 'does', 'a', 'the', 'an', 'pictures', 'picture', 'photos', 'photo', 'images', 'image']
-                search_terms = [term for term in search_terms if term not in stop_words]
-                
-                if search_terms:
-                    # Find matching plants
-                    matching_plants = []
-                    for plant in plants_with_photos:
-                        plant_name_lower = plant['name'].lower()
-                        # Check if any search term is in the plant name
-                        if any(term in plant_name_lower for term in search_terms):
-                            matching_plants.append(plant)
-                    
-                    if matching_plants:
-                        response = "Here are the matching plants I found:\n\n"
-                        for plant in matching_plants:
-                            response += f"**{plant['name']}**\n"
-                            response += f"Located in: {plant['location']}\n"
-                            response += f"![{plant['name']}]({plant['url']})\n\n"
-                        return response
-                    else:
-                        # If no matches found, check if the plant exists without a photo
-                        all_plants = get_all_plants()
-                        existing_plants = [p['name'] for p in all_plants 
-                                        if any(term in p['name'].lower() for term in search_terms)]
-                        if existing_plants:
-                            return f"I found {', '.join(existing_plants)} in the garden, but there are no photos available for them yet."
-                        return f"I couldn't find any plants matching '{' '.join(search_terms)}' in the garden database."
-            
-            # General request for plant pictures
-            if plants_with_photos:
-                response = "Here are the plants in the garden with photos:\n\n"
-                for plant in plants_with_photos:
-                    response += f"**{plant['name']}**\n"
-                    response += f"Located in: {plant['location']}\n"
-                    response += f"![{plant['name']}]({plant['url']})\n\n"
-                return response
             else:
-                return "There are currently no plants with photos in the garden database."
-        
+                search_text = msg_lower
+                
+            # Clean up search text and create search terms
+            stop_words = ['what', 'does', 'do', 'a', 'the', 'an', 'pictures', 'picture', 'photos', 'photo', 'images', 'image', 'trees', 'tree']
+            search_terms = [term for term in search_text.split() if term not in stop_words]
+            
+            # Find matching plants
+            matching_plants = []
+            for plant in plants_data:
+                plant_name = plant.get('Plant Name', '').lower()
+                # Check if any search term is in the plant name
+                if any(term in plant_name for term in search_terms):
+                    photo_url = plant.get('Photo URL', '').strip()
+                    # Extract URL from IMAGE formula or use direct URL
+                    if photo_url:
+                        if '=IMAGE' in photo_url:
+                            url = photo_url.split('"')[1] if '"' in photo_url else ''
+                        else:
+                            url = photo_url
+                        if url:
+                            matching_plants.append({
+                                'name': plant.get('Plant Name', ''),
+                                'location': plant.get('Location', ''),
+                                'url': url,
+                                'has_photo': True
+                            })
+                        else:
+                            matching_plants.append({
+                                'name': plant.get('Plant Name', ''),
+                                'location': plant.get('Location', ''),
+                                'has_photo': False
+                            })
+            
+            if matching_plants:
+                # Separate plants with and without photos
+                plants_with_photos = [p for p in matching_plants if p.get('has_photo')]
+                plants_without_photos = [p for p in matching_plants if not p.get('has_photo')]
+                
+                response = []
+                
+                # Show plants with photos
+                if plants_with_photos:
+                    response.append("Here are the matching plants with photos:\n")
+                    for plant in plants_with_photos:
+                        response.append(f"**{plant['name']}**")
+                        response.append(f"Located in: {plant['location']}")
+                        response.append(f"![{plant['name']}]({plant['url']})\n")
+                
+                # Mention plants without photos
+                if plants_without_photos:
+                    if plants_with_photos:
+                        response.append("\nAdditionally, I found these matching plants without photos:")
+                    else:
+                        response.append("I found these matching plants, but they don't have photos yet:")
+                    for plant in plants_without_photos:
+                        response.append(f"- **{plant['name']}** (Located in: {plant['location']})")
+                
+                return "\n".join(response)
+            else:
+                return f"I couldn't find any plants matching '{' '.join(search_terms)}' in the garden database."
+                
         # If not an image query, proceed with existing chat functionality
         if not client:
             logger.error("OpenAI client is not initialized")
