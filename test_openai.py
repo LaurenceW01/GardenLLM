@@ -810,7 +810,7 @@ def get_chat_response(message):
                     description = plant.get('Description', '').strip()
                     location = plant.get('Location', '').strip()
                     
-                    # Extract URL from IMAGE formula or use direct URL
+                    # Extract and format URL
                     url = ''
                     if photo_url:
                         if '=IMAGE("' in photo_url:
@@ -824,11 +824,30 @@ def get_chat_response(message):
                                 logger.error(f"Error extracting URL from IMAGE formula: {e}")
                         else:
                             url = photo_url.strip('="')  # Remove any remaining formula characters
+                        
+                        # Format Google Photos URL for public access
+                        if url and 'photos.google.com' in url:
+                            # Convert to direct sharing URL
+                            if '/share/' not in url:
+                                # Try to convert to sharing URL format
+                                parts = url.split('/')
+                                if len(parts) > 4:
+                                    album_id = parts[-2]
+                                    photo_id = parts[-1]
+                                    url = f"https://photos.google.com/share/{album_id}/photo/{photo_id}"
+                            
+                            # Add sharing parameters
+                            if '?' not in url:
+                                url += '?'
+                            if 'share=' not in url:
+                                url += '&share=true'
+                            if 'key=' not in url:
+                                url += '&key=public'
                     
-                    # Log the URL extraction for debugging
+                    # Log URL processing
                     logger.info(f"Plant: {plant.get('Plant Name')}")
                     logger.info(f"Original Photo URL: {photo_url}")
-                    logger.info(f"Extracted URL: {url}")
+                    logger.info(f"Processed URL: {url}")
                     
                     matching_plants.append({
                         'name': plant.get('Plant Name', ''),
