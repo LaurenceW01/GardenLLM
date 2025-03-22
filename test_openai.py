@@ -731,14 +731,7 @@ def find_plant_id_by_name(plant_name):
         return None  # Return None on error
 
 def get_chat_response(message):
-    """Get a chat response from OpenAI's API
-    
-    Args:
-        message (str): The user's message to process
-        
-    Returns:
-        str: The AI's response or error message
-    """
+    """Get a chat response from OpenAI's API"""
     global conversation_history, client
     
     try:
@@ -756,9 +749,12 @@ def get_chat_response(message):
             plants_with_photos = []
             for plant in plants_data:
                 photo_url = plant.get('Photo URL', '').strip()
-                if photo_url and '=IMAGE' in photo_url:
-                    # Extract actual URL from IMAGE formula
-                    url = photo_url.split('"')[1] if '"' in photo_url else ''
+                if photo_url:
+                    # Extract actual URL from IMAGE formula or use direct URL
+                    if '=IMAGE' in photo_url:
+                        url = photo_url.split('"')[1] if '"' in photo_url else ''
+                    else:
+                        url = photo_url
                     if url:
                         plants_with_photos.append({
                             'name': plant.get('Plant Name', ''),
@@ -766,24 +762,51 @@ def get_chat_response(message):
                             'url': url
                         })
             
-            # If looking for specific plant
-            if 'look like' in message.lower():
-                search_terms = message.lower().split('look like')[0].strip().split()
+            # If looking for specific plant(s)
+            search_terms = []
+            msg_lower = message.lower()
+            
+            # Extract search terms based on different query patterns
+            if 'look like' in msg_lower:
+                search_terms = msg_lower.split('look like')[0].strip().split()
+            elif 'show me' in msg_lower:
+                search_terms = msg_lower.split('show me')[1].strip().split()
+            elif 'picture of' in msg_lower or 'photo of' in msg_lower:
+                for phrase in ['picture of', 'photo of']:
+                    if phrase in msg_lower:
+                        search_terms = msg_lower.split(phrase)[1].strip().split()
+                        break
+            
+            # Clean up search terms
+            if search_terms:
+                # Remove common words that shouldn't be part of the search
+                stop_words = ['what', 'does', 'a', 'the', 'an', 'pictures', 'picture', 'photos', 'photo', 'images', 'image']
+                search_terms = [term for term in search_terms if term not in stop_words]
+                
                 if search_terms:
-                    # Remove question words
-                    search_terms = [term for term in search_terms if term not in ['what', 'does', 'a', 'the', 'an']]
-                    if search_terms:
-                        matching_plants = [p for p in plants_with_photos 
+                    # Find matching plants
+                    matching_plants = []
+                    for plant in plants_with_photos:
+                        plant_name_lower = plant['name'].lower()
+                        # Check if any search term is in the plant name
+                        if any(term in plant_name_lower for term in search_terms):
+                            matching_plants.append(plant)
+                    
+                    if matching_plants:
+                        response = "Here are the matching plants I found:\n\n"
+                        for plant in matching_plants:
+                            response += f"**{plant['name']}**\n"
+                            response += f"Located in: {plant['location']}\n"
+                            response += f"![{plant['name']}]({plant['url']})\n\n"
+                        return response
+                    else:
+                        # If no matches found, check if the plant exists without a photo
+                        all_plants = get_all_plants()
+                        existing_plants = [p['name'] for p in all_plants 
                                         if any(term in p['name'].lower() for term in search_terms)]
-                        if matching_plants:
-                            response = "Here are the matching plants I found:\n\n"
-                            for plant in matching_plants:
-                                response += f"**{plant['name']}**\n"
-                                response += f"Located in: {plant['location']}\n"
-                                response += f"![{plant['name']}]({plant['url']})\n\n"
-                            return response
-                        else:
-                            return f"I couldn't find any pictures of plants matching '{' '.join(search_terms)}' in the garden database."
+                        if existing_plants:
+                            return f"I found {', '.join(existing_plants)} in the garden, but there are no photos available for them yet."
+                        return f"I couldn't find any plants matching '{' '.join(search_terms)}' in the garden database."
             
             # General request for plant pictures
             if plants_with_photos:
