@@ -769,13 +769,16 @@ def get_chat_response(message):
             if not search_terms:
                 search_terms = [word for word in msg_lower.split() if word not in stop_words]
             
-            # Find matching plants
+            # Find matching plants - using stricter matching criteria
             matching_plants = []
+            search_term = ' '.join(search_terms).lower()  # Combine search terms
+            
             for plant in plants_data:
                 plant_name = plant.get('Plant Name', '').lower()
                 
-                # Check if any search term is in the plant name
-                if any(term in plant_name for term in search_terms):
+                # Only match if search term is a complete word in the plant name
+                plant_words = plant_name.split()
+                if any(search_term in word for word in plant_words):
                     photo_url = plant.get('Photo URL', '').strip()
                     # Extract URL from IMAGE formula or use direct URL
                     if photo_url:
