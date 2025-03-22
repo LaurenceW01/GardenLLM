@@ -8,266 +8,277 @@
 <script>
     // Configure marked options
     marked.setOptions({
-        breaks: true,  // Enable line breaks
-        gfm: true,     // Enable GitHub Flavored Markdown
-        sanitize: true // Sanitize HTML input
+        breaks: true,
+        gfm: true,
+        sanitize: true
+    });
+</script>
+
+<!-- Initialize Alpine.js data -->
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('chatInterface', () => ({
+            message: '',
+            response: '',
+            loading: false,
+            imageFile: null,
+            imagePreview: null,
+            conversationId: null,
+            useDatabase: true,
+            hasMessages: false,
+            messages: [],
+            
+            init() {
+                this.updateMessageStatus();
+            },
+            
+            clearImage() {
+                this.imageFile = null;
+                this.imagePreview = null;
+                document.getElementById('image-input').value = '';
+            },
+            
+            toggleMode() {
+                this.useDatabase = !this.useDatabase;
+                if (this.useDatabase) {
+                    this.clearImage();
+                    if (this.conversationId && !this.conversationId.startsWith('db_')) {
+                        this.conversationId = null;
+                    }
+                } else {
+                    if (this.conversationId && this.conversationId.startsWith('db_')) {
+                        this.conversationId = null;
+                    }
+                }
+            },
+            
+            handleImageSelect(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    this.imageFile = file;
+                    const reader = new FileReader();
+                    reader.onload = e => this.imagePreview = e.target.result;
+                    reader.readAsDataURL(file);
+                    this.useDatabase = false;
+                }
+            },
+            
+            async submitMessage() {
+                if (!this.message.trim() && !this.imageFile) return;
+                
+                this.loading = true;
+                const chatHistory = document.querySelector('#chat-history .space-y-4');
+                
+                // Add loading indicator
+                const loadingDiv = document.createElement('div');
+                loadingDiv.className = 'flex justify-start';
+                loadingDiv.innerHTML = `
+                    <div class='bg-gray-100 rounded-lg p-3 max-w-3/4 flex items-center space-x-2'>
+                        <div class='typing-indicator'>
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </div>
+                `;
+                chatHistory.appendChild(loadingDiv);
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+                
+                try {
+                    let response;
+                    
+                    if (this.imageFile) {
+                        const userDiv = document.createElement('div');
+                        userDiv.className = 'flex justify-end';
+                        userDiv.innerHTML = `
+                            <div class='bg-green-600 text-white rounded-lg p-3 max-w-3/4'>
+                                <img src='${this.imagePreview}' class='max-w-full h-auto rounded mb-2'>
+                                ${this.message ? `<p>${this.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>` : ''}
+                            </div>
+                        `;
+                        chatHistory.appendChild(userDiv);
+                        
+                        const formData = new FormData();
+                        formData.append('file', this.imageFile);
+                        if (this.message.trim()) {
+                            formData.append('message', this.message);
+                        }
+                        if (this.conversationId) {
+                            formData.append('conversation_id', this.conversationId);
+                        }
+                        
+                        response = await fetch('/analyze-plant', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.conversation_id) {
+                            this.conversationId = data.conversation_id;
+                        }
+                        
+                        loadingDiv.remove();
+                        
+                        const botDiv = document.createElement('div');
+                        botDiv.className = 'flex justify-start';
+                        const markdownContent = marked.parse(data.response);
+                        botDiv.innerHTML = `
+                            <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
+                                ${markdownContent}
+                            </div>
+                        `;
+                        chatHistory.appendChild(botDiv);
+                        
+                        setTimeout(() => {
+                            botDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 100);
+                        
+                        this.clearImage();
+                        
+                    } else {
+                        const userDiv = document.createElement('div');
+                        userDiv.className = 'flex justify-end';
+                        userDiv.innerHTML = `
+                            <div class='bg-green-600 text-white rounded-lg p-3 max-w-3/4'>
+                                ${this.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                            </div>
+                        `;
+                        chatHistory.appendChild(userDiv);
+                        
+                        response = await fetch('/chat', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ 
+                                message: this.message,
+                                conversation_id: this.conversationId,
+                                use_database: this.useDatabase
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        loadingDiv.remove();
+                        
+                        const botDiv = document.createElement('div');
+                        botDiv.className = 'flex justify-start';
+                        const markdownContent = marked.parse(data.response);
+                        botDiv.innerHTML = `
+                            <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
+                                ${markdownContent}
+                            </div>
+                        `;
+                        chatHistory.appendChild(botDiv);
+                    }
+                    
+                    this.message = '';
+                    this.updateMessageStatus();
+                    
+                    setTimeout(() => {
+                        chatHistory.scrollTop = chatHistory.scrollHeight;
+                    }, 100);
+                    
+                } catch (error) {
+                    loadingDiv.remove();
+                    
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'flex justify-start';
+                    errorDiv.innerHTML = `
+                        <div class='bg-red-100 text-red-700 rounded-lg p-3 max-w-3/4'>
+                            Sorry, there was an error processing your request.
+                        </div>
+                    `;
+                    chatHistory.appendChild(errorDiv);
+                }
+                
+                this.loading = false;
+            },
+
+            saveConversation() {
+                const chatHistory = document.querySelector('#chat-history .space-y-4');
+                const messages = [];
+                
+                chatHistory.querySelectorAll('.flex').forEach(messageDiv => {
+                    const isUser = messageDiv.classList.contains('justify-end');
+                    const content = messageDiv.querySelector('div > div').cloneNode(true);
+                    
+                    const image = content.querySelector('img');
+                    let messageText = '';
+                    let imageData = '';
+                    
+                    if (image) {
+                        imageData = image.src;
+                        messageText = '[Image included below]\n';
+                    }
+                    
+                    if (content.classList.contains('prose')) {
+                        messageText += content.innerHTML
+                            .replace(/<div>/g, '\n')
+                            .replace(/<\/div>/g, '')
+                            .replace(/<p>/g, '')
+                            .replace(/<\/p>/g, '\n')
+                            .replace(/<br>/g, '\n')
+                            .replace(/<[^>]*>/g, '');
+                    } else {
+                        messageText += content.textContent;
+                    }
+                    
+                    messages.push({
+                        role: isUser ? 'User' : 'Assistant',
+                        content: messageText.trim(),
+                        image: imageData,
+                        timestamp: new Date().toLocaleString()
+                    });
+                });
+                
+                let conversationText = `GardenLLM Conversation\n`;
+                conversationText += `======================\n\n`;
+                conversationText += `Date: ${new Date().toLocaleString()}\n`;
+                conversationText += `Mode: ${this.useDatabase ? 'Garden Database' : 'Image Analysis'}\n`;
+                conversationText += `Conversation ID: ${this.conversationId || 'Not assigned'}\n\n`;
+                conversationText += `Chat History\n`;
+                conversationText += `------------\n\n`;
+                
+                messages.forEach(msg => {
+                    conversationText += `[${msg.role} - ${msg.timestamp}]\n`;
+                    conversationText += `${msg.content}\n`;
+                    
+                    if (msg.image) {
+                        conversationText += `\n--- Image Data ---\n`;
+                        conversationText += `${msg.image}\n`;
+                        conversationText += `--- End Image Data ---\n`;
+                    }
+                    
+                    conversationText += `\n`;
+                });
+                
+                conversationText += `\nNote: Image data is preserved in base64 format and can be viewed by copying the data between "Image Data" markers into a web browser's address bar.\n`;
+                
+                const blob = new Blob([conversationText], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `conversation_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.txt`;
+                
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            },
+
+            updateMessageStatus() {
+                const chatHistory = document.querySelector('#chat-history .space-y-4');
+                this.hasMessages = chatHistory.children.length > 0;
+            }
+        }));
     });
 </script>
 
 <div 
     class="max-w-4xl mx-auto" 
-    x-data="{ 
-        message: '',
-        response: '',
-        loading: false,
-        imageFile: null,
-        imagePreview: null,
-        conversationId: null,
-        useDatabase: true,  // Default to database mode
-        hasMessages: false,
-        messages: [],
-        
-        clearImage() {
-            this.imageFile = null;
-            this.imagePreview = null;
-            document.getElementById('image-input').value = '';
-        },
-        
-        toggleMode() {
-            this.useDatabase = !this.useDatabase;
-            if (this.useDatabase) {
-                this.clearImage();
-                if (this.conversationId && !this.conversationId.startsWith('db_')) {
-                    this.conversationId = null;
-                }
-            } else {
-                if (this.conversationId && this.conversationId.startsWith('db_')) {
-                    this.conversationId = null;
-                }
-            }
-        },
-        
-        handleImageSelect(event) {
-            const file = event.target.files[0];
-            if (file) {
-                this.imageFile = file;
-                const reader = new FileReader();
-                reader.onload = e => this.imagePreview = e.target.result;
-                reader.readAsDataURL(file);
-                this.useDatabase = false;
-            }
-        },
-        
-        async submitMessage() {
-            if (!this.message.trim() && !this.imageFile) return;
-            
-            this.loading = true;
-            const chatHistory = document.querySelector('#chat-history .space-y-4');
-            
-            // Add loading indicator
-            const loadingDiv = document.createElement('div');
-            loadingDiv.className = 'flex justify-start';
-            loadingDiv.innerHTML = `
-                <div class='bg-gray-100 rounded-lg p-3 max-w-3/4 flex items-center space-x-2'>
-                    <div class='typing-indicator'>
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                    </div>
-                </div>
-            `;
-            chatHistory.appendChild(loadingDiv);
-            chatHistory.scrollTop = chatHistory.scrollHeight;
-            
-            try {
-                let response;
-                
-                if (this.imageFile) {
-                    const userDiv = document.createElement('div');
-                    userDiv.className = 'flex justify-end';
-                    userDiv.innerHTML = `
-                        <div class='bg-green-600 text-white rounded-lg p-3 max-w-3/4'>
-                            <img src='${this.imagePreview}' class='max-w-full h-auto rounded mb-2'>
-                            ${this.message ? `<p>${this.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>` : ''}
-                        </div>
-                    `;
-                    chatHistory.appendChild(userDiv);
-                    
-                    const formData = new FormData();
-                    formData.append('file', this.imageFile);
-                    if (this.message.trim()) {
-                        formData.append('message', this.message);
-                    }
-                    if (this.conversationId) {
-                        formData.append('conversation_id', this.conversationId);
-                    }
-                    
-                    response = await fetch('/analyze-plant', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    
-                    const data = await response.json();
-                    
-                    if (data.conversation_id) {
-                        this.conversationId = data.conversation_id;
-                    }
-                    
-                    loadingDiv.remove();
-                    
-                    const botDiv = document.createElement('div');
-                    botDiv.className = 'flex justify-start';
-                    const markdownContent = marked.parse(data.response);
-                    botDiv.innerHTML = `
-                        <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
-                            ${markdownContent}
-                        </div>
-                    `;
-                    chatHistory.appendChild(botDiv);
-                    
-                    setTimeout(() => {
-                        botDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }, 100);
-                    
-                    this.clearImage();
-                    
-                } else {
-                    const userDiv = document.createElement('div');
-                    userDiv.className = 'flex justify-end';
-                    userDiv.innerHTML = `
-                        <div class='bg-green-600 text-white rounded-lg p-3 max-w-3/4'>
-                            ${this.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
-                        </div>
-                    `;
-                    chatHistory.appendChild(userDiv);
-                    
-                    response = await fetch('/chat', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ 
-                            message: this.message,
-                            conversation_id: this.conversationId,
-                            use_database: this.useDatabase
-                        })
-                    });
-                    
-                    const data = await response.json();
-                    
-                    loadingDiv.remove();
-                    
-                    const botDiv = document.createElement('div');
-                    botDiv.className = 'flex justify-start';
-                    const markdownContent = marked.parse(data.response);
-                    botDiv.innerHTML = `
-                        <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
-                            ${markdownContent}
-                        </div>
-                    `;
-                    chatHistory.appendChild(botDiv);
-                }
-                
-                this.message = '';
-                this.updateMessageStatus();
-                
-                setTimeout(() => {
-                    chatHistory.scrollTop = chatHistory.scrollHeight;
-                }, 100);
-                
-            } catch (error) {
-                loadingDiv.remove();
-                
-                const errorDiv = document.createElement('div');
-                errorDiv.className = 'flex justify-start';
-                errorDiv.innerHTML = `
-                    <div class='bg-red-100 text-red-700 rounded-lg p-3 max-w-3/4'>
-                        Sorry, there was an error processing your request.
-                    </div>
-                `;
-                chatHistory.appendChild(errorDiv);
-            }
-            
-            this.loading = false;
-        },
-
-        saveConversation() {
-            const chatHistory = document.querySelector('#chat-history .space-y-4');
-            const messages = [];
-            
-            chatHistory.querySelectorAll('.flex').forEach(messageDiv => {
-                const isUser = messageDiv.classList.contains('justify-end');
-                const content = messageDiv.querySelector('div > div').cloneNode(true);
-                
-                const image = content.querySelector('img');
-                let messageText = '';
-                let imageData = '';
-                
-                if (image) {
-                    imageData = image.src;
-                    messageText = '[Image included below]\n';
-                }
-                
-                if (content.classList.contains('prose')) {
-                    messageText += content.innerHTML
-                        .replace(/<div>/g, '\n')
-                        .replace(/<\/div>/g, '')
-                        .replace(/<p>/g, '')
-                        .replace(/<\/p>/g, '\n')
-                        .replace(/<br>/g, '\n')
-                        .replace(/<[^>]*>/g, '');
-                } else {
-                    messageText += content.textContent;
-                }
-                
-                messages.push({
-                    role: isUser ? 'User' : 'Assistant',
-                    content: messageText.trim(),
-                    image: imageData,
-                    timestamp: new Date().toLocaleString()
-                });
-            });
-            
-            let conversationText = `GardenLLM Conversation\n`;
-            conversationText += `======================\n\n`;
-            conversationText += `Date: ${new Date().toLocaleString()}\n`;
-            conversationText += `Mode: ${this.useDatabase ? 'Garden Database' : 'Image Analysis'}\n`;
-            conversationText += `Conversation ID: ${this.conversationId || 'Not assigned'}\n\n`;
-            conversationText += `Chat History\n`;
-            conversationText += `------------\n\n`;
-            
-            messages.forEach(msg => {
-                conversationText += `[${msg.role} - ${msg.timestamp}]\n`;
-                conversationText += `${msg.content}\n`;
-                
-                if (msg.image) {
-                    conversationText += `\n--- Image Data ---\n`;
-                    conversationText += `${msg.image}\n`;
-                    conversationText += `--- End Image Data ---\n`;
-                }
-                
-                conversationText += `\n`;
-            });
-            
-            conversationText += `\nNote: Image data is preserved in base64 format and can be viewed by copying the data between "Image Data" markers into a web browser's address bar.\n`;
-            
-            const blob = new Blob([conversationText], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `conversation_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.txt`;
-            
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        },
-
-        updateMessageStatus() {
-            const chatHistory = document.querySelector('#chat-history .space-y-4');
-            this.hasMessages = chatHistory.children.length > 0;
-        }
-    }"
+    x-data="chatInterface"
 >
     <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
         <h1 class="text-3xl font-bold mb-4 text-green-700">Welcome to GardenLLM</h1>
