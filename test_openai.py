@@ -813,6 +813,9 @@ def get_chat_response(message):
                     # Extract URL from IMAGE formula
                     url = ''
                     if photo_url:
+                        # Log the original photo URL for debugging
+                        logger.info(f"Original Photo URL for {plant.get('Plant Name')}: {photo_url}")
+                        
                         if '=IMAGE("' in photo_url:
                             try:
                                 # Extract URL from IMAGE formula
@@ -820,28 +823,11 @@ def get_chat_response(message):
                                 url_end = photo_url.find('")', url_start)
                                 if url_start > 7 and url_end > url_start:
                                     url = photo_url[url_start:url_end]
-                                    
-                                    # Modify Google Photos URL for public access
-                                    if 'googleusercontent.com' in url:
-                                        # Remove any existing parameters
-                                        base_url = url.split('?')[0]
-                                        # Add required parameters for public access
-                                        url = f"{base_url}?authuser=0"
-                                        
+                                    logger.info(f"Extracted URL: {url}")
                             except Exception as e:
                                 logger.error(f"Error extracting URL from IMAGE formula: {e}")
                         else:
                             url = photo_url.strip('="')  # Remove any remaining formula characters
-                            if 'googleusercontent.com' in url:
-                                # Remove any existing parameters
-                                base_url = url.split('?')[0]
-                                # Add required parameters for public access
-                                url = f"{base_url}?authuser=0"
-                    
-                    # Log URL processing
-                    logger.info(f"Plant: {plant.get('Plant Name')}")
-                    logger.info(f"Original Photo URL: {photo_url}")
-                    logger.info(f"Processed URL: {url}")
                     
                     matching_plants.append({
                         'name': plant.get('Plant Name', ''),
