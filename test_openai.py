@@ -742,67 +742,109 @@ def get_chat_response(message):
     global conversation_history, client
     
     try:
-        # Verify OpenAI client is initialized
+        # Check if this is an image-related query
+        image_keywords = ['picture', 'pictures', 'photo', 'photos', 'look like', 'show me', 'image', 'images']
+        is_image_query = any(keyword in message.lower() for keyword in image_keywords)
+        
+        if is_image_query:
+            # Get all plants data
+            plants_data = get_plant_data()
+            if isinstance(plants_data, str):  # Error message
+                return plants_data
+                
+            # Filter plants with photos
+            plants_with_photos = []
+            for plant in plants_data:
+                photo_url = plant.get('Photo URL', '').strip()
+                if photo_url and '=IMAGE' in photo_url:
+                    # Extract actual URL from IMAGE formula
+                    url = photo_url.split('"')[1] if '"' in photo_url else ''
+                    if url:
+                        plants_with_photos.append({
+                            'name': plant.get('Plant Name', ''),
+                            'location': plant.get('Location', ''),
+                            'url': url
+                        })
+            
+            # If looking for specific plant
+            if 'look like' in message.lower():
+                search_terms = message.lower().split('look like')[0].strip().split()
+                if search_terms:
+                    # Remove question words
+                    search_terms = [term for term in search_terms if term not in ['what', 'does', 'a', 'the', 'an']]
+                    if search_terms:
+                        matching_plants = [p for p in plants_with_photos 
+                                        if any(term in p['name'].lower() for term in search_terms)]
+                        if matching_plants:
+                            response = "Here are the matching plants I found:\n\n"
+                            for plant in matching_plants:
+                                response += f"**{plant['name']}**\n"
+                                response += f"Located in: {plant['location']}\n"
+                                response += f"![{plant['name']}]({plant['url']})\n\n"
+                            return response
+                        else:
+                            return f"I couldn't find any pictures of plants matching '{' '.join(search_terms)}' in the garden database."
+            
+            # General request for plant pictures
+            if plants_with_photos:
+                response = "Here are the plants in the garden with photos:\n\n"
+                for plant in plants_with_photos:
+                    response += f"**{plant['name']}**\n"
+                    response += f"Located in: {plant['location']}\n"
+                    response += f"![{plant['name']}]({plant['url']})\n\n"
+                return response
+            else:
+                return "There are currently no plants with photos in the garden database."
+        
+        # If not an image query, proceed with existing chat functionality
         if not client:
             logger.error("OpenAI client is not initialized")
             raise ValueError("OpenAI client is not initialized")
             
-        # Update system prompt with current plant list
         update_system_prompt()
         
-        # Get complete plant data for context
         plants_data = get_plant_data()
         if isinstance(plants_data, list):
-            # Build detailed plant information string
             plant_details = "\n\nDetailed plant information:\n"
             for plant in plants_data:
-                # Add each plant's details to the context
                 plant_details += f"\nPlant: {plant.get('Plant Name', '')}\n"
                 plant_details += f"Location: {plant.get('Location', '')}\n"
                 plant_details += f"Description: {plant.get('Description', '')}\n"
                 plant_details += f"Care Notes: {plant.get('Care Notes', '')}\n"
             
-            # Add plant details to system prompt
             conversation_history[0]['content'] += plant_details
         
-        # Manage conversation history length
-        if len(conversation_history) > 6:  # Keep system prompt + 5 messages
+        if len(conversation_history) > 6:
             conversation_history = [
-                conversation_history[0],  # Preserve system prompt
-                *conversation_history[-5:]  # Keep last 5 messages
+                conversation_history[0],
+                *conversation_history[-5:]
             ]
         
-        # Add user message to conversation history
         conversation_history.append({"role": "user", "content": message})
         
-        # Log request details
         logger.info(f"Sending request to OpenAI with message: {message}")
         logger.info(f"Conversation history length: {len(conversation_history)}")
         
         try:
-            # Send request to OpenAI API
             response = client.chat.completions.create(
-                model="gpt-3.5-turbo",  # Use GPT-3.5 Turbo model
-                messages=conversation_history,  # Pass conversation context
-                temperature=0.7,  # Set response creativity
-                max_tokens=2000  # Limit response length
+                model="gpt-3.5-turbo",
+                messages=conversation_history,
+                temperature=0.7,
+                max_tokens=2000
             )
             logger.info(f"Received response from OpenAI: {response}")
             
-            # Extract and store assistant's response
             assistant_response = response.choices[0].message.content
             conversation_history.append({"role": "assistant", "content": assistant_response})
             
             return assistant_response
             
         except Exception as api_error:
-            # Handle OpenAI API errors
             logger.error(f"OpenAI API error: {str(api_error)}")
             logger.error(traceback.format_exc())
             return f"I encountered an error while processing your request: {str(api_error)}"
         
     except Exception as e:
-        # Handle general errors
         logger.error(f"Error in get_chat_response: {str(e)}")
         logger.error(traceback.format_exc())
         return f"I apologize, but I encountered an error: {str(e)}. Please try again or contact support if the issue persists."
@@ -1445,8 +1487,9 @@ def get_weather_forecast() -> List[Dict]:
             logger.info(f"Sample forecast for {forecast[0]['date']}: "
                        f"High: {forecast[0]['temp_max']}°F, "
                        f"Low: {forecast[0]['temp_min']}°F, "
-                       f"Rain: {forecast[0]['rain']}in, "
-                       f"Wind: {forecast[0]['wind_speed']}mph")
+                       f"Rain: {forecast[0]['rain']} inches\n"
+                       f"Humidity: {forecast[0]['humidity']}%\n"
+                       f"Wind: {forecast[0]['wind_speed']} mph")
         
         return forecast
         
