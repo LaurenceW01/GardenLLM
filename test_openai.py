@@ -778,6 +778,13 @@ def get_chat_response(message):
             if isinstance(plants_data, str):  # Error message
                 return plants_data
             
+            # Debug: Print all photo URLs from raw data
+            print("\n=== DEBUG: Raw Photo URLs from Sheet ===")
+            for plant in plants_data:
+                print(f"Plant: {plant.get('Plant Name')}")
+                print(f"Raw Photo URL field: {repr(plant.get('Photo URL', ''))}")
+                print("----------------------------------------")
+            
             # Extract search terms
             msg_lower = message.lower()
             search_text = ''
@@ -800,22 +807,23 @@ def get_chat_response(message):
             matching_plants = []
             search_term = ' '.join(search_terms).lower()  # Combine search terms
             
+            print(f"\n=== DEBUG: Searching for term: '{search_term}' ===")
+            
             for plant in plants_data:
                 plant_name = plant.get('Plant Name', '').lower()
                 
                 # Only match if search term is a complete word in the plant name
                 plant_words = set(plant_name.split())
                 if search_term in plant_words:  # Exact word match
+                    print(f"\n=== DEBUG: Found matching plant: {plant.get('Plant Name')} ===")
                     photo_url = plant.get('Photo URL', '').strip()
+                    print(f"Initial Photo URL: {repr(photo_url)}")
                     description = plant.get('Description', '').strip()
                     location = plant.get('Location', '').strip()
                     
                     # Extract URL from IMAGE formula
                     url = ''
                     if photo_url:
-                        # Log the original photo URL for debugging
-                        logger.info(f"Original Photo URL for {plant.get('Plant Name')}: {photo_url}")
-                        
                         if '=IMAGE("' in photo_url:
                             try:
                                 # Extract URL from IMAGE formula
@@ -823,21 +831,28 @@ def get_chat_response(message):
                                 url_end = photo_url.find('")', url_start)
                                 if url_start > 7 and url_end > url_start:
                                     url = photo_url[url_start:url_end]
-                                    logger.info(f"Extracted URL: {url}")
+                                    print(f"Extracted URL from IMAGE formula: {repr(url)}")
                             except Exception as e:
+                                print(f"Error extracting URL from IMAGE formula: {e}")
                                 logger.error(f"Error extracting URL from IMAGE formula: {e}")
                         else:
                             url = photo_url.strip('="')  # Remove any remaining formula characters
+                            print(f"Direct URL (no IMAGE formula): {repr(url)}")
+                    
+                    has_photo = bool(url and url.strip() and not url.startswith('=IMAGE'))
+                    print(f"Final URL: {repr(url)}")
+                    print(f"Has photo: {has_photo}")
                     
                     matching_plants.append({
                         'name': plant.get('Plant Name', ''),
                         'location': location,
                         'url': url,
                         'description': description,
-                        'has_photo': bool(url and url.strip() and not url.startswith('=IMAGE'))
+                        'has_photo': has_photo
                     })
             
             if matching_plants:
+                print("\n=== DEBUG: Preparing response with matching plants ===")
                 response = []
                 response.append("Here are the matching plants in the garden:\n")
                 
@@ -845,8 +860,13 @@ def get_chat_response(message):
                 plants_with_photos = [p for p in matching_plants if p.get('has_photo')]
                 plants_without_photos = [p for p in matching_plants if not p.get('has_photo')]
                 
+                print(f"\nPlants with photos: {len(plants_with_photos)}")
+                print(f"Plants without photos: {len(plants_without_photos)}")
+                
                 if plants_with_photos:
                     for plant in plants_with_photos:
+                        print(f"\nAdding plant with photo: {plant['name']}")
+                        print(f"URL being used: {repr(plant['url'])}")
                         response.append(f"**{plant['name']}**")
                         if plant['location']:
                             response.append(f"Located in: {plant['location']}")
@@ -865,7 +885,10 @@ def get_chat_response(message):
                         if plant['description']:
                             response.append(f"  {plant['description']}")
                 
-                return "\n".join(response)
+                final_response = "\n".join(response)
+                print("\n=== DEBUG: Final Response ===")
+                print(final_response)
+                return final_response
             else:
                 return f"I couldn't find any plants matching '{search_term}' in the garden database."
             
