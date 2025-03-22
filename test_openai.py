@@ -768,6 +768,12 @@ def get_chat_response(message):
     global conversation_history, client
     
     try:
+        # Debug: Print raw message
+        print("\n=== DEBUG: Raw Message ===")
+        print(f"Message type: {type(message)}")
+        print(f"Raw message: {repr(message)}")
+        print("----------------------------------------")
+        
         # Check if this is an image-related query
         image_keywords = ['look like', 'show me', 'picture', 'pictures', 'photo', 'photos', 'image', 'images']
         is_image_query = any(keyword in message.lower() for keyword in image_keywords)
