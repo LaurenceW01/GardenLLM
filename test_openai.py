@@ -304,61 +304,64 @@ def get_all_plants():
 
 def update_system_prompt():
     """Update the system prompt with current plant list and locations"""
-    global conversation_history  # Access global conversation history
+    global conversation_history
     
-    plants = get_all_plants()  # Get current plant data
+    plants = get_all_plants()
     
     # Create a reverse lookup from plant name to locations
-    plant_locations = {}  # Initialize plant locations dictionary
-    for plant in plants:  # Process each plant
-        name = plant['name']  # Get plant name
-        locations = plant['locations']  # Get normalized locations
-        plant_locations[name] = locations  # Map name to locations
+    plant_locations = {}
+    for plant in plants:
+        name = plant['name']
+        locations = plant['locations']
+        plant_locations[name] = locations
     
     # Group plants by location (case-insensitive)
-    plants_by_location = {}  # Initialize location-based grouping
-    for plant in plants:  # Process each plant
-        for location in plant['locations']:  # Process each location
-            if location not in plants_by_location:  # Create location entry if needed
-                plants_by_location[location] = []  # Initialize plant list for location
-            plants_by_location[location].append(plant['name'])  # Add plant to location
+    plants_by_location = {}
+    for plant in plants:
+        for location in plant['locations']:
+            if location not in plants_by_location:
+                plants_by_location[location] = []
+            plants_by_location[location].append(plant['name'])
     
-    # Create location-based plant list, preserving original location capitalization
-    location_list = []  # Initialize formatted location list
-    original_locations = {loc.lower(): loc for plant in plants  # Map lowercase to original case
+    # Create location-based plant list
+    location_list = []
+    original_locations = {loc.lower(): loc for plant in plants 
                         for loc in plant['location'].split(',') if loc.strip()}
     
-    for location_lower, plant_names in plants_by_location.items():  # Process each location
-        original_location = original_locations.get(location_lower, location_lower.title())  # Get original case
-        plant_bullets = [f"- {name}" for name in sorted(set(plant_names))]  # Create bullet points
-        location_list.append(f"### {original_location}\n" + "\n".join(plant_bullets))  # Format location section
+    for location_lower, plant_names in plants_by_location.items():
+        original_location = original_locations.get(location_lower, location_lower.title())
+        plant_bullets = [f"- {name}" for name in sorted(set(plant_names))]
+        location_list.append(f"### {original_location}\n" + "\n".join(plant_bullets))
     
-    location_text = "\n\n".join(location_list)  # Combine all location sections
+    location_text = "\n\n".join(location_list)
     
-    # Add examples of multi-location plants, sorted by number of locations
-    multi_location_examples = [  # Create list of multi-location examples
+    # Add examples of multi-location plants
+    multi_location_examples = [
         f"- {name}: {', '.join(locs)}"
         for name, locs in sorted(plant_locations.items(), key=lambda x: len(x[1]), reverse=True)
         if len(locs) > 1
-    ][:5]  # Show top 5 plants with most locations
+    ][:5]
     
-    # Create comprehensive system prompt
+    # Enhanced system prompt with stronger emphasis on listing ALL matches
     system_prompt = (
         "You are a helpful gardening assistant that helps manage a plant journal for a garden in Houston, Texas.\n\n"
         f"Current plants in the garden:\n{location_text}\n\n"
-        "IMPORTANT INSTRUCTIONS:\n"
-        "1. Plants can be in ANY NUMBER of locations. When asked about plants in a specific location, "
+        "CRITICAL INSTRUCTIONS:\n"
+        "1. When asked about specific types of plants (e.g., 'cypress trees', 'roses'), "
+        "you MUST list ALL plants that match the query. For example, if asked about cypress trees "
+        "and there are both 'Italian Cypress' and 'Leyland Cypress' in the database, you MUST mention BOTH.\n\n"
+        "2. Plants can be in ANY NUMBER of locations. When asked about plants in a specific location, "
         "check for that location in the comma-separated location list for each plant.\n\n"
-        "2. When listing plants in a location:\n"
+        "3. When listing plants in a location:\n"
         "   - Include ALL plants that have that location in their list\n"
         "   - Use bullet points (-) for each plant\n"
         "   - Example: If asked 'What plants are in the middle bed?', list every plant that has 'middle bed' "
         "in its location list, even if it's also in other locations\n\n"
-        "3. When asked about a plant's location:\n"
+        "4. When asked about a plant's location:\n"
         "   - List ALL locations where the plant appears\n"
         "   - Format as a comma-separated list\n"
-        "   - Example: 'This plant is located in: Location1, Location2, Location3, etc.'\n\n"
-        "4. For watering queries:\n"
+        "   - Example: 'These plants are located in: Location1, Location2, Location3, etc.'\n\n"
+        "5. For watering queries:\n"
         "   - Group plants by watering needs using ** categories\n\n"
         "Here are some examples of plants in multiple locations:\n"
         f"{chr(10).join(multi_location_examples)}\n\n"
@@ -367,7 +370,7 @@ def update_system_prompt():
     )
 
     # Update the system prompt in conversation history
-    conversation_history[0]['content'] = system_prompt  # Set new system prompt
+    conversation_history[0]['content'] = system_prompt
 
 # Initialize conversation history with system prompt
 conversation_history = [  # Initialize conversation history
