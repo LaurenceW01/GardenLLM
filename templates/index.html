@@ -86,7 +86,7 @@
                 userDiv.className = 'flex justify-end';
                 userDiv.innerHTML = `
                     <div class='bg-green-600 text-white rounded-lg p-3 max-w-3/4'>
-                        <img src='${this.imagePreview}' class='max-w-full h-auto rounded mb-2'>
+                        <img src="${this.imagePreview}" class='max-w-full h-auto rounded mb-2'>
                         ${this.message ? `<p>${this.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>` : ''}
                     </div>
                 `;
@@ -224,7 +224,7 @@
         <form @submit.prevent="submitMessage" class="space-y-4">
             <!-- Image Preview -->
             <div x-show="imagePreview" class="relative inline-block">
-                <img :src="imagePreview" class="max-h-32 rounded">
+                <img x-bind:src="imagePreview" class="max-h-32 rounded">
                 <button @click="clearImage" type="button" 
                     class="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center">
                     ×
