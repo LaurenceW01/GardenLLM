@@ -813,24 +813,29 @@ def get_chat_response(message):
                     # Extract URL from IMAGE formula or use direct URL
                     url = ''
                     if photo_url:
-                        if '=IMAGE' in photo_url:
+                        if '=IMAGE("' in photo_url:
                             try:
                                 # Extract URL from IMAGE formula
-                                url_start = photo_url.find('"') + 1
-                                url_end = photo_url.find('"', url_start)
-                                if url_start > 0 and url_end > url_start:
+                                url_start = photo_url.find('=IMAGE("') + 8
+                                url_end = photo_url.find('")', url_start)
+                                if url_start > 7 and url_end > url_start:
                                     url = photo_url[url_start:url_end]
                             except Exception as e:
                                 logger.error(f"Error extracting URL from IMAGE formula: {e}")
                         else:
-                            url = photo_url
+                            url = photo_url.strip('="')  # Remove any remaining formula characters
+                    
+                    # Log the URL extraction for debugging
+                    logger.info(f"Plant: {plant.get('Plant Name')}")
+                    logger.info(f"Original Photo URL: {photo_url}")
+                    logger.info(f"Extracted URL: {url}")
                     
                     matching_plants.append({
                         'name': plant.get('Plant Name', ''),
                         'location': location,
                         'url': url,
                         'description': description,
-                        'has_photo': bool(url and url.strip())
+                        'has_photo': bool(url and url.strip() and not url.startswith('=IMAGE'))
                     })
             
             if matching_plants:
@@ -1780,3 +1785,25 @@ def handle_weather_query(message: str) -> str:
 
 # Remove the automatic weather advice display
 # display_weather_advice()  # Only run when called from CLI
+
+def get_photo_url_from_album(photo_url):
+    """Convert Google Photos URL to publicly accessible format"""
+    try:
+        if 'photos.google.com' in photo_url:
+            # If it's a sharing link, ensure it has the correct parameters
+            if '?share=' not in photo_url:
+                if '?' in photo_url:
+                    photo_url += '&share=true'
+                else:
+                    photo_url += '?share=true'
+            
+            # Add necessary parameters for public access
+            if '&key=' not in photo_url:
+                photo_url += '&key=public'
+                
+            logger.info(f"Formatted photo URL: {photo_url}")
+            return photo_url
+        return photo_url
+    except Exception as e:
+        logger.error(f"Error formatting photo URL: {e}")
+        return photo_url
