@@ -200,67 +200,78 @@
                 const chatHistory = document.querySelector('#chat-history .space-y-4');
                 const messages = [];
                 
+                // Create HTML document structure
+                let htmlContent = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="utf-8">
+                        <title>GardenLLM Conversation</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
+                            .header { border-bottom: 2px solid #16a34a; padding-bottom: 20px; margin-bottom: 20px; }
+                            .message { margin: 20px 0; padding: 15px; border-radius: 8px; }
+                            .user-message { background-color: #16a34a; color: white; margin-left: 20%; }
+                            .assistant-message { background-color: #f3f4f6; color: black; margin-right: 20%; }
+                            .timestamp { font-size: 0.8em; color: #666; margin-bottom: 5px; }
+                            img { max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0; }
+                            .metadata { color: #666; margin-bottom: 20px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <h1>GardenLLM Conversation</h1>
+                            <div class="metadata">
+                                <p>Date: ${new Date().toLocaleString()}</p>
+                                <p>Mode: ${this.useDatabase ? 'Garden Database' : 'Image Analysis'}</p>
+                                <p>Conversation ID: ${this.conversationId || 'Not assigned'}</p>
+                            </div>
+                        </div>
+                        <div class="chat-content">
+                `;
+                
+                // Process each message
                 chatHistory.querySelectorAll('.flex').forEach(messageDiv => {
                     const isUser = messageDiv.classList.contains('justify-end');
                     const content = messageDiv.querySelector('div > div').cloneNode(true);
+                    const timestamp = new Date().toLocaleString();
                     
+                    htmlContent += `
+                        <div class="message ${isUser ? 'user-message' : 'assistant-message'}">
+                            <div class="timestamp">${isUser ? 'User' : 'Assistant'} - ${timestamp}</div>
+                    `;
+                    
+                    // Handle images
                     const image = content.querySelector('img');
-                    let messageText = '';
-                    let imageData = '';
-                    
                     if (image) {
-                        imageData = image.src;
-                        messageText = '[Image included below]\n';
+                        htmlContent += `<img src="${image.src}" alt="Uploaded plant image"><br>`;
                     }
                     
+                    // Handle text content
                     if (content.classList.contains('prose')) {
-                        messageText += content.innerHTML
-                            .replace(/<div>/g, '\n')
-                            .replace(/<\/div>/g, '')
-                            .replace(/<p>/g, '')
-                            .replace(/<\/p>/g, '\n')
-                            .replace(/<br>/g, '\n')
-                            .replace(/<[^>]*>/g, '');
+                        // For assistant messages, preserve markdown formatting
+                        htmlContent += content.innerHTML;
                     } else {
-                        messageText += content.textContent;
+                        // For user messages, get plain text
+                        htmlContent += `<p>${content.textContent}</p>`;
                     }
                     
-                    messages.push({
-                        role: isUser ? 'User' : 'Assistant',
-                        content: messageText.trim(),
-                        image: imageData,
-                        timestamp: new Date().toLocaleString()
-                    });
+                    htmlContent += `</div>`;
                 });
                 
-                let conversationText = `GardenLLM Conversation\n`;
-                conversationText += `======================\n\n`;
-                conversationText += `Date: ${new Date().toLocaleString()}\n`;
-                conversationText += `Mode: ${this.useDatabase ? 'Garden Database' : 'Image Analysis'}\n`;
-                conversationText += `Conversation ID: ${this.conversationId || 'Not assigned'}\n\n`;
-                conversationText += `Chat History\n`;
-                conversationText += `------------\n\n`;
+                // Close HTML document
+                htmlContent += `
+                        </div>
+                    </body>
+                    </html>
+                `;
                 
-                messages.forEach(msg => {
-                    conversationText += `[${msg.role} - ${msg.timestamp}]\n`;
-                    conversationText += `${msg.content}\n`;
-                    
-                    if (msg.image) {
-                        conversationText += `\n--- Image Data ---\n`;
-                        conversationText += `${msg.image}\n`;
-                        conversationText += `--- End Image Data ---\n`;
-                    }
-                    
-                    conversationText += `\n`;
-                });
-                
-                conversationText += `\nNote: Image data is preserved in base64 format and can be viewed by copying the data between "Image Data" markers into a web browser's address bar.\n`;
-                
-                const blob = new Blob([conversationText], { type: 'text/plain' });
+                // Create and download the HTML file
+                const blob = new Blob([htmlContent], { type: 'text/html' });
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = `conversation_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.txt`;
+                link.download = `conversation_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.html`;
                 
                 document.body.appendChild(link);
                 link.click();
