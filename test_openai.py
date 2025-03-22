@@ -777,6 +777,8 @@ def get_chat_response(message):
         # Check if this is an image-related query
         image_keywords = ['look like', 'show me', 'picture', 'pictures', 'photo', 'photos', 'image', 'images']
         is_image_query = any(keyword in message.lower() for keyword in image_keywords)
+        print("\n=== DEBUG: Query Analysis ===")
+        print(f"Is image query: {is_image_query}")
         
         if is_image_query:
             # Get plant data
@@ -784,36 +786,36 @@ def get_chat_response(message):
             if isinstance(plants_data, str):  # Error message
                 return plants_data
             
-            # Debug: Print all photo URLs from raw data
-            print("\n=== DEBUG: Raw Photo URLs from Sheet ===")
-            for plant in plants_data:
-                print(f"Plant: {plant.get('Plant Name')}")
-                print(f"Raw Photo URL field: {repr(plant.get('Photo URL', ''))}")
-                print("----------------------------------------")
-            
             # Extract search terms
             msg_lower = message.lower()
             search_text = ''
+            print("\n=== DEBUG: Search Text Extraction ===")
+            print(f"Original message (lowercase): {msg_lower}")
             
             if 'look like' in msg_lower:
                 search_text = msg_lower.split('look like')[0].strip()
+                print(f"Found 'look like' pattern. Initial search text: {repr(search_text)}")
             elif 'show me' in msg_lower:
                 search_text = msg_lower.split('show me')[1].strip()
+                print(f"Found 'show me' pattern. Initial search text: {repr(search_text)}")
             elif any(phrase in msg_lower for phrase in ['picture of', 'photo of']):
                 for phrase in ['picture of', 'photo of']:
                     if phrase in msg_lower:
                         search_text = msg_lower.split(phrase)[1].strip()
-                        #break
+                        print(f"Found '{phrase}' pattern. Initial search text: {repr(search_text)}")
+                        break
             
             # Clean up search text
             stop_words = ['what', 'does', 'do', 'a', 'the', 'an', 'pictures', 'picture', 'photos', 'photo', 'images', 'image', 'trees', 'tree', 'or', 'of']
             search_terms = [term for term in search_text.split() if term not in stop_words]
+            print("\n=== DEBUG: Search Terms Processing ===")
+            print(f"Stop words being removed: {stop_words}")
+            print(f"Terms after stop word removal: {search_terms}")
             
             # Find matching plants - using stricter matching criteria
             matching_plants = []
             search_term = ' '.join(search_terms).lower()  # Combine search terms
-            
-            print(f"\n=== DEBUG: Searching for term: '{search_term}' ===")
+            print(f"Final search term: {repr(search_term)}")
             
             for plant in plants_data:
                 plant_name = plant.get('Plant Name', '').lower()
