@@ -56,10 +56,9 @@
                         </a>
                         <button 
                             x-show="window.location.pathname === '/'"
-                            @click="$root.saveConversation(); isOpen = false" 
+                            @click="$dispatch('save-conversation')" 
                             type="button"
                             class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                            :disabled="!$root.hasMessages"
                         >
                             <span class="flex items-center gap-2">
                                 <span>💾</span> Save Chat
