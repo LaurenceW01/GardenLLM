@@ -139,7 +139,7 @@
                 } else {
                     const userDiv = document.createElement('div');
                     userDiv.className = 'flex justify-end';
-                    userDiv.innerHTML = `
+                    userDiv.innerHTML = /* html */ `
                         <div class='bg-green-600 text-white rounded-lg p-3 max-w-3/4'>
                             ${this.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
                         </div>
@@ -269,8 +269,8 @@
                 conversationText += `\n`;
             });
             
-            // Add a note about image data
-            conversationText += `\nNote: Image data is preserved in base64 format and can be viewed by copying the data between "Image Data" markers into a web browser's address bar.\n`;
+            // Fix the note text and file creation
+            conversationText += '\nNote: Image data is preserved in base64 format and can be viewed by copying the data between "Image Data" markers into a web browser\'s address bar.\n';
             
             // Create download link for text file
             const blob = new Blob([conversationText], { type: 'text/plain' });
@@ -279,7 +279,6 @@
             link.href = url;
             link.download = `conversation_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.txt`;
             
-            // Trigger download
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
