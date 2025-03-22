@@ -275,7 +275,7 @@
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `conversation_${new Date().toISOString().slice(0,19).replace(/[:]/g, '-')}.txt`;
+        link.download = `conversation_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.txt`;
         
         // Trigger download
         document.body.appendChild(link);
