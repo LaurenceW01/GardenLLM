@@ -22,6 +22,8 @@
     imagePreview: null,
     conversationId: null,
     useDatabase: true,  // Default to database mode
+    hasMessages: false,
+    messages: [],
     
     clearImage() {
         this.imageFile = null;
@@ -179,6 +181,8 @@
                 chatHistory.scrollTop = chatHistory.scrollHeight;
             }, 100);
 
+            this.updateMessageStatus();
+
         } catch (error) {
             // Remove loading indicator on error
             loadingDiv.remove();
@@ -195,6 +199,94 @@
         }
         
         this.loading = false;
+    },
+
+    saveConversation() {
+        // Get all messages from the chat history
+        const chatHistory = document.querySelector('#chat-history .space-y-4');
+        const messages = [];
+        
+        // Convert chat history to text format
+        chatHistory.querySelectorAll('.flex').forEach(messageDiv => {
+            const isUser = messageDiv.classList.contains('justify-end');
+            const content = messageDiv.querySelector('div > div').cloneNode(true);
+            
+            // Handle images in messages
+            const image = content.querySelector('img');
+            let messageText = '';
+            let imageData = '';
+            
+            if (image) {
+                // Get the image source (base64 or URL)
+                imageData = image.src;
+                messageText = '[Image included below]\n';
+            }
+            
+            // Get the text content, preserving markdown formatting
+            if (content.classList.contains('prose')) {
+                // For assistant messages, get the HTML to preserve formatting
+                messageText += content.innerHTML
+                    .replace(/<div>/g, '\n')
+                    .replace(/<\/div>/g, '')
+                    .replace(/<p>/g, '')
+                    .replace(/<\/p>/g, '\n')
+                    .replace(/<br>/g, '\n')
+                    .replace(/<[^>]*>/g, ''); // Remove any remaining HTML tags
+            } else {
+                // For user messages, get plain text
+                messageText += content.textContent;
+            }
+            
+            messages.push({
+                role: isUser ? 'User' : 'Assistant',
+                content: messageText.trim(),
+                image: imageData,
+                timestamp: new Date().toLocaleString()
+            });
+        });
+        
+        // Create a human-readable format with image data
+        let conversationText = `GardenLLM Conversation\n`;
+        conversationText += `======================\n\n`;
+        conversationText += `Date: ${new Date().toLocaleString()}\n`;
+        conversationText += `Mode: ${this.useDatabase ? 'Garden Database' : 'Image Analysis'}\n`;
+        conversationText += `Conversation ID: ${this.conversationId || 'Not assigned'}\n\n`;
+        conversationText += `Chat History\n`;
+        conversationText += `------------\n\n`;
+        
+        messages.forEach((msg, index) => {
+            conversationText += `[${msg.role} - ${msg.timestamp}]\n`;
+            conversationText += `${msg.content}\n`;
+            
+            if (msg.image) {
+                conversationText += `\n--- Image Data ---\n`;
+                conversationText += `${msg.image}\n`;
+                conversationText += `--- End Image Data ---\n`;
+            }
+            
+            conversationText += `\n`;
+        });
+        
+        // Add a note about image data
+        conversationText += `\nNote: Image data is preserved in base64 format and can be viewed by copying the data between "Image Data" markers into a web browser's address bar.\n`;
+        
+        // Create download link for text file
+        const blob = new Blob([conversationText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `conversation_${new Date().toISOString().slice(0,19).replace(/[:]/g, '-')}.txt`;
+        
+        // Trigger download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    },
+
+    updateMessageStatus() {
+        const chatHistory = document.querySelector('#chat-history .space-y-4');
+        this.hasMessages = chatHistory.children.length > 0;
     }
 }">
     <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
@@ -202,21 +294,34 @@
         <p class="text-gray-600 mb-4">Your AI-powered garden assistant for Houston, TX.</p>
         
         <!-- Mode Toggle Switch -->
-        <div class="flex items-center justify-end mb-4 gap-2">
-            <span class="text-sm text-gray-600" x-text="useDatabase ? 'Garden Database Mode' : 'Image Analysis Mode'"></span>
-            <button 
-                @click="toggleMode()" 
-                type="button"
-                :class="{'bg-green-600': useDatabase, 'bg-blue-600': !useDatabase}"
-                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
-                role="switch"
-                :aria-checked="useDatabase"
-            >
-                <span 
-                    :class="useDatabase ? 'translate-x-5' : 'translate-x-0'"
-                    class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                ></span>
-            </button>
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+                <button 
+                    @click="saveConversation()" 
+                    type="button"
+                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                    :disabled="!hasMessages"
+                >
+                    <span>💾</span> Save Chat
+                </button>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <span class="text-sm text-gray-600" x-text="useDatabase ? 'Garden Database Mode' : 'Image Analysis Mode'"></span>
+                <button 
+                    @click="toggleMode()" 
+                    type="button"
+                    :class="{'bg-green-600': useDatabase, 'bg-blue-600': !useDatabase}"
+                    class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
+                    role="switch"
+                    :aria-checked="useDatabase"
+                >
+                    <span 
+                        :class="useDatabase ? 'translate-x-5' : 'translate-x-0'"
+                        class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                    ></span>
+                </button>
+            </div>
         </div>
         
         <!-- Chat Interface -->
@@ -362,6 +467,21 @@
 /* Add transition for response messages */
 #chat-history .flex {
     transition: opacity 0.3s ease-in-out;
+}
+
+/* Add styles for the save button */
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Add transition for button hover */
+button {
+    transition: all 0.2s ease-in-out;
+}
+
+button:not(:disabled):hover {
+    transform: translateY(-1px);
 }
 </style>
 {% endblock %} 
