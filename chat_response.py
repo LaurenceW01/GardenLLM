@@ -70,19 +70,13 @@ def get_chat_response(message: str) -> str:
             response_parts = []
             for plant in plant_data:
                 plant_name = plant.get('Plant Name', '')
-                photo_url = plant.get('Photo URL', '')
+                photo_url = plant.get('Raw Photo URL', '')  # Use Raw Photo URL field
                 
-                if photo_url and '=IMAGE("' in photo_url:
-                    # Extract URL from IMAGE formula
-                    url_match = re.search(r'=IMAGE\("([^"]+)"\)', photo_url)
-                    if url_match:
-                        photo_url = url_match.group(1)
-                        if 'photos.google.com' in photo_url:
-                            # Modify Google Photos URL for public access
-                            photo_url = photo_url.split('?')[0] + '?authuser=0'
-                        response_parts.append(f"Here's what {plant_name} looks like:\n{photo_url}")
-                    else:
-                        response_parts.append(f"I found {plant_name}, but there seems to be an issue with the photo URL.")
+                if photo_url:
+                    # Format Google Photos URL if needed
+                    if 'photos.google.com' in photo_url:
+                        photo_url = photo_url.split('?')[0] + '?authuser=0'
+                    response_parts.append(f"Here's what {plant_name} looks like:\n{photo_url}")
                 else:
                     response_parts.append(f"I found {plant_name}, but there's no photo available.")
             
@@ -100,7 +94,7 @@ def get_chat_response(message: str) -> str:
             # Generate response using OpenAI
             plant_info = []
             for plant in plant_data:
-                info = {k: v for k, v in plant.items() if v and k != 'Photo URL'}
+                info = {k: v for k, v in plant.items() if v and k not in ['Photo URL', 'Raw Photo URL']}
                 plant_info.append(info)
             
             prompt = f"Please provide information about the following plants in a natural, conversational way. Focus on the most relevant details for a gardener. Plant data: {plant_info}"
@@ -121,7 +115,7 @@ def get_chat_response(message: str) -> str:
                 logger.error(f"OpenAI API error: {e}")
                 # Fallback to basic response if API fails
                 return "\n\n".join([f"Here's what I know about {plant.get('Plant Name')}:\n" + 
-                                  "\n".join([f"{k}: {v}" for k, v in plant.items() if v and k != 'Photo URL'])
+                                  "\n".join([f"{k}: {v}" for k, v in plant.items() if v and k not in ['Photo URL', 'Raw Photo URL']])
                                   for plant in plant_data])
         
         return "I'm not sure what you're asking about. Could you please rephrase your question or specify a plant name?"

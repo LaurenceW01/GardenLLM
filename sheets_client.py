@@ -43,13 +43,13 @@ def initialize_sheet(start_cli=False):
         'ID', 'Plant Name', 'Description', 'Location', 'Light Requirements',
         'Frost Tolerance', 'Watering Needs', 'Soil Preferences', 'Pruning Instructions',
         'Mulching Needs', 'Fertilizing Schedule', 'Winterizing Instructions',
-        'Spacing Requirements', 'Care Notes', 'Photo URL', 'Last Updated'
+        'Spacing Requirements', 'Care Notes', 'Photo URL', 'Raw Photo URL', 'Last Updated'
     ]
     
     # Check if headers exist
     result = sheets_client.values().get(
         spreadsheetId=SPREADSHEET_ID,
-        range='Plants!A1:P1'
+        range='Plants!A1:Q1'
     ).execute()
     
     if not result.get('values'):
@@ -94,8 +94,21 @@ def initialize_sheet(start_cli=False):
             'range': {
                 'sheetId': sheet_id,
                 'dimension': 'COLUMNS',
-                'startIndex': 14,
+                'startIndex': 14,  # Photo URL column
                 'endIndex': 15
+            },
+            'properties': {
+                'pixelSize': 200
+            },
+            'fields': 'pixelSize'
+        }
+    }, {
+        'updateDimensionProperties': {
+            'range': {
+                'sheetId': sheet_id,
+                'dimension': 'COLUMNS',
+                'startIndex': 15,  # Raw Photo URL column
+                'endIndex': 16
             },
             'properties': {
                 'pixelSize': 200

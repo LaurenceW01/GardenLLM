@@ -136,6 +136,7 @@ def update_plant(plant_data: Dict) -> bool:
                 plant_row = i
                 break
         
+        # Handle photo URLs
         photo_url = plant_data.get('Photo URL', '')
         photo_formula = f'=IMAGE("{photo_url}")' if photo_url else ''
         
@@ -157,13 +158,14 @@ def update_plant(plant_data: Dict) -> bool:
             plant_data.get('Winterizing Instructions', ''),
             plant_data.get('Spacing Requirements', ''),
             plant_data.get('Care Notes', ''),
-            photo_formula,
+            photo_formula,  # Photo URL as image formula
+            photo_url,     # Raw Photo URL
             timestamp
         ]
         
         try:
             if plant_row is not None:
-                range_name = f'Plants!A{plant_row + 1}:P{plant_row + 1}'
+                range_name = f'Plants!A{plant_row + 1}:Q{plant_row + 1}'
                 result = sheets_client.values().update(
                     spreadsheetId=SPREADSHEET_ID,
                     range=range_name,
@@ -173,7 +175,7 @@ def update_plant(plant_data: Dict) -> bool:
             else:
                 result = sheets_client.values().append(
                     spreadsheetId=SPREADSHEET_ID,
-                    range='Plants!A1:P',
+                    range='Plants!A1:Q',
                     valueInputOption='USER_ENTERED',
                     insertDataOption='INSERT_ROWS',
                     body={'values': [new_row]}
