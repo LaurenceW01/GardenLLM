@@ -637,6 +637,10 @@ def get_plant_data(plant_names=None):
         headers = values[0]  # Get column headers
         plants_data = []  # Initialize list for plant data
         
+        # Debug: Print headers
+        print("\n=== DEBUG: Sheet Headers ===")
+        print(f"Headers: {headers}")
+        
         # Convert sheet rows to list of dictionaries
         for row in values[1:]:  # Skip header row
             # Pad row with empty strings if shorter than headers
@@ -647,8 +651,18 @@ def get_plant_data(plant_names=None):
             if plant_names:  # Check if specific plants requested
                 if any(name.lower() in plant_dict['Plant Name'].lower() for name in plant_names):  # Case-insensitive name match
                     plants_data.append(plant_dict)  # Add matching plant
+                    # Debug: Print matching plant data
+                    print(f"\n=== DEBUG: Matching Plant Data ===")
+                    print(f"Plant Name: {plant_dict['Plant Name']}")
+                    for key, value in plant_dict.items():
+                        print(f"{key}: {value}")
             else:
                 plants_data.append(plant_dict)  # Add all plants if no filter
+                # Debug: Print all plant data
+                print(f"\n=== DEBUG: Plant Data ===")
+                print(f"Plant Name: {plant_dict['Plant Name']}")
+                for key, value in plant_dict.items():
+                    print(f"{key}: {value}")
         
         return plants_data  # Return list of plant dictionaries
         
