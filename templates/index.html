@@ -126,6 +126,10 @@
                 `;
                 chatHistory.appendChild(botDiv);
                 
+                setTimeout(() => {
+                    botDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+                
                 this.clearImage();
                 
             } else {
