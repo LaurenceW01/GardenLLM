@@ -765,11 +765,7 @@ def get_chat_response(message):
             stop_words = ['what', 'does', 'do', 'a', 'the', 'an', 'pictures', 'picture', 'photos', 'photo', 'images', 'image', 'trees', 'tree']
             search_terms = [term for term in search_text.split() if term not in stop_words]
             
-            # If no search terms found, try to extract from original message
-            if not search_terms:
-                search_terms = [word for word in msg_lower.split() if word not in stop_words]
-            
-            # Find matching plants - using stricter matching criteria
+            # Find matching plants
             matching_plants = []
             search_term = ' '.join(search_terms).lower()  # Combine search terms
             
@@ -780,15 +776,35 @@ def get_chat_response(message):
                 plant_words = plant_name.split()
                 if any(search_term in word for word in plant_words):
                     photo_url = plant.get('Photo URL', '').strip()
-                    # Extract URL from IMAGE formula or use direct URL
+                    
+                    # Process Google Photos URL
                     if photo_url:
                         if '=IMAGE' in photo_url:
                             try:
+                                # Extract URL from IMAGE formula
                                 url = photo_url.split('"')[1] if '"' in photo_url else ''
+                                # Convert to direct access URL if it's a Google Photos URL
+                                if 'photos.google.com' in url:
+                                    # Add sharing parameters to URL
+                                    if '?' not in url:
+                                        url += '?'
+                                    if 'share=' not in url:
+                                        url += '&share=true'
+                                    if 'access=public' not in url:
+                                        url += '&access=public'
                             except IndexError:
                                 url = photo_url
                         else:
                             url = photo_url
+                            # Convert to direct access URL if it's a Google Photos URL
+                            if 'photos.google.com' in url:
+                                # Add sharing parameters to URL
+                                if '?' not in url:
+                                    url += '?'
+                                if 'share=' not in url:
+                                    url += '&share=true'
+                                if 'access=public' not in url:
+                                    url += '&access=public'
                         
                         matching_plants.append({
                             'name': plant.get('Plant Name', ''),
@@ -804,6 +820,11 @@ def get_chat_response(message):
                         })
             
             if matching_plants:
+                # Log the URLs for debugging
+                logger.info("Matching plants and their URLs:")
+                for plant in matching_plants:
+                    logger.info(f"Plant: {plant['name']}, URL: {plant.get('url', 'No URL')}")
+                
                 # Separate plants with and without photos
                 plants_with_photos = [p for p in matching_plants if p.get('has_photo')]
                 plants_without_photos = [p for p in matching_plants if not p.get('has_photo')]
