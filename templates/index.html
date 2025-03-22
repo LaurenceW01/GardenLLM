@@ -130,6 +130,8 @@
                         `;
                         chatHistory.appendChild(botDiv);
                         
+                        this.updateMessageStatus();
+                        
                         setTimeout(() => {
                             botDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
                         }, 100);
@@ -191,6 +193,7 @@
                         </div>
                     `;
                     chatHistory.appendChild(errorDiv);
+                    this.updateMessageStatus();
                 }
                 
                 this.loading = false;
