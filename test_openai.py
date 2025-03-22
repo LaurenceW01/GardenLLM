@@ -797,7 +797,7 @@ def get_chat_response(message):
                 for phrase in ['picture of', 'photo of']:
                     if phrase in msg_lower:
                         search_text = msg_lower.split(phrase)[1].strip()
-                        break
+                        #break
             
             # Clean up search text
             stop_words = ['what', 'does', 'do', 'a', 'the', 'an', 'pictures', 'picture', 'photos', 'photo', 'images', 'image', 'trees', 'tree', 'or', 'of']
