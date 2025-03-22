@@ -66,9 +66,9 @@
         // Add loading indicator
         const loadingDiv = document.createElement('div');
         loadingDiv.className = 'flex justify-start';
-        loadingDiv.innerHTML = `
+        loadingDiv.innerHTML = /* html */ `
             <div class='bg-gray-100 rounded-lg p-3 max-w-3/4 flex items-center space-x-2'>
-                <div class="typing-indicator">
+                <div class='typing-indicator'>
                     <span></span>
                     <span></span>
                     <span></span>
@@ -84,9 +84,9 @@
             if (this.imageFile) {
                 const userDiv = document.createElement('div');
                 userDiv.className = 'flex justify-end';
-                userDiv.innerHTML = `
+                userDiv.innerHTML = /* html */ `
                     <div class='bg-green-600 text-white rounded-lg p-3 max-w-3/4'>
-                        <img src="${this.imagePreview}" class='max-w-full h-auto rounded mb-2'>
+                        <img src='${this.imagePreview}' class='max-w-full h-auto rounded mb-2'>
                         ${this.message ? `<p>${this.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>` : ''}
                     </div>
                 `;
@@ -113,10 +113,13 @@
                     console.log('New conversation started with ID:', this.conversationId);
                 }
                 
+                // Remove loading indicator
+                loadingDiv.remove();
+                
                 const botDiv = document.createElement('div');
                 botDiv.className = 'flex justify-start';
                 const markdownContent = marked.parse(data.response);
-                botDiv.innerHTML = `
+                botDiv.innerHTML = /* html */ `
                     <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
                         ${markdownContent}
                     </div>
@@ -128,7 +131,7 @@
             } else {
                 const userDiv = document.createElement('div');
                 userDiv.className = 'flex justify-end';
-                userDiv.innerHTML = `
+                userDiv.innerHTML = /* html */ `
                     <div class='bg-green-600 text-white rounded-lg p-3 max-w-3/4'>
                         ${this.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
                     </div>
@@ -151,10 +154,13 @@
                 
                 const data = await response.json();
                 
+                // Remove loading indicator
+                loadingDiv.remove();
+                
                 const botDiv = document.createElement('div');
                 botDiv.className = 'flex justify-start';
                 const markdownContent = marked.parse(data.response);
-                botDiv.innerHTML = `
+                botDiv.innerHTML = /* html */ `
                     <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
                         ${markdownContent}
                     </div>
@@ -164,13 +170,9 @@
             
             this.message = '';
             
-            // Remove loading indicator before adding response
-            loadingDiv.remove();
-            
-            // Add response and scroll
-            chatHistory.appendChild(botDiv);
+            // Scroll to the new message
             setTimeout(() => {
-                botDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                chatHistory.scrollTop = chatHistory.scrollHeight;
             }, 100);
 
         } catch (error) {
@@ -180,7 +182,7 @@
             console.error('Error:', error);
             const errorDiv = document.createElement('div');
             errorDiv.className = 'flex justify-start';
-            errorDiv.innerHTML = `
+            errorDiv.innerHTML = /* html */ `
                 <div class='bg-red-100 text-red-700 rounded-lg p-3 max-w-3/4'>
                     Sorry, there was an error processing your request.
                 </div>
