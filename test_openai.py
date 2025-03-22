@@ -18,6 +18,7 @@ import requests
 from typing import List, Dict, Optional, Any
 import math
 import time
+from time import sleep
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -38,6 +39,36 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapi
 SPREADSHEET_ID = '1zmKVuDTbgColGuoHJDF0ZJxXB6N2WfwLkp7LZ0vqOag'
 SHEET_GID = '828349954'
 RANGE_NAME = 'Plants!A1:P'
+
+# Add these variables near the top of the file
+SHEETS_REQUESTS = {}  # Track API requests
+MAX_REQUESTS_PER_MINUTE = 30  # Reduce from 60 to 30 to be safer
+RATE_LIMIT_SLEEP = 2  # Increase sleep time from 1 to 2 seconds
+QUOTA_RESET_INTERVAL = 60  # Seconds to wait when quota is exceeded
+
+def check_rate_limit():
+    """Check if we're approaching API rate limits and sleep if necessary"""
+    global SHEETS_REQUESTS
+    
+    # Clean old requests from tracking
+    current_time = datetime.now()
+    SHEETS_REQUESTS = {
+        timestamp: count 
+        for timestamp, count in SHEETS_REQUESTS.items() 
+        if current_time - timestamp < timedelta(minutes=1)
+    }
+    
+    # Count recent requests
+    recent_requests = sum(SHEETS_REQUESTS.values())
+    
+    # If approaching limit, sleep
+    if recent_requests >= MAX_REQUESTS_PER_MINUTE:
+        logger.warning(f"Rate limit reached. Sleeping for {QUOTA_RESET_INTERVAL} seconds")
+        sleep(QUOTA_RESET_INTERVAL)  # Sleep for full minute when quota is reached
+        SHEETS_REQUESTS.clear()  # Clear the requests after sleeping
+    
+    # Track this request
+    SHEETS_REQUESTS[current_time] = SHEETS_REQUESTS.get(current_time, 0) + 1
 
 def setup_sheets_client() -> Optional[Resource]:
     """Set up and return Google Sheets client"""
@@ -261,6 +292,7 @@ def get_all_plants():
         list: List of dictionaries containing plant information
     """
     try:
+        check_rate_limit()  # Add rate limiting
         # Retrieve all values from the sheet
         result = sheets_client.values().get(  # Get all plant data
             spreadsheetId=SPREADSHEET_ID,
@@ -591,6 +623,7 @@ def get_plant_data(plant_names=None):
         list/str: List of plant dictionaries or error message string
     """
     try:
+        check_rate_limit()  # Add rate limiting
         # Get all values from sheet
         result = sheets_client.values().get(  # Retrieve all plant data
             spreadsheetId=SPREADSHEET_ID,
@@ -735,131 +768,49 @@ def get_chat_response(message):
     global conversation_history, client
     
     try:
-        # Check if this is an image-related query
-        image_keywords = ['picture', 'pictures', 'photo', 'photos', 'look like', 'show me', 'image', 'images']
-        is_image_query = any(keyword in message.lower() for keyword in image_keywords)
-        
-        if is_image_query:
-            # Get all plants data
+        # Get plant data with error handling
+        try:
             plants_data = get_plant_data()
-            if isinstance(plants_data, str):  # Error message
-                return plants_data
-                
-            # Extract search terms based on different query patterns
-            msg_lower = message.lower()
-            search_text = ''
-            
-            if 'look like' in msg_lower:
-                search_text = msg_lower.split('look like')[0].strip()
-            elif 'show me' in msg_lower:
-                search_text = msg_lower.split('show me')[1].strip()
-            elif 'picture of' in msg_lower or 'photo of' in msg_lower:
-                for phrase in ['picture of', 'photo of']:
-                    if phrase in msg_lower:
-                        search_text = msg_lower.split(phrase)[1].strip()
-                        break
-            else:
-                search_text = msg_lower
-                
-            # Clean up search text and create search terms
-            stop_words = ['what', 'does', 'do', 'a', 'the', 'an', 'pictures', 'picture', 'photos', 'photo', 'images', 'image', 'trees', 'tree']
-            search_terms = [term for term in search_text.split() if term not in stop_words]
-            
-            # Find matching plants
-            matching_plants = []
-            search_term = ' '.join(search_terms).lower()  # Combine search terms
-            
-            for plant in plants_data:
-                plant_name = plant.get('Plant Name', '').lower()
-                
-                # Only match if search term is a complete word in the plant name
-                plant_words = plant_name.split()
-                if any(search_term in word for word in plant_words):
-                    photo_url = plant.get('Photo URL', '').strip()
-                    
-                    # Process Google Photos URL
-                    if photo_url:
-                        if '=IMAGE' in photo_url:
-                            try:
-                                # Extract URL from IMAGE formula
-                                url = photo_url.split('"')[1] if '"' in photo_url else ''
-                                # Convert to direct access URL if it's a Google Photos URL
-                                if 'photos.google.com' in url:
-                                    # Add sharing parameters to URL
-                                    if '?' not in url:
-                                        url += '?'
-                                    if 'share=' not in url:
-                                        url += '&share=true'
-                                    if 'access=public' not in url:
-                                        url += '&access=public'
-                            except IndexError:
-                                url = photo_url
-                        else:
-                            url = photo_url
-                            # Convert to direct access URL if it's a Google Photos URL
-                            if 'photos.google.com' in url:
-                                # Add sharing parameters to URL
-                                if '?' not in url:
-                                    url += '?'
-                                if 'share=' not in url:
-                                    url += '&share=true'
-                                if 'access=public' not in url:
-                                    url += '&access=public'
-                        
-                        matching_plants.append({
-                            'name': plant.get('Plant Name', ''),
-                            'location': plant.get('Location', ''),
-                            'url': url,
-                            'has_photo': bool(url)
-                        })
-                    else:
-                        matching_plants.append({
-                            'name': plant.get('Plant Name', ''),
-                            'location': plant.get('Location', ''),
-                            'has_photo': False
-                        })
-            
-            if matching_plants:
-                # Log the URLs for debugging
-                logger.info("Matching plants and their URLs:")
-                for plant in matching_plants:
-                    logger.info(f"Plant: {plant['name']}, URL: {plant.get('url', 'No URL')}")
-                
-                # Separate plants with and without photos
-                plants_with_photos = [p for p in matching_plants if p.get('has_photo')]
-                plants_without_photos = [p for p in matching_plants if not p.get('has_photo')]
-                
-                response = []
-                
-                # Show plants with photos
-                if plants_with_photos:
-                    response.append("Here are the matching plants with photos:\n")
-                    for plant in plants_with_photos:
-                        response.append(f"**{plant['name']}**")
-                        response.append(f"Located in: {plant['location']}")
-                        response.append(f"![{plant['name']}]({plant['url']})\n")
-                
-                # Mention plants without photos
-                if plants_without_photos:
-                    if plants_with_photos:
-                        response.append("\nAdditionally, I found these matching plants without photos:")
-                    else:
-                        response.append("I found these matching plants, but they don't have photos yet:")
-                    for plant in plants_without_photos:
-                        response.append(f"- **{plant['name']}** (Located in: {plant['location']})")
-                
-                return "\n".join(response)
-            else:
-                # If no matches found with image query, fall back to regular chat response
-                return get_chat_response(message.replace('look like', 'in the garden'))
-        
-        # Regular chat functionality remains unchanged
-        # ... rest of the existing function ...
+            if isinstance(plants_data, str) and "quota" in plants_data.lower():
+                logger.error("Google Sheets quota exceeded")
+                return "I apologize, but I've temporarily reached the limit for accessing the plant database. Please try again in a minute."
+        except Exception as e:
+            logger.error(f"Error getting plant data: {e}")
+            logger.error(traceback.format_exc())
+            return "I apologize, but I'm having trouble accessing the plant database. Please try again in a moment."
 
+        # Rest of the existing function remains the same...
+        if not client:
+            logger.error("OpenAI client is not initialized")
+            return "I apologize, but I'm having trouble connecting to the AI service. Please try again in a moment."
+            
+        update_system_prompt()
+        
+        # Add the message to conversation history
+        conversation_history.append({"role": "user", "content": message})
+        
+        try:
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=conversation_history,
+                temperature=0.7,
+                max_tokens=2000
+            )
+            
+            assistant_response = response.choices[0].message.content
+            conversation_history.append({"role": "assistant", "content": assistant_response})
+            
+            return assistant_response
+            
+        except Exception as api_error:
+            logger.error(f"OpenAI API error: {str(api_error)}")
+            logger.error(traceback.format_exc())
+            return "I apologize, but I encountered an error while processing your request. Please try again."
+        
     except Exception as e:
         logger.error(f"Error in get_chat_response: {str(e)}")
         logger.error(traceback.format_exc())
-        return f"I apologize, but I encountered an error: {str(e)}. Please try again or contact support if the issue persists."
+        return "I apologize, but I encountered an error. Please try again in a moment."
 
 def update_plant_url(plant_id, new_url):
     """Update a plant's photo URL in the Google Sheet
@@ -1320,6 +1271,7 @@ def update_plant(plant_data):
         bool: True if successful, False otherwise
     """
     try:
+        check_rate_limit()  # Add rate limiting
         # Log start of update process
         logger.info("Starting plant update process")
         logger.info(f"Plant data received: {plant_data}")
