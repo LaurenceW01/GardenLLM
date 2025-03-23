@@ -322,36 +322,61 @@ def parse_care_guide(response: str) -> Dict[str, str]:
     }
     
     try:
+        # Log the raw response for debugging
+        logger.info(f"Raw response to parse: {response[:100]}...")
+        
         # Split the response into sections based on the ** markers
         sections = response.split('**')
         
+        logger.info(f"Found {len(sections)} sections")
+        
         # Process each section
         for section in sections:
-            if not section.strip():
+            section = section.strip()
+            if not section:
                 continue
                 
             # Split section into title and content
-            parts = section.split(':', 1)
-            if len(parts) != 2:
-                continue
-                
-            title = parts[0].strip()
-            content = parts[1].strip()
+            if '\n' in section:
+                # Handle multiline sections
+                first_line = section.split('\n', 1)[0].strip()
+                if ':' in first_line:
+                    title = first_line.split(':', 1)[0].strip()
+                    # Get content after the first line
+                    content = section.split('\n', 1)[1].strip() if '\n' in section else ''
+                else:
+                    continue
+            else:
+                # Handle single line sections
+                if ':' not in section:
+                    continue
+                title = section.split(':', 1)[0].strip()
+                content = section.split(':', 1)[1].strip()
             
-            # Remove any leading/trailing whitespace and newlines
-            content = ' '.join(content.split())
+            # Log the title we found for debugging
+            logger.info(f"Found section title: '{title}'")
             
             # Store content if title matches exactly
             if title in care_details:
                 care_details[title] = content
-                logger.info(f"Parsed section '{title}': {content[:50]}...")
+                logger.info(f"Matched section '{title}': {content[:50]}...")
+            else:
+                # Log if we found a title that doesn't match our expected fields
+                logger.warning(f"Unmatched section title: '{title}'")
     except Exception as e:
         logger.error(f"Error parsing care guide: {e}")
         logger.error(f"Response: {response}")
     
-    # Verify all sections were found
+    # Verify all sections were found and log the results
     missing_sections = [title for title, content in care_details.items() if not content]
     if missing_sections:
         logger.warning(f"Missing sections in care guide: {missing_sections}")
+    else:
+        logger.info("All sections were found and parsed successfully")
+    
+    # Log the final parsed data
+    logger.info("Final parsed care details:")
+    for title, content in care_details.items():
+        logger.info(f"{title}: {content[:50]}...")
     
     return care_details
