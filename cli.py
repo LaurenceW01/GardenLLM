@@ -15,12 +15,11 @@ from plant_operations import (
     get_all_plants,
     find_plant_by_id_or_name,
     update_plant_field,
-    update_plant,
-    parse_care_guide
+    update_plant
 )
 from chat_response import get_chat_response
 from weather_service import get_weather_forecast, analyze_forecast_for_plants, handle_weather_query
-from config import setup_sheets_client, initialize_sheet, SPREADSHEET_ID, RANGE_NAME
+from test_openai import setup_sheets_client, initialize_sheet, parse_care_guide, SPREADSHEET_ID, RANGE_NAME
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -73,17 +72,20 @@ class GardenBotCLI:
             # Handle add plant command
             if command.lower().startswith('add plant '):
                 try:
-                    # Split command into parts
-                    parts = command.split(' location ')
-                    if len(parts) != 2:
-                        return "Please specify the plant name and location(s). Format: add plant [name] location [location1], [location2], ..."
+                    # Extract the command parts after "add plant"
+                    command_parts = command[len('add plant '):].strip()
                     
-                    # Extract plant name and clean it
-                    plant_name = parts[0].replace('add plant', '', 1).strip()
-                    plant_name = ' '.join(word.capitalize() for word in plant_name.split())
+                    # Find the location keyword
+                    location_index = command_parts.lower().find('location')
+                    if location_index == -1:
+                        return "Please specify the location using 'location' keyword. Format: add plant [name] location [location1], [location2], ..."
+                    
+                    # Split into plant name and locations
+                    plant_name = command_parts[:location_index].strip()
+                    locations_part = command_parts[location_index + len('location'):].strip()
                     
                     # Process locations and URL if present
-                    location_url_parts = parts[1].split(' url ')
+                    location_url_parts = locations_part.split(' url ')
                     locations = [loc.strip() for loc in location_url_parts[0].split(',') if loc.strip()]
                     if not locations:
                         return "Please specify at least one location for the plant."

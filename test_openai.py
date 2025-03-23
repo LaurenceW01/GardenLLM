@@ -297,3 +297,63 @@ def get_photo_url_from_album(photo_url):
     except Exception as e:
         logger.error(f"Error formatting photo URL: {e}")
         return photo_url
+
+def parse_care_guide(response: str) -> Dict[str, str]:
+    """Parse the care guide response from OpenAI into a structured dictionary.
+    
+    Args:
+        response (str): The response text from OpenAI containing the care guide
+        
+    Returns:
+        Dict[str, str]: A dictionary containing parsed care guide sections
+    """
+    # Initialize the dictionary with empty values for all expected fields
+    care_details = {
+        'Description': '',
+        'Light Requirements': '',
+        'Soil Preferences': '',
+        'Watering Needs': '',
+        'Frost Tolerance': '',
+        'Pruning Instructions': '',
+        'Mulching Needs': '',
+        'Fertilizing Schedule': '',
+        'Winterizing Instructions': '',
+        'Spacing Requirements': '',
+    }
+    
+    # Split the response into sections based on the ** markers
+    sections = response.split('**')
+    
+    # Process each section
+    for section in sections:
+        if not section.strip():
+            continue
+            
+        # Split section into title and content
+        parts = section.split(':', 1)
+        if len(parts) != 2:
+            continue
+            
+        title, content = parts[0].strip(), parts[1].strip()
+        
+        # Map section titles to dictionary keys
+        key_mapping = {
+            'Description': 'Description',
+            'Light': 'Light Requirements',
+            'Soil': 'Soil Preferences',
+            'Watering': 'Watering Needs',
+            'Temperature': 'Frost Tolerance',
+            'Pruning': 'Pruning Instructions',
+            'Mulching': 'Mulching Needs',
+            'Fertilizing': 'Fertilizing Schedule',
+            'Winter Care': 'Winterizing Instructions',
+            'Spacing': 'Spacing Requirements'
+        }
+        
+        # Store the content under the appropriate key
+        for section_title, dict_key in key_mapping.items():
+            if title.startswith(section_title):
+                care_details[dict_key] = content.strip()
+                break
+    
+    return care_details
