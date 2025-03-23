@@ -4,7 +4,7 @@ from time import sleep
 from typing import List, Dict, Optional, Any
 from config import (
     sheets_client, SPREADSHEET_ID, RANGE_NAME, SHEETS_REQUESTS,
-    MAX_REQUESTS_PER_MINUTE, QUOTA_RESET_INTERVAL
+    MAX_REQUESTS_PER_MINUTE, QUOTA_RESET_INTERVAL, SHEET_GID
 )
 
 logger = logging.getLogger(__name__)
@@ -133,6 +133,28 @@ def initialize_sheet(start_cli=False):
         spreadsheetId=SPREADSHEET_ID,
         body={'requests': requests}
     ).execute()
+    
+    # Add formula to extract URLs from IMAGE formulas in the Raw Photo URL column
+    result = sheets_client.values().get(
+        spreadsheetId=SPREADSHEET_ID,
+        range='Plants!A2:O'  # Get all rows except header, up to Photo URL column
+    ).execute()
+    
+    values = result.get('values', [])
+    if values:
+        formulas = []
+        for i in range(len(values)):
+            row_num = i + 2  # Start from row 2 (after header)
+            formula = f'=IF(O{row_num}<>"", REGEXEXTRACT(FORMULATEXT(O{row_num}), """(https?://[^""]+)"""), "")'
+            formulas.append([formula])
+        
+        # Update Raw Photo URL column with formulas
+        sheets_client.values().update(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f'Plants!P2:P{len(values)+1}',
+            valueInputOption='USER_ENTERED',
+            body={'values': formulas}
+        ).execute()
     
     print("Sheet initialized successfully!")
     
