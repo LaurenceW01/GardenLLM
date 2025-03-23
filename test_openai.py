@@ -354,6 +354,6 @@ def parse_care_guide(response: str) -> Dict[str, str]:
         for section_title, dict_key in key_mapping.items():
             if title.startswith(section_title):
                 care_details[dict_key] = content.strip()
-                break
+        break
     
     return care_details
