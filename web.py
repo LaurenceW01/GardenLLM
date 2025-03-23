@@ -14,10 +14,14 @@ import os
 from typing import Optional, List, Dict
 import traceback
 from datetime import datetime
+from openai import OpenAI
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Initialize OpenAI client
+openai_client = OpenAI()
 
 app = FastAPI(title="GardenLLM API")
 
@@ -243,11 +247,11 @@ async def add_plant(request: AddPlantRequest):
     try:
         # Create plant info request
         prompt = (
-            f"Create a detailed plant care guide for {request.name} in Houston, TX. "
+            f"You are a gardening expert assistant. Create a detailed plant care guide for {request.name} in Houston, TX. "
             "Include care requirements, growing conditions, and maintenance tips. "
             "Focus on practical advice for the specified locations: " + 
             ', '.join(request.locations) + "\n\n" +
-            "Please include sections for:\n" +
+            "Format your response with these exact sections:\n" +
             "**Description:**\n" +
             "**Light:**\n" +
             "**Soil:**\n" +
@@ -257,14 +261,26 @@ async def add_plant(request: AddPlantRequest):
             "**Mulching:**\n" +
             "**Fertilizing:**\n" +
             "**Winter Care:**\n" +
-            "**Spacing:**"
+            "**Spacing:**\n\n" +
+            "Be specific and detailed in each section. Focus on practical care instructions."
         )
         
         # Get plant care information from OpenAI
-        response = get_chat_response(prompt)
+        response = openai_client.chat.completions.create(
+            model="gpt-4-turbo-preview",
+            messages=[
+                {"role": "system", "content": "You are a gardening expert assistant. Provide detailed, practical plant care guides with specific instructions."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=1000
+        )
+        
+        # Extract the response text
+        care_guide = response.choices[0].message.content
         
         # Parse the care guide to extract details
-        care_details = parse_care_guide(response)
+        care_details = parse_care_guide(care_guide)
         
         # Create plant data with all fields
         plant_data = {
@@ -280,7 +296,7 @@ async def add_plant(request: AddPlantRequest):
             'Fertilizing Schedule': care_details.get('Fertilizing Schedule', ''),
             'Winterizing Instructions': care_details.get('Winterizing Instructions', ''),
             'Spacing Requirements': care_details.get('Spacing Requirements', ''),
-            'Care Notes': response,
+            'Care Notes': care_guide,
             'Photo URL': request.photo_url or ''
         }
         
@@ -289,7 +305,7 @@ async def add_plant(request: AddPlantRequest):
             return {
                 "success": True,
                 "message": f"Added plant '{request.name}' to locations: {', '.join(request.locations)}",
-                "care_guide": response,
+                "care_guide": care_guide,
                 "plant_data": plant_data
             }
         else:
