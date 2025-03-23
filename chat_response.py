@@ -113,6 +113,12 @@ def get_chat_response(message: str) -> str:
             if not plant_data:
                 return f"I couldn't find any plants matching '{search_term}' in the database."
             
+            # Log available data for debugging
+            for plant in plant_data:
+                logger.info(f"Plant data - Name: {plant.get('Plant Name')}")
+                logger.info(f"Photo URL: {plant.get('Photo URL')}")
+                logger.info(f"Raw Photo URL: {plant.get('Raw Photo URL')}")
+            
             # Handle location queries
             if is_location_query:
                 response_parts = []
@@ -123,6 +129,15 @@ def get_chat_response(message: str) -> str:
                         response_parts.append(f"The {plant_name} is located in the {location}.")
                     else:
                         response_parts.append(f"I found {plant_name}, but its location is not specified.")
+                
+                # Add photos to location responses if available
+                for plant in plant_data:
+                    raw_photo_url = plant.get('Raw Photo URL', '')
+                    if raw_photo_url:
+                        if 'photos.google.com' in raw_photo_url:
+                            raw_photo_url = raw_photo_url.split('?')[0] + '?authuser=0'
+                        response_parts.append(f"\nYou can see a photo of the {plant['Plant Name']} here: {raw_photo_url}")
+                
                 return "\n".join(response_parts)
             
             # Handle image queries
@@ -131,6 +146,7 @@ def get_chat_response(message: str) -> str:
                 for plant in plant_data:
                     plant_name = plant.get('Plant Name', '')
                     raw_photo_url = plant.get('Raw Photo URL', '')
+                    logger.info(f"Processing image query for {plant_name} - Raw Photo URL: {raw_photo_url}")
                     
                     if raw_photo_url:
                         # Format Google Photos URL if needed
