@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Plant - GardenLLM</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 800px;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .location-input {
+            margin-bottom: 10px;
+        }
+        #locationInputs {
+            margin-bottom: 20px;
+        }
+        .success-message {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .care-guide {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">Add New Plant</h1>
+        
+        <form id="addPlantForm">
+            <div class="mb-3">
+                <label for="plantName" class="form-label">Plant Name</label>
+                <input type="text" class="form-control" id="plantName" required>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Locations</label>
+                <div id="locationInputs">
+                    <div class="location-input">
+                        <input type="text" class="form-control" name="location" required>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-secondary mt-2" onclick="addLocationInput()">Add Another Location</button>
+            </div>
+            
+            <div class="mb-3">
+                <label for="photoUrl" class="form-label">Photo URL (optional)</label>
+                <input type="url" class="form-control" id="photoUrl">
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Add Plant</button>
+        </form>
+        
+        <div id="successMessage" class="success-message alert alert-success">
+            Plant added successfully!
+        </div>
+        
+        <div id="errorMessage" class="success-message alert alert-danger">
+        </div>
+        
+        <div id="careGuide" class="care-guide" style="display: none;">
+            <h3>Care Guide</h3>
+            <div id="careGuideContent"></div>
+        </div>
+    </div>
+
+    <script>
+        function addLocationInput() {
+            const container = document.getElementById('locationInputs');
+            const div = document.createElement('div');
+            div.className = 'location-input';
+            div.innerHTML = `
+                <div class="input-group">
+                    <input type="text" class="form-control" name="location" required>
+                    <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.parentElement.remove()">Remove</button>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        document.getElementById('addPlantForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const plantName = document.getElementById('plantName').value;
+            const locations = Array.from(document.getElementsByName('location'))
+                                 .map(input => input.value.trim())
+                                 .filter(value => value);
+            const photoUrl = document.getElementById('photoUrl').value;
+            
+            const data = {
+                name: plantName,
+                locations: locations,
+                photo_url: photoUrl || null
+            };
+            
+            try {
+                const response = await fetch('/api/plants', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('successMessage').style.display = 'block';
+                    document.getElementById('errorMessage').style.display = 'none';
+                    
+                    // Display care guide
+                    document.getElementById('careGuide').style.display = 'block';
+                    document.getElementById('careGuideContent').textContent = result.care_guide;
+                    
+                    // Clear form
+                    document.getElementById('addPlantForm').reset();
+                    const locationInputs = document.getElementById('locationInputs');
+                    locationInputs.innerHTML = `
+                        <div class="location-input">
+                            <input type="text" class="form-control" name="location" required>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(result.detail || 'Failed to add plant');
+                }
+            } catch (error) {
+                document.getElementById('successMessage').style.display = 'none';
+                document.getElementById('errorMessage').style.display = 'block';
+                document.getElementById('errorMessage').textContent = error.message;
+            }
+        });
+    </script>
+</body>
+</html> 

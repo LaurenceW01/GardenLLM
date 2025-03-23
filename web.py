@@ -7,6 +7,8 @@ from pydantic import BaseModel
 from chat_response import get_chat_response
 from weather_service import get_weather_forecast, analyze_forecast_for_plants, handle_weather_query
 from plant_vision import analyze_plant_image, validate_image, save_image, conversation_manager, client, MODEL_NAME
+from plant_operations import update_plant
+from test_openai import parse_care_guide
 import logging
 import os
 from typing import Optional, List, Dict
@@ -45,6 +47,12 @@ class WeatherResponse(BaseModel):
 class ImageAnalysisRequest(BaseModel):
     message: Optional[str] = None
     conversation_id: Optional[str] = None
+
+class AddPlantRequest(BaseModel):
+    """Request model for adding a plant"""
+    name: str
+    locations: List[str]
+    photo_url: Optional[str] = None
 
 @app.get("/", response_class=HTMLResponse)
 @app.head("/")
@@ -228,3 +236,77 @@ async def analyze_plant(
         logger.error(f"Error in analyze_plant endpoint: {e}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/plants")
+async def add_plant(request: AddPlantRequest):
+    """Add a new plant to the database"""
+    try:
+        # Create plant info request
+        prompt = (
+            f"Create a detailed plant care guide for {request.name} in Houston, TX. "
+            "Include care requirements, growing conditions, and maintenance tips. "
+            "Focus on practical advice for the specified locations: " + 
+            ', '.join(request.locations) + "\n\n" +
+            "Please include sections for:\n" +
+            "**Description:**\n" +
+            "**Light:**\n" +
+            "**Soil:**\n" +
+            "**Watering:**\n" +
+            "**Temperature:**\n" +
+            "**Pruning:**\n" +
+            "**Mulching:**\n" +
+            "**Fertilizing:**\n" +
+            "**Winter Care:**\n" +
+            "**Spacing:**"
+        )
+        
+        # Get plant care information from OpenAI
+        response = get_chat_response(prompt)
+        
+        # Parse the care guide to extract details
+        care_details = parse_care_guide(response)
+        
+        # Create plant data with all fields
+        plant_data = {
+            'Plant Name': request.name,
+            'Location': ', '.join(request.locations),
+            'Description': care_details.get('Description', ''),
+            'Light Requirements': care_details.get('Light Requirements', ''),
+            'Soil Preferences': care_details.get('Soil Preferences', ''),
+            'Watering Needs': care_details.get('Watering Needs', ''),
+            'Frost Tolerance': care_details.get('Frost Tolerance', ''),
+            'Pruning Instructions': care_details.get('Pruning Instructions', ''),
+            'Mulching Needs': care_details.get('Mulching Needs', ''),
+            'Fertilizing Schedule': care_details.get('Fertilizing Schedule', ''),
+            'Winterizing Instructions': care_details.get('Winterizing Instructions', ''),
+            'Spacing Requirements': care_details.get('Spacing Requirements', ''),
+            'Care Notes': response,
+            'Photo URL': request.photo_url or ''
+        }
+        
+        # Add the plant to the spreadsheet
+        if update_plant(plant_data):
+            return {
+                "success": True,
+                "message": f"Added plant '{request.name}' to locations: {', '.join(request.locations)}",
+                "care_guide": response,
+                "plant_data": plant_data
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error adding plant '{request.name}' to database"
+            )
+            
+    except Exception as e:
+        logger.error(f"Error adding plant: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/add-plant", response_class=HTMLResponse)
+async def add_plant_page(request: Request):
+    """Page for adding new plants"""
+    return templates.TemplateResponse(
+        "add_plant.html",
+        {"request": request}
+    )
