@@ -66,6 +66,11 @@ def get_plant_data(plant_names=None) -> List[Dict]:
             row_data = row + [''] * (len(headers) - len(row))
             plant_dict = dict(zip(headers, row_data))
             
+            # Debug log the photo URLs
+            print(f"\n=== DEBUG: Photo URLs for {plant_dict.get('Plant Name', 'Unknown Plant')} ===")
+            print(f"Photo URL (formula): {plant_dict.get('Photo URL', '')}")
+            print(f"Raw Photo URL: {plant_dict.get('Raw Photo URL', '')}")
+            
             if plant_names:
                 if any(name.lower() in plant_dict['Plant Name'].lower() for name in plant_names):
                     plants_data.append(plant_dict)
