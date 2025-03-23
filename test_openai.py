@@ -321,23 +321,37 @@ def parse_care_guide(response: str) -> Dict[str, str]:
         'Spacing Requirements': '',
     }
     
-    # Split the response into sections based on the ** markers
-    sections = response.split('**')
-    
-    # Process each section
-    for section in sections:
-        if not section.strip():
-            continue
-            
-        # Split section into title and content
-        parts = section.split(':', 1)
-        if len(parts) != 2:
-            continue
-            
-        title, content = parts[0].strip(), parts[1].strip()
+    try:
+        # Split the response into sections based on the ** markers
+        sections = response.split('**')
         
-        # Exact title matching - no mapping needed
-        if title in care_details:
-            care_details[title] = content.strip()
+        # Process each section
+        for section in sections:
+            if not section.strip():
+                continue
+                
+            # Split section into title and content
+            parts = section.split(':', 1)
+            if len(parts) != 2:
+                continue
+                
+            title = parts[0].strip()
+            content = parts[1].strip()
+            
+            # Remove any leading/trailing whitespace and newlines
+            content = ' '.join(content.split())
+            
+            # Store content if title matches exactly
+            if title in care_details:
+                care_details[title] = content
+                logger.info(f"Parsed section '{title}': {content[:50]}...")
+    except Exception as e:
+        logger.error(f"Error parsing care guide: {e}")
+        logger.error(f"Response: {response}")
+    
+    # Verify all sections were found
+    missing_sections = [title for title, content in care_details.items() if not content]
+    if missing_sections:
+        logger.warning(f"Missing sections in care guide: {missing_sections}")
     
     return care_details
