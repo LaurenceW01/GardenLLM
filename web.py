@@ -46,39 +46,6 @@ class ImageAnalysisRequest(BaseModel):
     message: Optional[str] = None
     conversation_id: Optional[str] = None
 
-def handle_weather_query(message: str) -> str:
-    """Handle weather-related queries and return formatted response"""
-    try:
-        logger.info("Getting weather forecast...")
-        forecast = get_weather_forecast()
-        if not forecast:
-            return "I'm sorry, I couldn't retrieve the weather forecast at this time."
-
-        advice = analyze_forecast_for_plants(forecast)
-        
-        # Format the response
-        response = "🌿 Weather Forecast and Plant Care Advice 🌿\n\n"
-        
-        # Add forecast summary
-        response += "Weather Forecast:\n"
-        for day in forecast[:5]:  # Show next 5 days
-            response += f"\n📅 {day['date']}:\n"
-            response += f"• Temperature: {day['temp_min']}°F to {day['temp_max']}°F\n"
-            response += f"• Conditions: {day['description']}\n"
-            response += f"• Rain: {day['rain']} inches\n"
-            response += f"• Humidity: {day['humidity']}%\n"
-            response += f"• Wind: {day['wind_speed']} mph\n"
-        
-        # Add plant care advice
-        response += "\n🌱 Plant Care Recommendations:\n"
-        response += advice
-        
-        return response
-    except Exception as e:
-        logger.error(f"Error handling weather query: {e}")
-        logger.error(traceback.format_exc())
-        return "I'm sorry, I encountered an error while processing the weather information."
-
 @app.get("/", response_class=HTMLResponse)
 @app.head("/")
 async def home(request: Request):

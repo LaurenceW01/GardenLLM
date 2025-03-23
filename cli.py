@@ -11,22 +11,16 @@ import pytz
 from datetime import datetime
 import requests
 from typing import List, Dict
-from test_openai import (
+from plant_operations import (
     get_all_plants,
     find_plant_by_id_or_name,
     update_plant_field,
-    get_chat_response,
-    display_weather_advice,
-    setup_sheets_client,
-    initialize_sheet,
-    gardenbot_response,
-    SPREADSHEET_ID,
-    RANGE_NAME,
-    parse_care_guide,
-    update_plant
+    update_plant,
+    parse_care_guide
 )
 from chat_response import get_chat_response
 from weather_service import get_weather_forecast, analyze_forecast_for_plants, handle_weather_query
+from config import setup_sheets_client, initialize_sheet, SPREADSHEET_ID, RANGE_NAME
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
