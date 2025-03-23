@@ -25,6 +25,8 @@ from test_openai import (
     parse_care_guide,
     update_plant
 )
+from chat_response import get_chat_response
+from weather_service import get_weather_forecast, analyze_forecast_for_plants, handle_weather_query
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -71,8 +73,8 @@ class GardenBotCLI:
             
             # If it's a weather command, show weather advice
             if command.lower() == 'weather':
-                display_weather_advice()
-                return "Weather advice displayed above."
+                forecast = get_weather_forecast()
+                return analyze_forecast_for_plants(forecast)
             
             # Handle add plant command
             if command.lower().startswith('add plant '):
@@ -148,8 +150,8 @@ class GardenBotCLI:
                     logger.error(f"Error adding plant: {e}")
                     return f"Error adding plant: {str(e)}"
             
-            # For all other commands, use the existing gardenbot_response function
-            response = gardenbot_response(command)
+            # For all other commands, use the chat response function
+            response = get_chat_response(command)
             return response
             
         except Exception as e:

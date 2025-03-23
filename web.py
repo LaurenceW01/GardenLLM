@@ -4,7 +4,8 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from test_openai import gardenbot_response, get_weather_forecast, analyze_forecast_for_plants
+from chat_response import get_chat_response
+from weather_service import get_weather_forecast, analyze_forecast_for_plants, handle_weather_query
 from plant_vision import analyze_plant_image, validate_image, save_image, conversation_manager, client, MODEL_NAME
 import logging
 import os
@@ -183,58 +184,10 @@ async def weather_page(request: Request):
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    logger.info(f"Chat endpoint accessed with message: {request.message} (conversation_id: {request.conversation_id})")
+    """Handle chat requests"""
     try:
-        # Check if there's an active conversation
-        if request.conversation_id and conversation_manager.get_messages(request.conversation_id):
-            logger.info("Using existing conversation context")
-            
-            # Add user message to conversation
-            conversation_manager.add_message(request.conversation_id, {
-                "role": "user",
-                "content": request.message
-            })
-            
-            # Get conversation history
-            messages = conversation_manager.get_messages(request.conversation_id)
-            
-            # Call GPT-4 with conversation history
-            response = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """You are a plant expert analyzing a specific plant from a previously shared image. 
-                        IMPORTANT RULES:
-                        1. ONLY answer questions about the specific plant from the image
-                        2. DO NOT ask for plant names or check any database
-                        3. Use the context from the previous image analysis
-                        4. If you're not sure about something, refer to what you can see in the previous image
-                        5. Never mention checking databases or plant lists"""
-                    },
-                    *messages
-                ],
-                max_tokens=1000,
-                temperature=0.7,
-                response_format={ "type": "text" }
-            )
-            
-            # Add assistant's response to conversation history
-            conversation_manager.add_message(request.conversation_id, {
-                "role": "assistant",
-                "content": response.choices[0].message.content
-            })
-            
-            return {
-                "response": response.choices[0].message.content,
-                "conversation_id": request.conversation_id
-            }
-        else:
-            logger.info("No active conversation, using garden database query")
-            # No active conversation, use regular garden database query
-            response = gardenbot_response(request.message)
-            return {"response": response}
-            
+        response = get_chat_response(request.message)
+        return {"response": response}
     except Exception as e:
         logger.error(f"Error in chat endpoint: {e}")
         logger.error(traceback.format_exc())
