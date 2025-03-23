@@ -251,25 +251,26 @@ async def add_plant(request: AddPlantRequest):
             "Include care requirements, growing conditions, and maintenance tips. "
             "Focus on practical advice for the specified locations: " + 
             ', '.join(request.locations) + "\n\n" +
-            "Format your response with these exact sections:\n" +
+            "Format your response with these EXACT section titles - do not modify them:\n" +
             "**Description:**\n" +
-            "**Light:**\n" +
-            "**Soil:**\n" +
-            "**Watering:**\n" +
-            "**Temperature:**\n" +
-            "**Pruning:**\n" +
-            "**Mulching:**\n" +
-            "**Fertilizing:**\n" +
-            "**Winter Care:**\n" +
-            "**Spacing:**\n\n" +
-            "Be specific and detailed in each section. Focus on practical care instructions."
+            "**Light Requirements:**\n" +
+            "**Frost Tolerance:**\n" +
+            "**Watering Needs:**\n" +
+            "**Soil Preferences:**\n" +
+            "**Pruning Instructions:**\n" +
+            "**Mulching Needs:**\n" +
+            "**Fertilizing Schedule:**\n" +
+            "**Winterizing Instructions:**\n" +
+            "**Spacing Requirements:**\n\n" +
+            "Be specific and detailed in each section. Focus on practical care instructions. "
+            "IMPORTANT: Use these exact section titles without modification."
         )
         
         # Get plant care information from OpenAI
         response = openai_client.chat.completions.create(
             model="gpt-4-turbo-preview",
             messages=[
-                {"role": "system", "content": "You are a gardening expert assistant. Provide detailed, practical plant care guides with specific instructions."},
+                {"role": "system", "content": "You are a gardening expert assistant. Provide detailed, practical plant care guides with specific instructions. Use the exact section titles provided without modification."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
@@ -278,9 +279,11 @@ async def add_plant(request: AddPlantRequest):
         
         # Extract the response text
         care_guide = response.choices[0].message.content
+        logger.info(f"Generated care guide: {care_guide}")
         
         # Parse the care guide to extract details
         care_details = parse_care_guide(care_guide)
+        logger.info(f"Parsed care details: {care_details}")
         
         # Create plant data with all fields
         plant_data = {
@@ -299,6 +302,8 @@ async def add_plant(request: AddPlantRequest):
             'Care Notes': care_guide,
             'Photo URL': request.photo_url or ''
         }
+        
+        logger.info(f"Final plant data: {plant_data}")
         
         # Add the plant to the spreadsheet
         if update_plant(plant_data):

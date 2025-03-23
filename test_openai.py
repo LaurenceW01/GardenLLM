@@ -336,24 +336,8 @@ def parse_care_guide(response: str) -> Dict[str, str]:
             
         title, content = parts[0].strip(), parts[1].strip()
         
-        # Map section titles to dictionary keys
-        key_mapping = {
-            'Description': 'Description',
-            'Light': 'Light Requirements',
-            'Soil': 'Soil Preferences',
-            'Watering': 'Watering Needs',
-            'Temperature': 'Frost Tolerance',
-            'Pruning': 'Pruning Instructions',
-            'Mulching': 'Mulching Needs',
-            'Fertilizing': 'Fertilizing Schedule',
-            'Winter Care': 'Winterizing Instructions',
-            'Spacing': 'Spacing Requirements'
-        }
-        
-        # Store the content under the appropriate key
-        for section_title, dict_key in key_mapping.items():
-            if title.startswith(section_title):
-                care_details[dict_key] = content.strip()
-        break
+        # Exact title matching - no mapping needed
+        if title in care_details:
+            care_details[title] = content.strip()
     
     return care_details
