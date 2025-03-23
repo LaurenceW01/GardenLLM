@@ -337,21 +337,12 @@ def parse_care_guide(response: str) -> Dict[str, str]:
                 continue
                 
             # Split section into title and content
-            if '\n' in section:
-                # Handle multiline sections
-                first_line = section.split('\n', 1)[0].strip()
-                if ':' in first_line:
-                    title = first_line.split(':', 1)[0].strip()
-                    # Get content after the first line
-                    content = section.split('\n', 1)[1].strip() if '\n' in section else ''
-                else:
-                    continue
-            else:
-                # Handle single line sections
-                if ':' not in section:
-                    continue
-                title = section.split(':', 1)[0].strip()
-                content = section.split(':', 1)[1].strip()
+            parts = section.split(':', 1)
+            if len(parts) != 2:
+                continue
+                
+            title = parts[0].strip()
+            content = parts[1].strip()
             
             # Log the title we found for debugging
             logger.info(f"Found section title: '{title}'")
@@ -359,7 +350,7 @@ def parse_care_guide(response: str) -> Dict[str, str]:
             # Store content if title matches exactly
             if title in care_details:
                 care_details[title] = content
-                logger.info(f"Matched section '{title}': {content[:50]}...")
+                logger.info(f"Parsed section '{title}': {content[:50]}...")
             else:
                 # Log if we found a title that doesn't match our expected fields
                 logger.warning(f"Unmatched section title: '{title}'")
