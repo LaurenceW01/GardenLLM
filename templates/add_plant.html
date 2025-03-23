@@ -1,196 +1,159 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add Plant - GardenLLM</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body {
-            padding-top: 60px;
-            background-color: #f8f9fa;
-        }
-        .container {
-            max-width: 800px;
-            background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            margin-top: 20px;
-        }
-        .location-input {
-            margin-bottom: 10px;
-        }
-        #locationInputs {
-            margin-bottom: 20px;
-        }
-        .success-message {
-            display: none;
-            margin-top: 20px;
-            padding: 20px;
-            border-radius: 5px;
-        }
-        .care-guide {
-            margin-top: 20px;
-            padding: 20px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            white-space: pre-wrap;
-        }
-        .loading {
-            display: none;
-            margin-top: 20px;
-            text-align: center;
-        }
-    </style>
-</head>
-<body>
-    <!-- Navigation Bar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/">GardenLLM</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/">Home</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/weather">Weather</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/add-plant">Add Plant</a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
+{% extends "base.html" %}
 
-    <div class="container">
-        <h1 class="mb-4">Add New Plant</h1>
+{% block title %}GardenLLM - Add Plant{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+        <h1 class="text-2xl font-bold mb-4">Add New Plant</h1>
         
-        <form id="addPlantForm">
-            <div class="mb-3">
-                <label for="plantName" class="form-label">Plant Name</label>
-                <input type="text" class="form-control" id="plantName" required>
-                <div class="form-text">Enter the name of your plant (e.g. "Fir Tree")</div>
+        <form id="addPlantForm" class="space-y-4">
+            <div>
+                <label for="plantName" class="block text-sm font-medium text-gray-700">Plant Name</label>
+                <input type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500" id="plantName" required>
+                <p class="mt-1 text-sm text-gray-500">Enter the name of your plant (e.g. "Fir Tree")</p>
             </div>
             
-            <div class="mb-3">
-                <label class="form-label">Locations</label>
-                <div id="locationInputs">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Locations</label>
+                <div id="locationInputs" class="space-y-2">
                     <div class="location-input">
-                        <input type="text" class="form-control" name="location" required placeholder="e.g. front, back, patio">
+                        <input type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500" name="location" required placeholder="e.g. front, back, patio">
                     </div>
                 </div>
-                <button type="button" class="btn btn-secondary mt-2" onclick="addLocationInput()">Add Another Location</button>
+                <button type="button" class="mt-2 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" onclick="addLocationInput()">
+                    Add Another Location
+                </button>
             </div>
             
-            <div class="mb-3">
-                <label for="photoUrl" class="form-label">Photo URL (optional)</label>
-                <input type="url" class="form-control" id="photoUrl" placeholder="https://example.com/plant-photo.jpg">
+            <div>
+                <label for="photoUrl" class="block text-sm font-medium text-gray-700">Photo URL (optional)</label>
+                <input type="url" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500" id="photoUrl" placeholder="https://example.com/plant-photo.jpg">
             </div>
             
-            <button type="submit" class="btn btn-primary">Add Plant</button>
+            <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                Add Plant
+            </button>
         </form>
         
-        <div id="loading" class="loading">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
+        <div id="loading" class="hidden mt-4 text-center">
+            <div class="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm text-white transition ease-in-out duration-150 cursor-not-allowed">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Generating plant care guide...
             </div>
-            <p class="mt-2">Generating plant care guide...</p>
         </div>
         
-        <div id="successMessage" class="success-message alert alert-success">
-            Plant added successfully!
+        <div id="successMessage" class="hidden mt-4 p-4 rounded-md bg-green-50 border border-green-400">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-green-800">Plant added successfully!</p>
+                </div>
+            </div>
         </div>
         
-        <div id="errorMessage" class="success-message alert alert-danger">
+        <div id="errorMessage" class="hidden mt-4 p-4 rounded-md bg-red-50 border border-red-400">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-red-800"></p>
+                </div>
+            </div>
         </div>
         
-        <div id="careGuide" class="care-guide" style="display: none;">
-            <h3>Care Guide</h3>
-            <div id="careGuideContent"></div>
+        <div id="careGuide" class="hidden mt-4">
+            <h3 class="text-lg font-medium text-gray-900">Care Guide</h3>
+            <div id="careGuideContent" class="mt-2 p-4 bg-gray-50 rounded-md prose prose-sm"></div>
         </div>
     </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        function addLocationInput() {
-            const container = document.getElementById('locationInputs');
-            const div = document.createElement('div');
-            div.className = 'location-input';
-            div.innerHTML = `
-                <div class="input-group">
-                    <input type="text" class="form-control" name="location" required placeholder="e.g. front, back, patio">
-                    <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.parentElement.remove()">Remove</button>
-                </div>
-            `;
-            container.appendChild(div);
-        }
+<script>
+    function addLocationInput() {
+        const container = document.getElementById('locationInputs');
+        const div = document.createElement('div');
+        div.className = 'location-input mt-2';
+        div.innerHTML = `
+            <div class="flex gap-2">
+                <input type="text" class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500" name="location" required placeholder="e.g. front, back, patio">
+                <button type="button" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500" onclick="this.parentElement.parentElement.remove()">
+                    Remove
+                </button>
+            </div>
+        `;
+        container.appendChild(div);
+    }
 
-        document.getElementById('addPlantForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
+    document.getElementById('addPlantForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        // Show loading spinner
+        document.getElementById('loading').classList.remove('hidden');
+        document.getElementById('successMessage').classList.add('hidden');
+        document.getElementById('errorMessage').classList.add('hidden');
+        document.getElementById('careGuide').classList.add('hidden');
+        
+        const plantName = document.getElementById('plantName').value;
+        const locations = Array.from(document.getElementsByName('location'))
+                             .map(input => input.value.trim())
+                             .filter(value => value);
+        const photoUrl = document.getElementById('photoUrl').value;
+        
+        const data = {
+            name: plantName,
+            locations: locations,
+            photo_url: photoUrl || null
+        };
+        
+        try {
+            const response = await fetch('/api/plants', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
             
-            // Show loading spinner
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('successMessage').style.display = 'none';
-            document.getElementById('errorMessage').style.display = 'none';
-            document.getElementById('careGuide').style.display = 'none';
+            const result = await response.json();
             
-            const plantName = document.getElementById('plantName').value;
-            const locations = Array.from(document.getElementsByName('location'))
-                                 .map(input => input.value.trim())
-                                 .filter(value => value);
-            const photoUrl = document.getElementById('photoUrl').value;
+            // Hide loading spinner
+            document.getElementById('loading').classList.add('hidden');
             
-            const data = {
-                name: plantName,
-                locations: locations,
-                photo_url: photoUrl || null
-            };
-            
-            try {
-                const response = await fetch('/api/plants', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
+            if (response.ok) {
+                document.getElementById('successMessage').classList.remove('hidden');
+                document.getElementById('errorMessage').classList.add('hidden');
                 
-                const result = await response.json();
+                // Display care guide
+                document.getElementById('careGuide').classList.remove('hidden');
+                document.getElementById('careGuideContent').textContent = result.care_guide;
                 
-                // Hide loading spinner
-                document.getElementById('loading').style.display = 'none';
-                
-                if (response.ok) {
-                    document.getElementById('successMessage').style.display = 'block';
-                    document.getElementById('errorMessage').style.display = 'none';
-                    
-                    // Display care guide
-                    document.getElementById('careGuide').style.display = 'block';
-                    document.getElementById('careGuideContent').textContent = result.care_guide;
-                    
-                    // Clear form
-                    document.getElementById('addPlantForm').reset();
-                    const locationInputs = document.getElementById('locationInputs');
-                    locationInputs.innerHTML = `
-                        <div class="location-input">
-                            <input type="text" class="form-control" name="location" required placeholder="e.g. front, back, patio">
-                        </div>
-                    `;
-                } else {
-                    throw new Error(result.detail || 'Failed to add plant');
-                }
-            } catch (error) {
-                document.getElementById('successMessage').style.display = 'none';
-                document.getElementById('errorMessage').style.display = 'block';
-                document.getElementById('errorMessage').textContent = error.message;
+                // Clear form
+                document.getElementById('addPlantForm').reset();
+                const locationInputs = document.getElementById('locationInputs');
+                locationInputs.innerHTML = `
+                    <div class="location-input">
+                        <input type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500" name="location" required placeholder="e.g. front, back, patio">
+                    </div>
+                `;
+            } else {
+                throw new Error(result.detail || 'Failed to add plant');
             }
-        });
-    </script>
-</body>
-</html> 
+        } catch (error) {
+            document.getElementById('successMessage').classList.add('hidden');
+            document.getElementById('errorMessage').classList.remove('hidden');
+            document.getElementById('errorMessage').querySelector('p').textContent = error.message;
+        }
+    });
+</script>
+{% endblock %} 

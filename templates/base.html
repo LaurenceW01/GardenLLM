@@ -54,6 +54,14 @@
                         >
                             Weather
                         </a>
+                        <a href="/add-plant" 
+                           class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                           :class="{'bg-gray-100': window.location.pathname === '/add-plant'}"
+                        >
+                            <span class="flex items-center gap-2">
+                                <span>🌱</span> Add Plant
+                            </span>
+                        </a>
                         <button 
                             x-show="window.location.pathname === '/'"
                             @click="$dispatch('save-chat'); isOpen = false"
