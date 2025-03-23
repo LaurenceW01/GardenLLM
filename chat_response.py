@@ -1,76 +1,64 @@
 import logging
-import re
 from typing import List, Dict, Optional
-from config import openai_client
+import re
 from plant_operations import get_plant_data
+from config import openai_client
 
 logger = logging.getLogger(__name__)
 
-# Stop words for search term filtering
-stop_words = {'what', 'does', 'do', 'a', 'an', 'the', 'show', 'me', 'pictures', 'picture', 'photos', 'photo', 'of', 'look', 'like', 'in', 'my', 'garden', 'tell', 'about', 'can', 'you', 'describe', 'how', 'is', 'are', 'there', 'any', 'some', 'have', 'has', 'with', 'without', 'and', 'or', 'but', 'for', 'to', 'at', 'by', 'up', 'down', 'on', 'off', 'over', 'under', 'again', 'further', 'then', 'once'}
-
-def extract_search_terms(message: str) -> str:
-    """Extract search terms from the user's message"""
-    print("\n=== DEBUG: Query Analysis ===")
+def extract_search_terms(message: str) -> Optional[str]:
+    """Extract plant names from the message using basic pattern matching"""
+    # Common patterns for plant queries
+    patterns = [
+        r'about\s+(?:the\s+)?([a-zA-Z\s]+\b)',
+        r'how\s+(?:do\s+)?(?:I\s+)?(?:grow|care\s+for|plant|maintain)\s+(?:a\s+)?([a-zA-Z\s]+\b)',
+        r'show\s+me\s+(?:the\s+)?([a-zA-Z\s]+\b)',
+        r'what\s+does\s+(?:a\s+)?([a-zA-Z\s]+)\s+look\s+like',
+        r'picture\s+of\s+(?:a\s+)?([a-zA-Z\s]+\b)',
+        r'photo\s+of\s+(?:a\s+)?([a-zA-Z\s]+\b)',
+        r'^([a-zA-Z\s]+)$'
+    ]
+    
     msg_lower = message.lower()
-    print(f"Original message (lowercase): {msg_lower}")
-    
-    # Check for image-related patterns
-    is_image_query = any(pattern in msg_lower for pattern in ['look like', 'show me', 'picture of', 'photo of'])
-    print(f"Is image query: {is_image_query}")
-    
-    # Extract search text based on patterns
-    search_text = ""
-    if 'look like' in msg_lower:
-        search_text = msg_lower.split('look like')[0]
-        print(f"Found 'look like' pattern. Initial search text: {repr(search_text)}")
-    elif any(pattern in msg_lower for pattern in ['show me', 'picture of', 'photo of']):
-        for pattern in ['show me', 'picture of', 'photo of']:
-            if pattern in msg_lower:
-                search_text = msg_lower.split(pattern)[1]
-                print(f"Found '{pattern}' pattern. Initial search text: {repr(search_text)}")
-                break
-    else:
-        search_text = msg_lower
-        print(f"No specific pattern found. Using full message: {repr(search_text)}")
-    
-    # Remove stop words and clean up search terms
-    print("\n=== DEBUG: Search Terms Processing ===")
-    print(f"Stop words being removed: {stop_words}")
-    search_terms = [term.strip() for term in search_text.split() if term.strip() and term.strip() not in stop_words]
-    print(f"Terms after stop word removal: {search_terms}")
-    
-    search_term = ' '.join(search_terms).strip()
-    print(f"Final search term: {repr(search_term)}")
-    return search_term
+    for pattern in patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            return match.group(1).strip()
+    return None
 
 def get_chat_response(message: str) -> str:
-    """Get a response from the chatbot"""
+    """Generate a chat response based on the user's message"""
+    logger.info(f"Processing message: {message}")
+    
     try:
-        # First check if this is an image-specific query
         msg_lower = message.lower()
+        search_term = extract_search_terms(message)
+        logger.info(f"Extracted search term: {search_term}")
+        
+        # Handle image-related queries
         is_image_query = any(pattern in msg_lower for pattern in ['look like', 'show me', 'picture of', 'photo of'])
         
-        # Extract search terms and get plant data
-        search_term = extract_search_terms(message)
-        if not search_term:
-            return "I couldn't identify which plant you're asking about. Could you please specify the plant name?"
-        
-        plant_data = get_plant_data([search_term])
-        if not plant_data or not isinstance(plant_data, list):
-            return f"I couldn't find any information about '{search_term}'. Could you please check the plant name and try again?"
-        
-        # Handle image-specific queries differently
         if is_image_query:
+            if not search_term:
+                return "I couldn't identify which plant you're asking about. Could you please specify the plant name?"
+            
+            plant_data = get_plant_data([search_term])
+            logger.info(f"Retrieved plant data for image query: {plant_data}")
+            
+            if isinstance(plant_data, str):  # Error message
+                return plant_data
+            
+            if not plant_data:
+                return f"I couldn't find any plants matching '{search_term}' in the database."
+            
             response_parts = []
             for plant in plant_data:
                 plant_name = plant.get('Plant Name', '')
                 raw_photo_url = plant.get('Raw Photo URL', '')
                 
                 if raw_photo_url:
-                    # Format Google Photos URLs for public access if needed
+                    # Format Google Photos URL if needed
                     if 'photos.google.com' in raw_photo_url:
-                        # Remove any parameters and add authuser=0 for public access
                         raw_photo_url = raw_photo_url.split('?')[0] + '?authuser=0'
                     response_parts.append(f"Here's what {plant_name} looks like:\n{raw_photo_url}")
                 else:
@@ -78,52 +66,56 @@ def get_chat_response(message: str) -> str:
             
             return "\n\n".join(response_parts)
         
-        # For non-image queries, provide detailed information with photos as supplementary
-        formatted_data = []
-        for plant in plant_data:
-            # Create a copy of plant data without photo URLs
-            plant_info = {k: v for k, v in plant.items() if k not in ['Photo URL', 'Raw Photo URL']}
-            formatted_data.append(plant_info)
+        # Handle general plant queries
+        if search_term:
+            plant_data = get_plant_data([search_term])
+            logger.info(f"Retrieved plant data for general query: {plant_data}")
+            
+            if isinstance(plant_data, str):  # Error message
+                return plant_data
+            
+            if not plant_data:
+                return f"I couldn't find any plants matching '{search_term}' in the database."
+            
+            # Generate response using OpenAI
+            plant_info = []
+            for plant in plant_data:
+                # Exclude photo URLs from the OpenAI prompt
+                info = {k: v for k, v in plant.items() if v and k not in ['Photo URL', 'Raw Photo URL']}
+                plant_info.append(info)
+            
+            prompt = f"Please provide information about the following plants in a natural, conversational way. Focus on the most relevant details for a gardener. Plant data: {plant_info}"
+            
+            try:
+                response = openai_client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": "You are a helpful gardening assistant."},
+                        {"role": "user", "content": prompt}
+                    ]
+                )
+                
+                chat_response = response.choices[0].message.content
+                
+                # Add photo URLs to the response if available
+                for plant in plant_data:
+                    raw_photo_url = plant.get('Raw Photo URL', '')
+                    if raw_photo_url:
+                        if 'photos.google.com' in raw_photo_url:
+                            raw_photo_url = raw_photo_url.split('?')[0] + '?authuser=0'
+                        chat_response += f"\n\nYou can see a photo of {plant['Plant Name']} here: {raw_photo_url}"
+                
+                return chat_response
+                
+            except Exception as e:
+                logger.error(f"OpenAI API error: {e}")
+                # Fallback to basic response if API fails
+                return "\n\n".join([f"Here's what I know about {plant.get('Plant Name')}:\n" + 
+                                  "\n".join([f"{k}: {v}" for k, v in plant.items() if v and k not in ['Photo URL', 'Raw Photo URL']])
+                                  for plant in plant_data])
         
-        # Create the prompt
-        prompt = f"Based on this plant data: {formatted_data}\n\nPlease answer this question about the plant(s): {message}"
-        
-        # Get response from OpenAI
-        response = get_openai_response(prompt)
-        
-        # Add photo information if available
-        photo_info = []
-        for plant in plant_data:
-            raw_photo_url = plant.get('Raw Photo URL', '')
-            if raw_photo_url:
-                # Format Google Photos URLs for public access if needed
-                if 'photos.google.com' in raw_photo_url:
-                    # Remove any parameters and add authuser=0 for public access
-                    raw_photo_url = raw_photo_url.split('?')[0] + '?authuser=0'
-                photo_info.append(f"\n\nYou can also see a photo of {plant['Plant Name']} here: {raw_photo_url}")
-        
-        if photo_info:
-            response += ''.join(photo_info)
-        
-        return response
+        return "I'm not sure what you're asking about. Could you please rephrase your question or specify a plant name?"
         
     except Exception as e:
-        logger.error(f"Error getting chat response: {e}")
-        return "I apologize, but I encountered an error while processing your request. Please try again."
-
-def get_openai_response(prompt: str) -> str:
-    """Get a response from OpenAI"""
-    try:
-        response = openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a knowledgeable gardening assistant. Provide helpful, accurate information about plants in a natural, conversational way."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=500,
-            temperature=0.7
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        logger.error(f"OpenAI API error: {e}")
-        return "I'm sorry, but I couldn't get a response from the OpenAI API. Please try again later." 
+        logger.error(f"Error generating chat response: {e}", exc_info=True)
+        return "Sorry, there was an error processing your request. Please try again." 
