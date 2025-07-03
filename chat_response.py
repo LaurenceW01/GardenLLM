@@ -55,7 +55,7 @@ def extract_search_terms(message: str) -> Optional[str]:
     return None
 
 def parse_update_command(message: str) -> Optional[Dict]:
-    """Parse update plant commands"""
+    """Parse update plant commands - supports multiple field updates"""
     msg_lower = message.lower()
     
     # Check if this is an update command
@@ -66,33 +66,76 @@ def parse_update_command(message: str) -> Optional[Dict]:
         # Extract the command parts after "update plant"
         command_parts = message[len('update plant '):].strip()
         
-        # Find the field keyword to separate plant identifier from field update
+        # Find the plant identifier (first part before any field keyword)
         field_keywords = ['location', 'url', 'photo url', 'raw photo url', 'description', 'light requirements', 'frost tolerance', 
                          'watering needs', 'soil preferences', 'pruning instructions', 'mulching needs',
                          'fertilizing schedule', 'winterizing instructions', 'spacing requirements', 'care notes']
         
-        field_found = None
-        field_index = -1
+        # Find the first field keyword to identify plant identifier
+        first_field_index = -1
+        first_field = None
         
         for field in field_keywords:
             index = command_parts.lower().find(field)
-            if index != -1 and (field_index == -1 or index < field_index):
-                field_found = field
-                field_index = index
+            if index != -1 and (first_field_index == -1 or index < first_field_index):
+                first_field_index = index
+                first_field = field
         
-        if field_found is None:
+        if first_field_index == -1:
             return None
         
-        # Split command into plant identifier (before field) and new value (after field)
-        plant_identifier = command_parts[:field_index].strip()
-        new_value = command_parts[field_index + len(field_found):].strip()
+        # Extract plant identifier (everything before the first field)
+        plant_identifier = command_parts[:first_field_index].strip()
         
-        if not plant_identifier or not new_value:
+        if not plant_identifier:
             return None
         
-        # Clean up the plant identifier - remove any trailing words that might be part of the field
-        # This handles cases like "Tomlinson natal shield" when it should be "Tomlinson natal plum"
-        plant_identifier = plant_identifier.strip()
+        # Parse all field updates in the command
+        updates = []
+        remaining_command = command_parts[first_field_index:].strip()
+        
+        while remaining_command:
+            # Find the next field keyword
+            next_field_index = -1
+            next_field = None
+            
+            for field in field_keywords:
+                index = remaining_command.lower().find(field)
+                if index != -1 and (next_field_index == -1 or index < next_field_index):
+                    next_field_index = index
+                    next_field = field
+            
+            if next_field_index == -1:
+                break
+            
+            # Find the end of this field's value (start of next field or end of command)
+            field_start = next_field_index
+            field_end = field_start + len(next_field) if next_field else field_start
+            
+            # Find the next field to determine where this field's value ends
+            next_field_start = -1
+            for field in field_keywords:
+                if field != next_field:  # Don't match the same field
+                    index = remaining_command.lower().find(field, field_end)
+                    if index != -1 and (next_field_start == -1 or index < next_field_start):
+                        next_field_start = index
+            
+            # Extract the value for this field
+            if next_field_start != -1:
+                field_value = remaining_command[field_end:next_field_start].strip()
+                remaining_command = remaining_command[next_field_start:].strip()
+            else:
+                field_value = remaining_command[field_end:].strip()
+                remaining_command = ""
+            
+            if field_value:
+                updates.append({
+                    'field': next_field,
+                    'value': field_value
+                })
+        
+        if not updates:
+            return None
         
         # Map user-friendly field names to actual database field names
         field_mapping = {
@@ -113,13 +156,18 @@ def parse_update_command(message: str) -> Optional[Dict]:
             'care notes': 'Care Notes'
         }
         
-        # Get the actual database field name
-        actual_field_name = field_mapping.get(field_found.lower(), field_found.title())
+        # Convert updates to use actual field names
+        actual_updates = []
+        for update in updates:
+            actual_field_name = field_mapping.get(update['field'].lower(), update['field'].title())
+            actual_updates.append({
+                'field_name': actual_field_name,
+                'new_value': update['value']
+            })
         
         return {
             'plant_identifier': plant_identifier,
-            'field_name': actual_field_name,
-            'new_value': new_value
+            'updates': actual_updates
         }
         
     except Exception as e:
@@ -141,14 +189,19 @@ def get_chat_response(message: str) -> str:
                 if plant_row is None:
                     return f"Plant '{update_data['plant_identifier']}' not found. Please check the plant name or ID and try again."
                 
-                # Update the field
-                success = update_plant_field(plant_row, update_data['field_name'], update_data['new_value'])
+                # Process multiple updates
+                results = []
+                plant_name = plant_data[1] if plant_data and len(plant_data) > 1 else update_data['plant_identifier']
                 
-                if success:
-                    plant_name = plant_data[1] if plant_data and len(plant_data) > 1 else update_data['plant_identifier']
-                    return f"Successfully updated {update_data['field_name']} for {plant_name} to: {update_data['new_value']}"
-                else:
-                    return f"Failed to update {update_data['field_name']} for plant '{update_data['plant_identifier']}'. Please check the field name and try again."
+                for update in update_data['updates']:
+                    success = update_plant_field(plant_row, update['field_name'], update['new_value'])
+                    
+                    if success:
+                        results.append(f"Successfully updated {update['field_name']} to: {update['new_value']}")
+                    else:
+                        results.append(f"Failed to update {update['field_name']}")
+                
+                return f"Updates for {plant_name}:\n" + "\n".join(results)
                     
             except Exception as e:
                 logger.error(f"Error processing update command: {e}")
