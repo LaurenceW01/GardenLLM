@@ -300,72 +300,90 @@ def get_photo_url_from_album(photo_url):
 
 def parse_care_guide(response: str) -> Dict[str, str]:
     """Parse the care guide response from OpenAI into a structured dictionary.
-    
-    Args:
-        response (str): The response text from OpenAI containing the care guide
-        
-    Returns:
-        Dict[str, str]: A dictionary containing parsed care guide sections
+    Handles **Section:**, ### Section:, and #### Section: headers, and maps short names to full field names.
     """
-    # Initialize the dictionary with empty values for all expected fields
-    care_details = {
-        'Description': '',
-        'Light Requirements': '',
-        'Soil Preferences': '',
-        'Watering Needs': '',
-        'Frost Tolerance': '',
-        'Pruning Instructions': '',
-        'Mulching Needs': '',
-        'Fertilizing Schedule': '',
-        'Winterizing Instructions': '',
-        'Spacing Requirements': '',
+    # Mapping from possible section names to spreadsheet field names
+    section_map = {
+        'Description': 'Description',
+        'Light': 'Light Requirements',
+        'Light Requirements': 'Light Requirements',
+        'Soil': 'Soil Preferences',
+        'Soil Preferences': 'Soil Preferences',
+        'Watering': 'Watering Needs',
+        'Watering Needs': 'Watering Needs',
+        'Temperature': 'Frost Tolerance',  # Map Temperature to Frost Tolerance field
+        'Frost Tolerance': 'Frost Tolerance',
+        'Pruning': 'Pruning Instructions',
+        'Pruning Instructions': 'Pruning Instructions',
+        'Mulching': 'Mulching Needs',
+        'Mulching Needs': 'Mulching Needs',
+        'Fertilizing': 'Fertilizing Schedule',
+        'Fertilizing Schedule': 'Fertilizing Schedule',
+        'Winter Care': 'Winterizing Instructions',  # Map Winter Care to Winterizing Instructions
+        'Winterizing Instructions': 'Winterizing Instructions',
+        'Spacing': 'Spacing Requirements',
+        'Spacing Requirements': 'Spacing Requirements',
     }
-    
+    care_details = {k: '' for k in [
+        'Description',
+        'Light Requirements',
+        'Soil Preferences',
+        'Watering Needs',
+        'Frost Tolerance',
+        'Pruning Instructions',
+        'Mulching Needs',
+        'Fertilizing Schedule',
+        'Winterizing Instructions',
+        'Spacing Requirements',
+    ]}
     try:
-        # Log the raw response for debugging
         logger.info(f"Raw response to parse: {response}")
-        
-        # Find all sections marked with **Section:** pattern
         current_section = None
         current_content = []
-        
         for line in response.split('\n'):
             line = line.strip()
             if not line:
                 continue
-                
-            # Check if this is a section header
+            is_section_header = False
+            section_name = None
+            # **Section:**
             if line.startswith('**') and line.endswith(':**'):
-                # If we were building a previous section, save it
+                is_section_header = True
+                section_name = line.strip('*:').strip()
+            # ### Section:
+            elif line.startswith('###'):
+                is_section_header = True
+                section_name = line.replace('###', '').strip()
+            # #### Section:
+            elif line.startswith('####'):
+                is_section_header = True
+                section_name = line.replace('####', '').strip()
+            # Remove trailing colon if present
+            if section_name:
+                section_name = section_name.rstrip(':').strip()
+            if is_section_header:
+                # Save previous section
                 if current_section and current_content:
-                    content = ' '.join(current_content).strip()
-                    if current_section in care_details:
-                        care_details[current_section] = content
-                        logger.info(f"Saved section {current_section}: {content[:50]}...")
-                
-                # Start new section
-                current_section = line.strip('*:').strip()
+                    mapped = section_map.get(current_section)
+                    if mapped:
+                        care_details[mapped] = ' '.join(current_content).strip()
+                        logger.info(f"Saved section {mapped}: {care_details[mapped][:50]}...")
+                current_section = section_name
                 current_content = []
             elif current_section:
-                # Add line to current section content
                 current_content.append(line)
-        
-        # Don't forget to save the last section
+        # Save last section
         if current_section and current_content:
-            content = ' '.join(current_content).strip()
-            if current_section in care_details:
-                care_details[current_section] = content
-                logger.info(f"Saved final section {current_section}: {content[:50]}...")
-        
-        # Log parsing results
+            mapped = section_map.get(current_section)
+            if mapped:
+                care_details[mapped] = ' '.join(current_content).strip()
+                logger.info(f"Saved final section {mapped}: {care_details[mapped][:50]}...")
         for section, content in care_details.items():
             if content:
                 logger.info(f"Successfully parsed {section}")
             else:
                 logger.warning(f"Missing content for section: {section}")
-                
     except Exception as e:
         logger.error(f"Error parsing care guide: {e}")
         logger.error(f"Response: {response}")
-        
     return care_details
