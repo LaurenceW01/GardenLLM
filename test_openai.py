@@ -358,9 +358,12 @@ def parse_care_guide(response: str) -> Dict[str, str]:
             elif line.startswith('####'):
                 is_section_header = True
                 section_name = line.replace('####', '').strip()
-            # Remove trailing colon if present
+            # Remove trailing colon and any leading # if present
             if section_name:
                 section_name = section_name.rstrip(':').strip()
+                # Remove any leading # that might remain
+                if section_name.startswith('#'):
+                    section_name = section_name.lstrip('#').strip()
             if is_section_header:
                 # Save previous section
                 if current_section and current_content:
@@ -368,8 +371,11 @@ def parse_care_guide(response: str) -> Dict[str, str]:
                     if mapped:
                         care_details[mapped] = ' '.join(current_content).strip()
                         logger.info(f"Saved section {mapped}: {care_details[mapped][:50]}...")
+                    else:
+                        logger.warning(f"No mapping found for section: '{current_section}'")
                 current_section = section_name
                 current_content = []
+                logger.info(f"Starting new section: '{section_name}'")
             elif current_section:
                 current_content.append(line)
         # Save last section
