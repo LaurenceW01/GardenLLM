@@ -1,7 +1,7 @@
 import logging
 from typing import List, Dict, Optional
 import re
-from plant_operations import get_plant_data
+from plant_operations import get_plant_data, find_plant_by_id_or_name, update_plant_field
 from config import openai_client
 
 logger = logging.getLogger(__name__)
@@ -54,11 +54,84 @@ def extract_search_terms(message: str) -> Optional[str]:
             return match.group(1).strip()
     return None
 
+def parse_update_command(message: str) -> Optional[Dict]:
+    """Parse update plant commands"""
+    msg_lower = message.lower()
+    
+    # Check if this is an update command
+    if not msg_lower.startswith('update plant '):
+        return None
+    
+    try:
+        # Extract the command parts after "update plant"
+        command_parts = message[len('update plant '):].strip()
+        
+        # Find the field keyword to separate plant identifier from field update
+        field_keywords = ['location', 'url', 'description', 'light requirements', 'frost tolerance', 
+                         'watering needs', 'soil preferences', 'pruning instructions', 'mulching needs',
+                         'fertilizing schedule', 'winterizing instructions', 'spacing requirements', 'care notes']
+        
+        field_found = None
+        field_index = -1
+        
+        for field in field_keywords:
+            index = command_parts.lower().find(field)
+            if index != -1 and (field_index == -1 or index < field_index):
+                field_found = field
+                field_index = index
+        
+        if field_found is None:
+            return None
+        
+        # Split command into plant identifier (before field) and new value (after field)
+        plant_identifier = command_parts[:field_index].strip()
+        new_value = command_parts[field_index + len(field_found):].strip()
+        
+        if not plant_identifier or not new_value:
+            return None
+        
+        # Clean up the plant identifier - remove any trailing words that might be part of the field
+        # This handles cases like "Tomlinson natal shield" when it should be "Tomlinson natal plum"
+        plant_identifier = plant_identifier.strip()
+        
+        return {
+            'plant_identifier': plant_identifier,
+            'field_name': field_found.title(),  # Capitalize for database field names
+            'new_value': new_value
+        }
+        
+    except Exception as e:
+        logger.error(f"Error parsing update command: {e}")
+        return None
+
 def get_chat_response(message: str) -> str:
     """Generate a chat response based on the user's message"""
     logger.info(f"Processing message: {message}")
     
     try:
+        # Check for update commands first
+        update_data = parse_update_command(message)
+        if update_data:
+            try:
+                # Find the plant by ID or name
+                plant_row, plant_data = find_plant_by_id_or_name(update_data['plant_identifier'])
+                
+                if plant_row is None:
+                    return f"Plant '{update_data['plant_identifier']}' not found. Please check the plant name or ID and try again."
+                
+                # Update the field
+                success = update_plant_field(plant_row, update_data['field_name'], update_data['new_value'])
+                
+                if success:
+                    plant_name = plant_data[1] if plant_data and len(plant_data) > 1 else update_data['plant_identifier']
+                    return f"Successfully updated {update_data['field_name']} for {plant_name} to: {update_data['new_value']}"
+                else:
+                    return f"Failed to update {update_data['field_name']} for plant '{update_data['plant_identifier']}'. Please check the field name and try again."
+                    
+            except Exception as e:
+                logger.error(f"Error processing update command: {e}")
+                return f"Error processing update command: {str(e)}"
+        
         msg_lower = message.lower()
         search_term = extract_search_terms(message)
         logger.info(f"Extracted search term: {search_term}")
@@ -95,7 +168,7 @@ def get_chat_response(message: str) -> str:
                     ]
                 )
                 
-                return response.choices[0].message.content
+                return response.choices[0].message.content or "No response generated"
                 
             except Exception as e:
                 logger.error(f"Error handling general plant query: {e}", exc_info=True)
@@ -177,7 +250,7 @@ def get_chat_response(message: str) -> str:
                     ]
                 )
                 
-                chat_response = response.choices[0].message.content
+                chat_response = response.choices[0].message.content or ""
                 
                 # Add photo URLs to the response if available
                 for plant in plant_data:
@@ -185,7 +258,7 @@ def get_chat_response(message: str) -> str:
                     if raw_photo_url:
                         if 'photos.google.com' in raw_photo_url:
                             raw_photo_url = raw_photo_url.split('?')[0] + '?authuser=0'
-                        chat_response += f"\n\nYou can see a photo of {plant['Plant Name']} here: {raw_photo_url}"
+                        chat_response += f"\n\nYou can see a photo of {plant.get('Plant Name', 'Unknown Plant')} here: {raw_photo_url}"
                 
                 return chat_response
                 

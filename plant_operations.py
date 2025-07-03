@@ -110,9 +110,33 @@ def find_plant_by_id_or_name(identifier: str) -> Tuple[Optional[int], Optional[L
                     return i, row
         except ValueError:
             search_name = identifier.lower()
+            
+            # First try exact match
             for i, row in enumerate(values[1:], start=1):
                 if row and len(row) > name_idx and row[name_idx].lower() == search_name:
                     return i, row
+            
+            # If no exact match, try partial matching
+            # Split the search name into words and look for plants that contain all words
+            search_words = search_name.split()
+            best_match = None
+            best_score = 0
+            
+            for i, row in enumerate(values[1:], start=1):
+                if row and len(row) > name_idx and row[name_idx]:
+                    plant_name = row[name_idx].lower()
+                    plant_words = plant_name.split()
+                    
+                    # Count how many search words are found in the plant name
+                    matches = sum(1 for word in search_words if any(word in plant_word for plant_word in plant_words))
+                    score = matches / len(search_words) if search_words else 0
+                    
+                    if score > best_score and score >= 0.5:  # At least 50% of words must match
+                        best_score = score
+                        best_match = (i, row)
+            
+            if best_match:
+                return best_match
         
         return None, None
         
