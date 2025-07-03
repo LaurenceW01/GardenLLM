@@ -245,25 +245,23 @@ async def analyze_plant(
 async def add_plant(request: AddPlantRequest):
     """Add a new plant to the database"""
     try:
-        # Create plant info request
+        # Create plant info request - using same format as CLI for consistency
         prompt = (
-            f"You are a gardening expert assistant. Create a detailed plant care guide for {request.name} in Houston, TX. "
+            f"Create a detailed plant care guide for {request.name} in Houston, TX. "
             "Include care requirements, growing conditions, and maintenance tips. "
             "Focus on practical advice for the specified locations: " + 
             ', '.join(request.locations) + "\n\n" +
-            "Format your response with these EXACT section titles - do not modify them:\n" +
+            "Please include sections for:\n" +
             "**Description:**\n" +
-            "**Light Requirements:**\n" +
-            "**Frost Tolerance:**\n" +
-            "**Watering Needs:**\n" +
-            "**Soil Preferences:**\n" +
-            "**Pruning Instructions:**\n" +
-            "**Mulching Needs:**\n" +
-            "**Fertilizing Schedule:**\n" +
-            "**Winterizing Instructions:**\n" +
-            "**Spacing Requirements:**\n\n" +
-            "Be specific and detailed in each section. Focus on practical care instructions. "
-            "IMPORTANT: Use these exact section titles without modification."
+            "**Light:**\n" +
+            "**Soil:**\n" +
+            "**Watering:**\n" +
+            "**Temperature:**\n" +
+            "**Pruning:**\n" +
+            "**Mulching:**\n" +
+            "**Fertilizing:**\n" +
+            "**Winter Care:**\n" +
+            "**Spacing:**"
         )
         
         # Get plant care information from OpenAI
@@ -278,7 +276,7 @@ async def add_plant(request: AddPlantRequest):
         )
         
         # Extract the response text
-        care_guide = response.choices[0].message.content
+        care_guide = response.choices[0].message.content or ""
         logger.info(f"Generated care guide: {care_guide}")
         
         # Parse the care guide to extract details

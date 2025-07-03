@@ -148,6 +148,108 @@
                         `;
                         chatHistory.appendChild(userDiv);
                         
+                                                // Check if this is an add plant command
+                        if (this.message.toLowerCase().startsWith('add plant ')) {
+                            // Parse the add plant command
+                            const commandParts = this.message.substring('add plant '.length).trim();
+                            const locationIndex = commandParts.toLowerCase().indexOf('location');
+                            
+                            if (locationIndex !== -1) {
+                                const plantName = commandParts.substring(0, locationIndex).trim();
+                                const locationsPart = commandParts.substring(locationIndex + 'location'.length).trim();
+                                const locations = locationsPart.split(',').map(loc => loc.trim()).filter(loc => loc);
+                                
+                                if (plantName && locations.length > 0) {
+                                    try {
+                                        // Send to add plant endpoint
+                                        response = await fetch('/api/plants', {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json'
+                                            },
+                                            body: JSON.stringify({
+                                                name: plantName,
+                                                locations: locations,
+                                                photo_url: null
+                                            })
+                                        });
+                                        
+                                        const data = await response.json();
+                                        
+                                        loadingDiv.remove();
+                                        
+                                        const botDiv = document.createElement('div');
+                                        botDiv.className = 'flex justify-start';
+                                        const markdownContent = marked.parse(data.message + '\n\n' + data.care_guide);
+                                        botDiv.innerHTML = `
+                                            <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
+                                                ${markdownContent}
+                                            </div>
+                                        `;
+                                        chatHistory.appendChild(botDiv);
+                                        
+                                        this.message = '';
+                                        this.updateMessageStatus();
+                                        
+                                        setTimeout(() => {
+                                            chatHistory.scrollTop = chatHistory.scrollHeight;
+                                        }, 100);
+                                        
+                                        this.loading = false;
+                                        return;
+                                    } catch (error) {
+                                        loadingDiv.remove();
+                                        
+                                        const errorDiv = document.createElement('div');
+                                        errorDiv.className = 'flex justify-start';
+                                        errorDiv.innerHTML = `
+                                            <div class='bg-red-100 text-red-700 rounded-lg p-3 max-w-3/4'>
+                                                Error adding plant: ${error.message}
+                                            </div>
+                                        `;
+                                        chatHistory.appendChild(errorDiv);
+                                        this.updateMessageStatus();
+                                        this.loading = false;
+                                        return;
+                                    }
+                                } else {
+                                    // Invalid add plant command format
+                                    loadingDiv.remove();
+                                    
+                                    const errorDiv = document.createElement('div');
+                                    errorDiv.className = 'flex justify-start';
+                                    errorDiv.innerHTML = `
+                                        <div class='bg-yellow-100 text-yellow-700 rounded-lg p-3 max-w-3/4'>
+                                            Please use the format: "add plant [name] location [location1, location2, ...]"<br>
+                                            Example: "add plant tomato location front garden, back patio"
+                                        </div>
+                                    `;
+                                    chatHistory.appendChild(errorDiv);
+                                    this.updateMessageStatus();
+                                    this.loading = false;
+                                    return;
+                                }
+                            } else {
+                                // Location keyword missing
+                                loadingDiv.remove();
+                                
+                                const errorDiv = document.createElement('div');
+                                errorDiv.className = 'flex justify-start';
+                                errorDiv.innerHTML = `
+                                    <div class='bg-yellow-100 text-yellow-700 rounded-lg p-3 max-w-3/4'>
+                                        Please specify the location using 'location' keyword.<br>
+                                        Format: "add plant [name] location [location1, location2, ...]"<br>
+                                        Example: "add plant tomato location front garden, back patio"
+                                    </div>
+                                `;
+                                chatHistory.appendChild(errorDiv);
+                                this.updateMessageStatus();
+                                this.loading = false;
+                                return;
+                            }
+                        }
+                        
+                        // Regular chat request
                         response = await fetch('/chat', {
                             method: 'POST',
                             headers: {
