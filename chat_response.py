@@ -67,7 +67,7 @@ def parse_update_command(message: str) -> Optional[Dict]:
         command_parts = message[len('update plant '):].strip()
         
         # Find the field keyword to separate plant identifier from field update
-        field_keywords = ['location', 'url', 'description', 'light requirements', 'frost tolerance', 
+        field_keywords = ['location', 'photo url', 'raw photo url', 'description', 'light requirements', 'frost tolerance', 
                          'watering needs', 'soil preferences', 'pruning instructions', 'mulching needs',
                          'fertilizing schedule', 'winterizing instructions', 'spacing requirements', 'care notes']
         
@@ -94,9 +94,30 @@ def parse_update_command(message: str) -> Optional[Dict]:
         # This handles cases like "Tomlinson natal shield" when it should be "Tomlinson natal plum"
         plant_identifier = plant_identifier.strip()
         
+        # Map user-friendly field names to actual database field names
+        field_mapping = {
+            'location': 'Location',
+            'photo url': 'Photo URL',
+            'raw photo url': 'Raw Photo URL',
+            'description': 'Description',
+            'light requirements': 'Light Requirements',
+            'frost tolerance': 'Frost Tolerance',
+            'watering needs': 'Watering Needs',
+            'soil preferences': 'Soil Preferences',
+            'pruning instructions': 'Pruning Instructions',
+            'mulching needs': 'Mulching Needs',
+            'fertilizing schedule': 'Fertilizing Schedule',
+            'winterizing instructions': 'Winterizing Instructions',
+            'spacing requirements': 'Spacing Requirements',
+            'care notes': 'Care Notes'
+        }
+        
+        # Get the actual database field name
+        actual_field_name = field_mapping.get(field_found.lower(), field_found.title())
+        
         return {
             'plant_identifier': plant_identifier,
-            'field_name': field_found.title(),  # Capitalize for database field names
+            'field_name': actual_field_name,
             'new_value': new_value
         }
         
