@@ -67,7 +67,7 @@ def parse_update_command(message: str) -> Optional[Dict]:
         command_parts = message[len('update plant '):].strip()
         
         # Find the field keyword to separate plant identifier from field update
-        field_keywords = ['location', 'photo url', 'raw photo url', 'description', 'light requirements', 'frost tolerance', 
+        field_keywords = ['location', 'url', 'photo url', 'raw photo url', 'description', 'light requirements', 'frost tolerance', 
                          'watering needs', 'soil preferences', 'pruning instructions', 'mulching needs',
                          'fertilizing schedule', 'winterizing instructions', 'spacing requirements', 'care notes']
         
@@ -97,6 +97,7 @@ def parse_update_command(message: str) -> Optional[Dict]:
         # Map user-friendly field names to actual database field names
         field_mapping = {
             'location': 'Location',
+            'url': 'Photo URL',  # Alias for photo url
             'photo url': 'Photo URL',
             'raw photo url': 'Raw Photo URL',
             'description': 'Description',
