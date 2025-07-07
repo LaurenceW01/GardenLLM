@@ -116,7 +116,7 @@ def analyze_query(user_query: str, plant_list: Optional[List[str]] = None) -> Di
 
 def _build_analysis_prompt(user_query: str, plant_list: List[str]) -> str:
     """
-    Build the AI prompt for query analysis.
+    Build the AI prompt for query analysis with intelligent plant name matching.
     
     Args:
         user_query (str): The user's query
@@ -125,20 +125,39 @@ def _build_analysis_prompt(user_query: str, plant_list: List[str]) -> str:
     Returns:
         str: Formatted prompt for AI analysis
     """
-    # Limit plant list to avoid token limits - show first 20 plants as examples
-    if plant_list and len(plant_list) > 20:
-        plant_list_text = ", ".join(plant_list[:20]) + f" (and {len(plant_list) - 20} more plants)"
+    # Limit plant list to avoid token limits - show first 30 plants as examples
+    if plant_list and len(plant_list) > 30:
+        plant_list_text = ", ".join(plant_list[:30]) + f" (and {len(plant_list) - 30} more plants)"
     else:
         plant_list_text = ", ".join(plant_list) if plant_list else "No plants in database"
     
     prompt = f"""
+You are a gardening assistant that analyzes user queries to extract plant references and classify query types. You have access to the user's garden database.
+
+IMPORTANT PLANT NAME MATCHING RULES:
+1. **Generic vs Specific Names**: 
+   - If user asks about "roses" (generic), match ALL rose varieties in the database
+   - If user asks about "Peggy Martin Rose" (specific), match only that exact variety
+   - If user asks about "cherry" from "cherry tomato", do NOT match "cherry tomato" unless they specifically mention "cherry tomato"
+
+2. **Compound Plant Names**:
+   - "Peggy Martin Rose" should only match when user asks about "Peggy Martin Rose" or "Peggy Martin"
+   - "Cherry Tomato" should only match when user asks about "cherry tomato" or "tomato" (generic)
+   - "Basil" should match "Sweet Basil", "Thai Basil", etc. when user asks about "basil" (generic)
+
+3. **Context Matters**:
+   - "How do I care for my roses?" → match all rose varieties
+   - "Where is my Peggy Martin Rose?" → match only "Peggy Martin Rose"
+   - "Show me cherry" → do NOT match "cherry tomato" (too specific)
+   - "How do I grow tomatoes?" → match all tomato varieties
+
 Analyze this query and respond with ONLY a JSON object:
 
 {{
-    "plant_references": ["plant", "names", "found"],
+    "plant_references": ["exact", "plant", "names", "from", "database"],
     "query_type": "TYPE",
     "confidence": 0.95,
-    "reasoning": "brief explanation"
+    "reasoning": "brief explanation of matching logic"
 }}
 
 Query Types:
@@ -150,7 +169,7 @@ Query Types:
 - ADVICE: "How to prune", "Gardening tips"
 - GENERAL: Other gardening questions
 
-Available plants: {plant_list_text}
+Available plants in database: {plant_list_text}
 
 Query: "{user_query}"
 

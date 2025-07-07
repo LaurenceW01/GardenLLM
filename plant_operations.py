@@ -46,7 +46,7 @@ def get_all_plants() -> List[Dict]:
 
 def _normalize_plant_name(name: Optional[str]) -> str:
     """
-    Normalize plant name for better matching (handle plurals, common variations).
+    Normalize plant name for basic matching (handle plurals, common variations).
     
     Args:
         name (str): Plant name to normalize
@@ -106,36 +106,23 @@ def _normalize_plant_name(name: Optional[str]) -> str:
 
 def _plant_names_match(search_name: str, plant_name: str) -> bool:
     """
-    Check if a search name matches a plant name, handling plurals and variations.
+    Check if a search name matches a plant name using simple normalization.
+    
+    This function is now simplified since the AI handles intelligent matching.
+    It only does basic normalization (plurals, case) and exact matching.
     
     Args:
-        search_name (str): The name being searched for
+        search_name (str): The name being searched for (from AI analysis)
         plant_name (str): The plant name in the database
     
     Returns:
-        bool: True if names match
+        bool: True if names match after normalization
     """
     search_normalized = _normalize_plant_name(search_name)
     plant_normalized = _normalize_plant_name(plant_name)
     
-    # Direct match after normalization
-    if search_normalized == plant_normalized:
-        return True
-    
-    # Substring match (original behavior)
-    if search_normalized in plant_normalized or plant_normalized in search_normalized:
-        return True
-    
-    # Word-based matching for compound names
-    search_words = search_normalized.split()
-    plant_words = plant_normalized.split()
-    
-    # Check if all search words are found in plant words
-    for search_word in search_words:
-        if not any(search_word in plant_word or plant_word in search_word for plant_word in plant_words):
-            return False
-    
-    return True
+    # Simple exact match after normalization
+    return search_normalized == plant_normalized
 
 def get_plant_data(plant_names=None) -> List[Dict]:
     """Get data for specified plants or all plants"""
@@ -257,10 +244,11 @@ def update_plant(plant_data: Dict) -> bool:
         plant_name = plant_data.get('Plant Name')
         plant_row = None
         
-        for i, row in enumerate(values[1:], start=1):
-            if len(row) > 1 and row[1].lower() == plant_name.lower():
-                plant_row = i
-                break
+        if plant_name:
+            for i, row in enumerate(values[1:], start=1):
+                if len(row) > 1 and row[1].lower() == plant_name.lower():
+                    plant_row = i
+                    break
         
         # Handle photo URLs - store both the IMAGE formula and raw URL
         photo_url = plant_data.get('Photo URL', '')
