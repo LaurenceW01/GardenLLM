@@ -125,11 +125,8 @@ def _build_analysis_prompt(user_query: str, plant_list: List[str]) -> str:
     Returns:
         str: Formatted prompt for AI analysis
     """
-    # Limit plant list to avoid token limits - show first 30 plants as examples
-    if plant_list and len(plant_list) > 30:
-        plant_list_text = ", ".join(plant_list[:30]) + f" (and {len(plant_list) - 30} more plants)"
-    else:
-        plant_list_text = ", ".join(plant_list) if plant_list else "No plants in database"
+    # Smart plant list selection: prioritize plants that might match the query
+    plant_list_text = _get_smart_plant_list(user_query, plant_list)
     
     prompt = f"""
 You are a gardening assistant that analyzes user queries to extract plant references and classify query types. You have access to the user's garden database.
@@ -176,6 +173,63 @@ Query: "{user_query}"
 JSON only:
 """
     return prompt
+
+def _get_smart_plant_list(user_query: str, plant_list: List[str]) -> str:
+    """
+    Get a smart selection of plants for the AI prompt, prioritizing potential matches.
+    
+    Args:
+        user_query (str): The user's query
+        plant_list (List[str]): Full list of plant names from database
+    
+    Returns:
+        str: Formatted plant list for AI prompt
+    """
+    if not plant_list:
+        return "No plants in database"
+    
+    query_lower = user_query.lower().strip()
+    
+    # First, try to find exact or partial matches in the full plant list
+    matching_plants = []
+    for plant in plant_list:
+        plant_lower = plant.lower()
+        # Check for exact match or if query contains plant name or vice versa
+        if (query_lower == plant_lower or 
+            query_lower in plant_lower or 
+            plant_lower in query_lower):
+            matching_plants.append(plant)
+    
+    # If we found matches, include them plus some context plants
+    if matching_plants:
+        # Get the indices of matching plants
+        matching_indices = [i for i, plant in enumerate(plant_list) if plant in matching_plants]
+        
+        # Include matching plants plus some surrounding context
+        context_plants = set()
+        for idx in matching_indices:
+            # Add the matching plant
+            context_plants.add(plant_list[idx])
+            # Add some plants before and after for context
+            start_idx = max(0, idx - 2)
+            end_idx = min(len(plant_list), idx + 3)
+            for i in range(start_idx, end_idx):
+                context_plants.add(plant_list[i])
+        
+        # Convert to list and sort to maintain some order
+        context_plant_list = sorted(list(context_plants))
+        
+        # If we have too many context plants, limit them
+        if len(context_plant_list) > 40:
+            context_plant_list = context_plant_list[:40]
+        
+        return ", ".join(context_plant_list) + f" (and {len(plant_list) - len(context_plant_list)} more plants)"
+    
+    # If no matches found, use the original truncation approach
+    if len(plant_list) > 30:
+        return ", ".join(plant_list[:30]) + f" (and {len(plant_list) - 30} more plants)"
+    else:
+        return ", ".join(plant_list)
 
 def _parse_analysis_response(ai_response: str) -> Dict:
     """
