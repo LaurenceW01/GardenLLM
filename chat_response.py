@@ -198,6 +198,192 @@ def get_chat_response(message: str) -> str:
         # Fall back to legacy method if analyzer fails
         return get_chat_response_legacy(message)
 
+def handle_ai_enhanced_query(query_type: str, plant_references: List[str], original_message: str) -> str:
+    """
+    Handle AI-enhanced queries (CARE, DIAGNOSIS, ADVICE, GENERAL) with database context.
+    
+    Args:
+        query_type (str): The type of query (CARE, DIAGNOSIS, ADVICE, GENERAL)
+        plant_references (List[str]): List of plant names referenced in the query
+        original_message (str): The original user message
+    
+    Returns:
+        str: AI-generated response with database context
+    """
+    logger.info(f"Handling AI-enhanced query: {query_type} for plants: {plant_references}")
+    
+    try:
+        # Get relevant plant data from database
+        plant_data = []
+        if plant_references:
+            for plant_name in plant_references:
+                plant_info = get_plant_data([plant_name])
+                if isinstance(plant_info, list) and plant_info:
+                    plant_data.extend(plant_info)
+        
+        # Build context for AI
+        context = _build_ai_context(query_type, plant_data, original_message)
+        
+        # Generate AI response
+        response = _generate_ai_response(query_type, context, original_message)
+        
+        # Add photo URLs if available
+        response = _add_photo_urls_to_response(response, plant_data)
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error handling AI-enhanced query: {e}")
+        return get_chat_response_legacy(original_message)
+
+def _build_ai_context(query_type: str, plant_data: List[Dict], original_message: str) -> str:
+    """
+    Build context for AI response based on query type and plant data.
+    
+    Args:
+        query_type (str): The type of query
+        plant_data (List[Dict]): Plant data from database
+        original_message (str): Original user message
+    
+    Returns:
+        str: Formatted context for AI
+    """
+    context_parts = []
+    
+    # Add Houston climate context (as per project requirements)
+    context_parts.append("Location: Houston, Texas (Zone 9a)")
+    context_parts.append("Climate: Hot and humid subtropical climate with mild winters")
+    context_parts.append("Growing season: Year-round with peak in spring and fall")
+    
+    # Add plant-specific context if available
+    if plant_data:
+        context_parts.append("\nRelevant plants in your garden:")
+        for plant in plant_data:
+            plant_name = plant.get('Plant Name', 'Unknown')
+            plant_info = []
+            
+            # Add relevant plant details based on query type
+            if query_type == QueryType.CARE:
+                care_fields = ['Light Requirements', 'Watering Needs', 'Soil Preferences', 
+                              'Fertilizing Schedule', 'Pruning Instructions', 'Care Notes']
+                for field in care_fields:
+                    if plant.get(field):
+                        plant_info.append(f"{field}: {plant.get(field)}")
+            
+            elif query_type == QueryType.DIAGNOSIS:
+                # Include care info for diagnosis context
+                care_fields = ['Light Requirements', 'Watering Needs', 'Soil Preferences', 'Care Notes']
+                for field in care_fields:
+                    if plant.get(field):
+                        plant_info.append(f"{field}: {plant.get(field)}")
+            
+            elif query_type == QueryType.ADVICE:
+                # Include general plant info for advice
+                advice_fields = ['Light Requirements', 'Watering Needs', 'Soil Preferences', 
+                               'Pruning Instructions', 'Mulching Needs', 'Spacing Requirements']
+                for field in advice_fields:
+                    if plant.get(field):
+                        plant_info.append(f"{field}: {plant.get(field)}")
+            
+            else:  # GENERAL
+                # Include all relevant plant info
+                for key, value in plant.items():
+                    if value and key not in ['Photo URL', 'Raw Photo URL']:
+                        plant_info.append(f"{key}: {value}")
+            
+            if plant_info:
+                context_parts.append(f"\n{plant_name}:")
+                context_parts.extend([f"  {info}" for info in plant_info])
+    
+    return "\n".join(context_parts)
+
+def _generate_ai_response(query_type: str, context: str, original_message: str) -> str:
+    """
+    Generate AI response based on query type and context.
+    
+    Args:
+        query_type (str): The type of query
+        context (str): Context information
+        original_message (str): Original user message
+    
+    Returns:
+        str: AI-generated response
+    """
+    # Build system prompt based on query type
+    if query_type == QueryType.CARE:
+        system_prompt = """You are a knowledgeable gardening assistant specializing in plant care. 
+        Provide specific, actionable care advice based on the plant information provided. 
+        Consider the Houston climate and growing conditions. Be encouraging and practical."""
+        
+    elif query_type == QueryType.DIAGNOSIS:
+        system_prompt = """You are a plant health expert. Help diagnose plant problems based on symptoms described. 
+        Consider the plant's care requirements and Houston climate. Provide both diagnosis and treatment recommendations."""
+        
+    elif query_type == QueryType.ADVICE:
+        system_prompt = """You are an experienced gardener providing practical advice. 
+        Give specific, actionable recommendations based on the plant information and Houston growing conditions. 
+        Focus on best practices and proven techniques."""
+        
+    else:  # GENERAL
+        system_prompt = """You are a helpful gardening assistant with expertise in Houston gardening. 
+        Provide informative, practical answers to gardening questions. 
+        Consider the local climate and growing conditions in your responses."""
+    
+    # Build user prompt
+    user_prompt = f"""Context: {context}
+
+User question: {original_message}
+
+Please provide a helpful, informative response that addresses the user's question."""
+    
+    try:
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=500
+        )
+        
+        return response.choices[0].message.content or "I'm sorry, I couldn't generate a response at this time."
+        
+    except Exception as e:
+        logger.error(f"Error generating AI response: {e}")
+        return "I'm sorry, I encountered an error while processing your request. Please try again."
+
+def _add_photo_urls_to_response(response: str, plant_data: List[Dict]) -> str:
+    """
+    Add photo URLs to the AI response if available.
+    
+    Args:
+        response (str): The AI-generated response
+        plant_data (List[Dict]): Plant data with photo URLs
+    
+    Returns:
+        str: Response with photo URLs added
+    """
+    if not plant_data:
+        return response
+    
+    photo_sections = []
+    for plant in plant_data:
+        plant_name = plant.get('Plant Name', 'Unknown Plant')
+        raw_photo_url = plant.get('Raw Photo URL', '')
+        
+        if raw_photo_url:
+            # Format Google Photos URL if needed
+            if 'photos.google.com' in raw_photo_url:
+                raw_photo_url = raw_photo_url.split('?')[0] + '?authuser=0'
+            
+            photo_sections.append(f"\nYou can see a photo of {plant_name} here: {raw_photo_url}")
+    
+    if photo_sections:
+        response += "\n" + "\n".join(photo_sections)
+    
+    return response
+
 def handle_database_only_query(query_type: str, plant_references: List[str], original_message: str) -> str:
     """
     Handle database-only queries (LOCATION, PHOTO, LIST) directly from database.
@@ -372,7 +558,7 @@ def handle_photo_query(plant_references: List[str]) -> str:
         return "I encountered an error while looking up plant photos. Please try again."
 
 def get_chat_response_with_analyzer(message: str) -> str:
-    """Generate a chat response using the new query analyzer (Phase 3)"""
+    """Generate a chat response using the new query analyzer (Phase 4)"""
     logger.info(f"Processing message with analyzer: {message}")
     
     try:
@@ -384,19 +570,18 @@ def get_chat_response_with_analyzer(message: str) -> str:
         plant_references = analysis_result['plant_references']
         requires_ai_response = analysis_result['requires_ai_response']
         
-        logger.info(f"Phase 3: Query classified as {query_type} with confidence {analysis_result['confidence']}")
-        logger.info(f"Phase 3: Plant references found: {plant_references}")
-        logger.info(f"Phase 3: Requires AI response: {requires_ai_response}")
+        logger.info(f"Phase 4: Query classified as {query_type} with confidence {analysis_result['confidence']}")
+        logger.info(f"Phase 4: Plant references found: {plant_references}")
+        logger.info(f"Phase 4: Requires AI response: {requires_ai_response}")
         
-        # Phase 3: Handle database-only queries directly
+        # Phase 4: Handle database-only queries directly
         if not requires_ai_response:
-            logger.info(f"Phase 3: Processing database-only query type: {query_type}")
+            logger.info(f"Phase 4: Processing database-only query type: {query_type}")
             return handle_database_only_query(query_type, plant_references, message)
         
-        # For queries requiring AI response, continue with legacy processing for now
-        # This will be replaced in Phase 4
-        logger.info(f"Phase 3: Query requires AI response, using legacy processing for now")
-        return get_chat_response_legacy(message)
+        # Phase 4: Handle AI-enhanced queries with database context
+        logger.info(f"Phase 4: Processing AI-enhanced query type: {query_type}")
+        return handle_ai_enhanced_query(query_type, plant_references, message)
         
     except Exception as e:
         logger.error(f"Error in query analyzer: {e}")
