@@ -691,14 +691,24 @@ Available locations in the garden database: {locations_text}
 User query: "{user_query}"
 
 Analyze the user query and return ONLY a JSON array of location names that match what the user is asking about. 
-If the user is asking about plants in a specific location, return that location name.
-If the user is asking about multiple locations, return all relevant location names.
-If no locations match, return an empty array.
+
+IMPORTANT MATCHING RULES:
+1. Be flexible with partial matches - "rear middle" should match "Rear middle bed" or "rear middle bed"
+2. "arboretum" should match "Arboretum", "Basket arboretum", "Right Arboretum", "arboretum"
+3. "kitchen bed" should match "Kitchen Bed", "kitchen bed", "Basket kitchen bed"
+4. "office bed" should match "Office Bed", "office bed", "basket office bed"
+5. "rear left" should match "Rear Left Bed", "rear left bed", "Rear left"
+6. "rear right" should match "Rear Right path", "rear right bed", "Rear right"
+7. "middle bed" should match "Middle Bed", "middle bed"
+8. "bocce" should match "Bocce Bed", "Bocce Path", "bocce bed", "bocce path"
+9. "patio" should match "Patio"
+10. "pool path" should match "Pool Path", "pool path"
 
 Examples:
-- "what plants are in the arboretum" → ["arboretum"]
-- "how many plants in the rear left bed" → ["rear left bed"]
-- "show me plants in the kitchen bed and office bed" → ["kitchen bed", "office bed"]
+- "what plants are in the arboretum" → ["Arboretum", "Basket arboretum", "Right Arboretum", "arboretum"]
+- "how many plants in the rear left bed" → ["Rear Left Bed", "rear left bed", "Rear left"]
+- "show me plants in the kitchen bed and office bed" → ["Kitchen Bed", "kitchen bed", "Basket kitchen bed", "Office Bed", "office bed", "basket office bed"]
+- "what plants are in the rear middle" → ["Rear middle bed", "rear middle bed", "Rear Middle Bed"]
 - "what's in the garden" → [] (too vague)
 
 Return ONLY the JSON array, no other text:
@@ -708,11 +718,11 @@ Return ONLY the JSON array, no other text:
         response = openai_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a gardening assistant that matches user queries to valid garden locations. Return only JSON arrays."},
+                {"role": "system", "content": "You are a gardening assistant that matches user queries to valid garden locations. Be flexible with partial matches and return only JSON arrays."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.1,
-            max_tokens=200
+            max_tokens=300
         )
         
         ai_response = response.choices[0].message.content
@@ -741,16 +751,70 @@ Return ONLY the JSON array, no other text:
             logger.info(f"AI matched locations: {matched_locations}")
             logger.info(f"Valid matches: {valid_matches}")
             
+            # If AI didn't find matches, try fallback matching
+            if not valid_matches:
+                logger.info("No AI matches found, trying fallback matching")
+                valid_matches = fallback_location_matching(user_query, valid_locations)
+            
             return valid_matches
             
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse AI location response: {e}")
             logger.error(f"Raw response: {ai_response}")
-            return []
+            # Try fallback matching if JSON parsing fails
+            logger.info("JSON parsing failed, trying fallback matching")
+            return fallback_location_matching(user_query, valid_locations)
             
     except Exception as e:
         logger.error(f"Error in AI location matching: {e}")
-        return []
+        # Try fallback matching if AI call fails
+        logger.info("AI call failed, trying fallback matching")
+        return fallback_location_matching(user_query, valid_locations)
+
+def fallback_location_matching(user_query: str, valid_locations: List[str]) -> List[str]:
+    """
+    Fallback location matching using simple text matching when AI fails.
+    
+    Args:
+        user_query (str): The user's query
+        valid_locations (List[str]): List of valid locations
+    
+    Returns:
+        List[str]: List of matched location names
+    """
+    logger.info(f"Using fallback location matching for query: {user_query}")
+    
+    query_lower = user_query.lower()
+    matches = []
+    
+    # Common location patterns and their variations
+    location_patterns = {
+        'arboretum': ['arboretum', 'basket arboretum', 'right arboretum'],
+        'rear middle': ['rear middle bed', 'rear middle', 'rear middle bed photo'],
+        'rear left': ['rear left bed', 'rear left'],
+        'rear right': ['rear right bed', 'rear right', 'rear right path'],
+        'middle bed': ['middle bed'],
+        'kitchen bed': ['kitchen bed', 'basket kitchen bed'],
+        'office bed': ['office bed', 'basket office bed'],
+        'bocce': ['bocce bed', 'bocce path'],
+        'patio': ['patio'],
+        'pool path': ['pool path'],
+        'ivy wave wall': ['ivy wave wall', 'basket ivy wave wall'],
+        'kitchen wall': ['kitchen wall', 'basket kitchen wall']
+    }
+    
+    # Check for pattern matches
+    for pattern, variations in location_patterns.items():
+        if pattern in query_lower:
+            for variation in variations:
+                # Find exact matches in valid locations (case-insensitive)
+                for valid_loc in valid_locations:
+                    if valid_loc.lower() == variation.lower():
+                        if valid_loc not in matches:
+                            matches.append(valid_loc)
+    
+    logger.info(f"Fallback matches found: {matches}")
+    return matches
 
 def handle_location_plants_query_with_ai(user_query: str) -> str:
     """
