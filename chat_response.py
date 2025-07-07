@@ -789,39 +789,40 @@ def handle_location_plants_query_with_ai(user_query: str) -> str:
             locations_str = ", ".join(matched_locations)
             return f"I couldn't find any plants in the following locations: {locations_str}."
         
-        # Format the response
+        # Format the response - collect all unique plant names
         response_parts = []
         locations_str = ", ".join(matched_locations)
         response_parts.append(f"Here are the plants I found in {locations_str}:")
         
-        # Group plants by location for better organization
-        plants_by_location = {}
+        # Collect all unique plant names
+        unique_plants = set()
         for plant in plant_data:
             plant_name = plant.get('Plant Name', 'Unknown Plant')
-            location = plant.get('Location', 'Unknown Location')
-            
-            if location not in plants_by_location:
-                plants_by_location[location] = []
-            plants_by_location[location].append(plant_name)
+            if plant_name and plant_name != 'Unknown Plant':
+                unique_plants.add(plant_name)
         
-        # Build the response
-        for location, plants in plants_by_location.items():
-            if len(plants) == 1:
-                response_parts.append(f"• {location}: {plants[0]}")
-            else:
-                plants_list = ", ".join(plants)
-                response_parts.append(f"• {location}: {plants_list}")
+        # Sort plant names alphabetically for better presentation
+        sorted_plants = sorted(list(unique_plants))
         
-        # Add photo URLs
-        for plant in plant_data:
-            plant_name = plant.get('Plant Name', 'Unknown Plant')
-            raw_photo_url = plant.get('Raw Photo URL', '')
-            
-            if raw_photo_url:
-                # Format Google Photos URL if needed
-                if 'photos.google.com' in raw_photo_url:
-                    raw_photo_url = raw_photo_url.split('?')[0] + '?authuser=0'
-                response_parts.append(f"\nYou can see a photo of the {plant_name} here: {raw_photo_url}")
+        if len(sorted_plants) == 1:
+            response_parts.append(f"• {sorted_plants[0]}")
+        else:
+            # Format as a simple list
+            for plant_name in sorted_plants:
+                response_parts.append(f"• {plant_name}")
+        
+        # Add photo URLs for each unique plant
+        for plant_name in sorted_plants:
+            # Find the first plant with this name to get the photo
+            for plant in plant_data:
+                if plant.get('Plant Name') == plant_name:
+                    raw_photo_url = plant.get('Raw Photo URL', '')
+                    if raw_photo_url:
+                        # Format Google Photos URL if needed
+                        if 'photos.google.com' in raw_photo_url:
+                            raw_photo_url = raw_photo_url.split('?')[0] + '?authuser=0'
+                        response_parts.append(f"\nYou can see a photo of the {plant_name} here: {raw_photo_url}")
+                    break  # Found the first occurrence, move to next plant
         
         return "\n".join(response_parts)
         
