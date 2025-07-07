@@ -1114,6 +1114,20 @@ def get_chat_response_with_analyzer_optimized(message: str) -> str:
     analysis_start = performance_monitor.start_timer()
     
     try:
+        # Check for location-based plant queries first (AI-driven approach)
+        msg_lower = message.lower()
+        location_patterns = [
+            'what plants are in', 'how many plants in', 'show me plants in',
+            'plants in the', 'plants in', 'what\'s in the', 'whats in the',
+            'how many different plants in', 'list plants in', 'plants located in'
+        ]
+        
+        is_location_plants_query = any(pattern in msg_lower for pattern in location_patterns)
+        
+        if is_location_plants_query:
+            logger.info(f"Phase 5: Detected location-based plant query: {message}")
+            return handle_location_plants_query_with_ai(message)
+        
         # Step 1: AI Analysis (First AI call)
         logger.info("Phase 5: Starting AI analysis (first AI call)")
         analysis_result = analyze_query(message)
