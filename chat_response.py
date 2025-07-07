@@ -6,6 +6,15 @@ from config import openai_client
 
 logger = logging.getLogger(__name__)
 
+# Phase 1: Import query analyzer (new functionality)
+try:
+    from query_analyzer import analyze_query, QueryType, is_database_only_query, is_ai_response_required
+    QUERY_ANALYZER_AVAILABLE = True
+    logger.info("Query analyzer module loaded successfully")
+except ImportError as e:
+    QUERY_ANALYZER_AVAILABLE = False
+    logger.warning(f"Query analyzer module not available: {e}. Using legacy functionality.")
+
 def extract_search_terms(message: str) -> Optional[str]:
     """Extract plant names from the message using basic pattern matching"""
     # Check for general plant list queries
@@ -177,6 +186,45 @@ def parse_update_command(message: str) -> Optional[Dict]:
 def get_chat_response(message: str) -> str:
     """Generate a chat response based on the user's message"""
     logger.info(f"Processing message: {message}")
+    
+    try:
+        # Phase 1: Use query analyzer if available, otherwise fall back to legacy
+        if QUERY_ANALYZER_AVAILABLE:
+            return get_chat_response_with_analyzer(message)
+        else:
+            return get_chat_response_legacy(message)
+    except Exception as e:
+        logger.error(f"Error in get_chat_response: {e}")
+        # Fall back to legacy method if analyzer fails
+        return get_chat_response_legacy(message)
+
+def get_chat_response_with_analyzer(message: str) -> str:
+    """Generate a chat response using the new query analyzer (Phase 1)"""
+    logger.info(f"Processing message with analyzer: {message}")
+    
+    try:
+        # Analyze the query using AI
+        analysis_result = analyze_query(message)
+        logger.info(f"Query analysis result: {analysis_result}")
+        
+        # For Phase 1, we'll log the analysis but still use legacy processing
+        # This allows us to validate the analyzer works without breaking existing functionality
+        logger.info(f"Phase 1: Query classified as {analysis_result['query_type']} with confidence {analysis_result['confidence']}")
+        logger.info(f"Phase 1: Plant references found: {analysis_result['plant_references']}")
+        logger.info(f"Phase 1: Requires AI response: {analysis_result['requires_ai_response']}")
+        
+        # For now, continue with legacy processing
+        # In Phase 3-4, this will be replaced with new processing logic
+        return get_chat_response_legacy(message)
+        
+    except Exception as e:
+        logger.error(f"Error in query analyzer: {e}")
+        # Fall back to legacy method
+        return get_chat_response_legacy(message)
+
+def get_chat_response_legacy(message: str) -> str:
+    """Legacy chat response function - preserves existing functionality"""
+    logger.info(f"Processing message with legacy method: {message}")
     
     try:
         # Check for update commands first

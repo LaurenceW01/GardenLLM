@@ -1,0 +1,12 @@
+# GardenLLM Version Information
+VERSION=v1.0.0-20250704-125248
+COMMIT_HASH=66de13bd
+CREATED_AT=2025-07-04T12:52:48.701512
+
+# Current Features:
+# - Plant care guide parsing functionality
+# - Google Sheets integration  
+# - Web interface for plant management
+# - Multiple field update support
+# - Photo URL handling
+# - OpenAI integration for plant care recommendations
