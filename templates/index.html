@@ -12,6 +12,60 @@
         gfm: true,
         sanitize: true
     });
+    
+    // Function to convert photo URLs to image tags
+    function convertPhotoUrlsToImages(text) {
+        // Pattern to match photo URLs in the format: "You can see a photo of the [Plant Name] here: [URL]"
+        const photoUrlPattern = /You can see a photo of the ([^:]+) here: (https?:\/\/[^\s\n]+)/gi;
+        
+        return text.replace(photoUrlPattern, (match, plantName, url) => {
+            return `<div class="plant-photo-container mb-4">
+                <p class="text-sm text-gray-600 mb-2">Photo of ${plantName}:</p>
+                <img src="${url}" alt="Photo of ${plantName}" class="plant-photo rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer" onclick="openImageModal('${url}', '${plantName}')">
+            </div>`;
+        });
+    }
+    
+    // Function to open image in modal
+    function openImageModal(imageUrl, plantName) {
+        // Create modal if it doesn't exist
+        let modal = document.getElementById('imageModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'imageModal';
+            modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden';
+            modal.innerHTML = `
+                <div class="relative max-w-4xl max-h-full p-4">
+                    <button onclick="closeImageModal()" class="absolute top-4 right-4 text-white text-2xl hover:text-gray-300 z-10">×</button>
+                    <img id="modalImage" src="" alt="" class="max-w-full max-h-full object-contain rounded-lg">
+                    <p id="modalCaption" class="text-white text-center mt-2 text-lg"></p>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        
+        // Update modal content
+        document.getElementById('modalImage').src = imageUrl;
+        document.getElementById('modalImage').alt = `Photo of ${plantName}`;
+        document.getElementById('modalCaption').textContent = plantName;
+        
+        // Show modal
+        modal.classList.remove('hidden');
+        
+        // Close modal when clicking outside
+        modal.onclick = function(e) {
+            if (e.target === modal) {
+                closeImageModal();
+            }
+        };
+    }
+    
+    function closeImageModal() {
+        const modal = document.getElementById('imageModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
 </script>
 
 <!-- Initialize Alpine.js data -->
@@ -122,7 +176,9 @@
                         
                         const botDiv = document.createElement('div');
                         botDiv.className = 'flex justify-start';
-                        const markdownContent = marked.parse(data.response);
+                        // Convert photo URLs to images before markdown processing
+                        const processedResponse = convertPhotoUrlsToImages(data.response);
+                        const markdownContent = marked.parse(processedResponse);
                         botDiv.innerHTML = `
                             <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
                                 ${markdownContent}
@@ -148,7 +204,7 @@
                         `;
                         chatHistory.appendChild(userDiv);
                         
-                                                // Check if this is an add plant command
+                        // Check if this is an add plant command
                         if (this.message.toLowerCase().startsWith('add plant ')) {
                             // Parse the add plant command
                             const commandParts = this.message.substring('add plant '.length).trim();
@@ -180,7 +236,9 @@
                                         
                                         const botDiv = document.createElement('div');
                                         botDiv.className = 'flex justify-start';
-                                        const markdownContent = marked.parse(data.message + '\n\n' + data.care_guide);
+                                        // Convert photo URLs to images before markdown processing
+                                        const processedResponse = convertPhotoUrlsToImages(data.message + '\n\n' + data.care_guide);
+                                        const markdownContent = marked.parse(processedResponse);
                                         botDiv.innerHTML = `
                                             <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
                                                 ${markdownContent}
@@ -268,7 +326,9 @@
                         
                         const botDiv = document.createElement('div');
                         botDiv.className = 'flex justify-start';
-                        const markdownContent = marked.parse(data.response);
+                        // Convert photo URLs to images before markdown processing
+                        const processedResponse = convertPhotoUrlsToImages(data.response);
+                        const markdownContent = marked.parse(processedResponse);
                         botDiv.innerHTML = `
                             <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
                                 ${markdownContent}
@@ -576,6 +636,72 @@ button {
 
 button:not(:disabled):hover {
     transform: translateY(-1px);
+}
+
+/* Plant photo styles */
+.plant-photo-container {
+    margin: 1rem 0;
+    padding: 0.5rem;
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    border: 1px solid #e9ecef;
+}
+
+.plant-photo {
+    max-width: 300px;
+    max-height: 300px;
+    width: auto;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}
+
+.plant-photo:hover {
+    transform: scale(1.02);
+    transition: transform 0.2s ease-in-out;
+}
+
+/* Modal styles */
+#imageModal {
+    backdrop-filter: blur(4px);
+}
+
+#imageModal img {
+    max-width: 90vw;
+    max-height: 90vh;
+    object-fit: contain;
+}
+
+#imageModal button {
+    background: rgba(0, 0, 0, 0.5);
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out;
+}
+
+#imageModal button:hover {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+/* Responsive adjustments for plant photos */
+@media (max-width: 768px) {
+    .plant-photo {
+        max-width: 250px;
+        max-height: 250px;
+    }
+    
+    .plant-photo-container {
+        margin: 0.5rem 0;
+        padding: 0.25rem;
+    }
 }
 </style>
 {% endblock %} 
