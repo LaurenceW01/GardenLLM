@@ -31,17 +31,20 @@ def get_plant_list_from_database() -> List[str]:
     """
     Get the current list of plant names from the database.
     
-    This function will be enhanced in Phase 2 to include caching.
-    For now, it provides a placeholder that can be integrated with
-    the existing plant_operations module.
+    This function uses the cached plant list from plant_operations
+    to provide efficient access to plant names for query analysis.
     
     Returns:
         List[str]: List of plant names currently in the database
     """
     try:
-        # TODO: In Phase 2, this will be replaced with actual database integration
-        # For now, return an empty list - this will be enhanced in Phase 2
-        logger.info("Getting plant list from database (placeholder for Phase 2)")
+        # Phase 2: Use the new cached plant list function
+        from plant_operations import get_plant_names_from_database
+        plant_names = get_plant_names_from_database()
+        logger.info(f"Retrieved {len(plant_names)} plant names from database")
+        return plant_names
+    except ImportError as e:
+        logger.error(f"Could not import plant_operations: {e}")
         return []
     except Exception as e:
         logger.error(f"Error getting plant list from database: {e}")

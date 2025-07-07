@@ -5,6 +5,7 @@ from typing import List, Dict, Optional, Tuple
 from config import sheets_client, SPREADSHEET_ID, RANGE_NAME
 from sheets_client import check_rate_limit, get_next_id
 import re
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -212,6 +213,9 @@ def update_plant(plant_data: Dict) -> bool:
                     body={'values': [new_row]}
                 ).execute()
             
+            # Phase 2: Invalidate cache after plant update
+            invalidate_plant_list_cache()
+            
             return True
             
         except Exception as e:
@@ -275,6 +279,9 @@ def update_plant_field(plant_row: int, field_name: str, new_value: str) -> bool:
                 valueInputOption='USER_ENTERED',
                 body={'values': [[formatted_value]]}
             ).execute()
+        
+        # Phase 2: Invalidate cache after field update
+        invalidate_plant_list_cache()
         
         return True
         
@@ -389,4 +396,102 @@ def add_test_photo_url():
         return "Test photo URL added successfully"
         
     except Exception as e:
-        return f"Failed to add test photo URL: {str(e)}" 
+        return f"Failed to add test photo URL: {str(e)}"
+
+# Phase 2: Plant List Caching System
+_plant_list_cache = {
+    'names': [],
+    'last_updated': 0,
+    'cache_duration': 300  # 5 minutes cache duration
+}
+
+def get_plant_names_from_database() -> List[str]:
+    """
+    Get a list of plant names from the database with caching.
+    
+    This function caches the plant names for 5 minutes to reduce database calls
+    and improve performance for the query analyzer.
+    
+    Returns:
+        List[str]: List of plant names currently in the database
+    """
+    global _plant_list_cache
+    
+    current_time = time.time()
+    
+    # Check if cache is still valid
+    if (current_time - _plant_list_cache['last_updated']) < _plant_list_cache['cache_duration']:
+        logger.info(f"Using cached plant list with {len(_plant_list_cache['names'])} plants")
+        return _plant_list_cache['names'].copy()
+    
+    try:
+        logger.info("Cache expired, fetching fresh plant list from database")
+        check_rate_limit()
+        
+        result = sheets_client.values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range=RANGE_NAME
+        ).execute()
+        
+        values = result.get('values', [])
+        if not values or len(values) <= 1:
+            logger.warning("No plants found in database or only header row present")
+            _plant_list_cache['names'] = []
+            _plant_list_cache['last_updated'] = current_time
+            return []
+        
+        headers = values[0]
+        name_idx = headers.index('Plant Name') if 'Plant Name' in headers else 1
+        
+        # Extract plant names from all rows except header
+        plant_names = []
+        for row in values[1:]:
+            if len(row) > name_idx and row[name_idx]:
+                plant_name = row[name_idx].strip()
+                if plant_name:  # Only add non-empty names
+                    plant_names.append(plant_name)
+        
+        # Update cache
+        _plant_list_cache['names'] = plant_names
+        _plant_list_cache['last_updated'] = current_time
+        
+        logger.info(f"Updated plant list cache with {len(plant_names)} plants")
+        return plant_names.copy()
+        
+    except Exception as e:
+        logger.error(f"Error fetching plant names from database: {e}")
+        # Return cached data if available, otherwise empty list
+        if _plant_list_cache['names']:
+            logger.info("Returning cached plant list due to database error")
+            return _plant_list_cache['names'].copy()
+        return []
+
+def invalidate_plant_list_cache():
+    """
+    Invalidate the plant list cache to force a fresh fetch on next request.
+    
+    This should be called when plants are added, updated, or removed from the database.
+    """
+    global _plant_list_cache
+    _plant_list_cache['last_updated'] = 0
+    logger.info("Plant list cache invalidated")
+
+def get_plant_list_cache_info() -> Dict:
+    """
+    Get information about the current plant list cache status.
+    
+    Returns:
+        Dict: Cache information including count, last updated, and cache duration
+    """
+    global _plant_list_cache
+    current_time = time.time()
+    age = current_time - _plant_list_cache['last_updated']
+    is_valid = age < _plant_list_cache['cache_duration']
+    
+    return {
+        'plant_count': len(_plant_list_cache['names']),
+        'last_updated': _plant_list_cache['last_updated'],
+        'cache_age_seconds': age,
+        'is_valid': is_valid,
+        'cache_duration_seconds': _plant_list_cache['cache_duration']
+    } 
