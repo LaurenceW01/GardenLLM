@@ -198,8 +198,181 @@ def get_chat_response(message: str) -> str:
         # Fall back to legacy method if analyzer fails
         return get_chat_response_legacy(message)
 
+def handle_database_only_query(query_type: str, plant_references: List[str], original_message: str) -> str:
+    """
+    Handle database-only queries (LOCATION, PHOTO, LIST) directly from database.
+    
+    Args:
+        query_type (str): The type of query (LOCATION, PHOTO, LIST)
+        plant_references (List[str]): List of plant names referenced in the query
+        original_message (str): The original user message
+    
+    Returns:
+        str: Formatted response from database data
+    """
+    logger.info(f"Handling database-only query: {query_type} for plants: {plant_references}")
+    
+    try:
+        if query_type == QueryType.LIST:
+            return handle_list_query()
+        elif query_type == QueryType.LOCATION:
+            return handle_location_query(plant_references)
+        elif query_type == QueryType.PHOTO:
+            return handle_photo_query(plant_references)
+        else:
+            logger.warning(f"Unknown database-only query type: {query_type}")
+            return get_chat_response_legacy(original_message)
+            
+    except Exception as e:
+        logger.error(f"Error handling database-only query: {e}")
+        return get_chat_response_legacy(original_message)
+
+def handle_list_query() -> str:
+    """
+    Handle queries asking for a list of all plants.
+    
+    Returns:
+        str: Formatted list of all plants in the database
+    """
+    logger.info("Handling list query")
+    
+    try:
+        # Get all plants from database
+        plant_data = get_plant_data([])  # Empty list returns all plants
+        
+        if not isinstance(plant_data, list):
+            return "I encountered an error while retrieving the plant list. Please try again."
+        
+        if not plant_data:
+            return "There are currently no plants in the database."
+        
+        # Extract plant names
+        plant_names = [plant.get('Plant Name', '') for plant in plant_data if plant.get('Plant Name')]
+        
+        if not plant_names:
+            return "There are currently no plants in the database."
+        
+        # Format response
+        response = f"You have {len(plant_names)} plants in your garden:\n\n"
+        response += "\n".join(f"• {name}" for name in plant_names)
+        
+        logger.info(f"List query response: {len(plant_names)} plants listed")
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error handling list query: {e}")
+        return "I encountered an error while retrieving your plant list. Please try again."
+
+def handle_location_query(plant_references: List[str]) -> str:
+    """
+    Handle queries asking for plant locations.
+    
+    Args:
+        plant_references (List[str]): List of plant names to look up
+    
+    Returns:
+        str: Formatted location information
+    """
+    logger.info(f"Handling location query for plants: {plant_references}")
+    
+    if not plant_references:
+        return "I couldn't identify which plants you're asking about. Could you please specify the plant names?"
+    
+    try:
+        response_parts = []
+        
+        for plant_name in plant_references:
+            # Get plant data from database
+            plant_data = get_plant_data([plant_name])
+            
+            if isinstance(plant_data, str):  # Error message
+                response_parts.append(f"Error looking up {plant_name}: {plant_data}")
+                continue
+            
+            if not plant_data:
+                response_parts.append(f"I couldn't find any plants matching '{plant_name}' in the database.")
+                continue
+            
+            # Process each matching plant
+            for plant in plant_data:
+                plant_name_actual = plant.get('Plant Name', plant_name)
+                location = plant.get('Location', '')
+                
+                if location:
+                    response_parts.append(f"The {plant_name_actual} is located in the {location}.")
+                else:
+                    response_parts.append(f"I found {plant_name_actual}, but its location is not specified.")
+                
+                # Add photo if available
+                raw_photo_url = plant.get('Raw Photo URL', '')
+                if raw_photo_url:
+                    if 'photos.google.com' in raw_photo_url:
+                        raw_photo_url = raw_photo_url.split('?')[0] + '?authuser=0'
+                    response_parts.append(f"You can see a photo of the {plant_name_actual} here: {raw_photo_url}")
+        
+        if not response_parts:
+            return "I couldn't find location information for the plants you mentioned."
+        
+        return "\n".join(response_parts)
+        
+    except Exception as e:
+        logger.error(f"Error handling location query: {e}")
+        return "I encountered an error while looking up plant locations. Please try again."
+
+def handle_photo_query(plant_references: List[str]) -> str:
+    """
+    Handle queries asking for plant photos.
+    
+    Args:
+        plant_references (List[str]): List of plant names to look up
+    
+    Returns:
+        str: Formatted photo information
+    """
+    logger.info(f"Handling photo query for plants: {plant_references}")
+    
+    if not plant_references:
+        return "I couldn't identify which plants you're asking about. Could you please specify the plant names?"
+    
+    try:
+        response_parts = []
+        
+        for plant_name in plant_references:
+            # Get plant data from database
+            plant_data = get_plant_data([plant_name])
+            
+            if isinstance(plant_data, str):  # Error message
+                response_parts.append(f"Error looking up {plant_name}: {plant_data}")
+                continue
+            
+            if not plant_data:
+                response_parts.append(f"I couldn't find any plants matching '{plant_name}' in the database.")
+                continue
+            
+            # Process each matching plant
+            for plant in plant_data:
+                plant_name_actual = plant.get('Plant Name', plant_name)
+                raw_photo_url = plant.get('Raw Photo URL', '')
+                
+                if raw_photo_url:
+                    # Format Google Photos URL if needed
+                    if 'photos.google.com' in raw_photo_url:
+                        raw_photo_url = raw_photo_url.split('?')[0] + '?authuser=0'
+                    response_parts.append(f"Here's what {plant_name_actual} looks like:\n{raw_photo_url}")
+                else:
+                    response_parts.append(f"I found {plant_name_actual}, but there's no photo available.")
+        
+        if not response_parts:
+            return "I couldn't find photos for the plants you mentioned."
+        
+        return "\n\n".join(response_parts)
+        
+    except Exception as e:
+        logger.error(f"Error handling photo query: {e}")
+        return "I encountered an error while looking up plant photos. Please try again."
+
 def get_chat_response_with_analyzer(message: str) -> str:
-    """Generate a chat response using the new query analyzer (Phase 1)"""
+    """Generate a chat response using the new query analyzer (Phase 3)"""
     logger.info(f"Processing message with analyzer: {message}")
     
     try:
@@ -207,14 +380,22 @@ def get_chat_response_with_analyzer(message: str) -> str:
         analysis_result = analyze_query(message)
         logger.info(f"Query analysis result: {analysis_result}")
         
-        # For Phase 1, we'll log the analysis but still use legacy processing
-        # This allows us to validate the analyzer works without breaking existing functionality
-        logger.info(f"Phase 1: Query classified as {analysis_result['query_type']} with confidence {analysis_result['confidence']}")
-        logger.info(f"Phase 1: Plant references found: {analysis_result['plant_references']}")
-        logger.info(f"Phase 1: Requires AI response: {analysis_result['requires_ai_response']}")
+        query_type = analysis_result['query_type']
+        plant_references = analysis_result['plant_references']
+        requires_ai_response = analysis_result['requires_ai_response']
         
-        # For now, continue with legacy processing
-        # In Phase 3-4, this will be replaced with new processing logic
+        logger.info(f"Phase 3: Query classified as {query_type} with confidence {analysis_result['confidence']}")
+        logger.info(f"Phase 3: Plant references found: {plant_references}")
+        logger.info(f"Phase 3: Requires AI response: {requires_ai_response}")
+        
+        # Phase 3: Handle database-only queries directly
+        if not requires_ai_response:
+            logger.info(f"Phase 3: Processing database-only query type: {query_type}")
+            return handle_database_only_query(query_type, plant_references, message)
+        
+        # For queries requiring AI response, continue with legacy processing for now
+        # This will be replaced in Phase 4
+        logger.info(f"Phase 3: Query requires AI response, using legacy processing for now")
         return get_chat_response_legacy(message)
         
     except Exception as e:

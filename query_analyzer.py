@@ -125,32 +125,36 @@ def _build_analysis_prompt(user_query: str, plant_list: List[str]) -> str:
     Returns:
         str: Formatted prompt for AI analysis
     """
-    plant_list_text = ", ".join(plant_list) if plant_list else "No plants in database"
+    # Limit plant list to avoid token limits - show first 20 plants as examples
+    if plant_list and len(plant_list) > 20:
+        plant_list_text = ", ".join(plant_list[:20]) + f" (and {len(plant_list) - 20} more plants)"
+    else:
+        plant_list_text = ", ".join(plant_list) if plant_list else "No plants in database"
     
     prompt = f"""
-Analyze the following user query and provide a JSON response with the following structure:
+Analyze this query and respond with ONLY a JSON object:
 
 {{
-    "plant_references": ["list", "of", "plant", "names", "referenced"],
-    "query_type": "CLASSIFICATION",
+    "plant_references": ["plant", "names", "found"],
+    "query_type": "TYPE",
     "confidence": 0.95,
-    "reasoning": "brief explanation of classification"
+    "reasoning": "brief explanation"
 }}
 
 Query Types:
-- LOCATION: Questions about where plants are located (e.g., "Where are my tomatoes?")
-- PHOTO: Requests for plant photos (e.g., "Show me my roses")
-- LIST: Requests to list all plants (e.g., "What plants do I have?")
-- CARE: Questions about plant care (e.g., "How do I water my basil?")
-- DIAGNOSIS: Questions about plant problems (e.g., "Why are my leaves yellow?")
-- ADVICE: Requests for gardening advice (e.g., "How do I prune my roses?")
-- GENERAL: General gardening questions not about specific plants
+- LIST: "What plants do I have?", "Show all plants", "List my plants"
+- LOCATION: "Where is my tomato?", "Location of roses"
+- PHOTO: "Show me tomato", "Picture of basil", "Photo of roses"
+- CARE: "How to water", "Care for plants"
+- DIAGNOSIS: "Why yellow leaves", "Plant problems"
+- ADVICE: "How to prune", "Gardening tips"
+- GENERAL: Other gardening questions
 
-Available plants in database: {plant_list_text}
+Available plants: {plant_list_text}
 
-User query: "{user_query}"
+Query: "{user_query}"
 
-Respond with ONLY the JSON object, no additional text.
+JSON only:
 """
     return prompt
 
@@ -223,11 +227,11 @@ def _get_fallback_analysis(user_query: str) -> Dict:
     query_lower = user_query.lower()
     
     # Check for list queries
-    if any(word in query_lower for word in ['what plants', 'list', 'all plants', 'which plants']):
+    if any(word in query_lower for word in ['what plants', 'list', 'all plants', 'which plants', 'show all', 'tell me about the plants']):
         return {
             'plant_references': [],
             'query_type': QueryType.LIST,
-            'confidence': 0.7,
+            'confidence': 0.8,
             'reasoning': 'Fallback: detected list-related keywords',
             'requires_ai_response': False,
             'original_query': user_query,
@@ -247,11 +251,11 @@ def _get_fallback_analysis(user_query: str) -> Dict:
         }
     
     # Check for photo queries
-    if any(word in query_lower for word in ['show me', 'picture', 'photo', 'see']):
+    if any(word in query_lower for word in ['show me', 'picture', 'photo', 'see', 'look like', 'what does']):
         return {
             'plant_references': [],
             'query_type': QueryType.PHOTO,
-            'confidence': 0.6,
+            'confidence': 0.7,
             'reasoning': 'Fallback: detected photo-related keywords',
             'requires_ai_response': False,
             'original_query': user_query,
