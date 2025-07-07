@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 import pytz
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Union
 from config import sheets_client, SPREADSHEET_ID, RANGE_NAME
 from sheets_client import check_rate_limit, get_next_id
 import re
@@ -44,6 +44,99 @@ def get_all_plants() -> List[Dict]:
         logger.error(f"Error getting plants: {e}")
         return []
 
+def _normalize_plant_name(name: Optional[str]) -> str:
+    """
+    Normalize plant name for better matching (handle plurals, common variations).
+    
+    Args:
+        name (str): Plant name to normalize
+    
+    Returns:
+        str: Normalized plant name
+    """
+    if not name:
+        return ""
+    
+    name = name.lower().strip()
+    
+    # Common plural to singular mappings
+    plural_to_singular = {
+        'roses': 'rose',
+        'tomatoes': 'tomato',
+        'basils': 'basil',
+        'lettuces': 'lettuce',
+        'herbs': 'herb',
+        'vegetables': 'vegetable',
+        'fruits': 'fruit',
+        'flowers': 'flower',
+        'shrubs': 'shrub',
+        'trees': 'tree',
+        'vines': 'vine',
+        'grasses': 'grass',
+        'ferns': 'fern',
+        'cacti': 'cactus',
+        'cactuses': 'cactus',
+        'succulents': 'succulent',
+        'annuals': 'annual',
+        'perennials': 'perennial',
+        'bulbs': 'bulb',
+        'seeds': 'seed',
+        'seedlings': 'seedling',
+        'cuttings': 'cutting',
+        'plants': 'plant'
+    }
+    
+    # Check if the name is a known plural
+    if name in plural_to_singular:
+        return plural_to_singular[name]
+    
+    # Handle common plural patterns
+    if name.endswith('s'):
+        # Remove 's' and check if it's a valid singular form
+        singular = name[:-1]
+        # Add back common endings that might have been removed
+        if singular.endswith('ie'):  # tomatoes -> tomato
+            return singular
+        elif singular.endswith('e'):  # roses -> rose
+            return singular
+        elif len(singular) > 2:  # general case
+            return singular
+    
+    return name
+
+def _plant_names_match(search_name: str, plant_name: str) -> bool:
+    """
+    Check if a search name matches a plant name, handling plurals and variations.
+    
+    Args:
+        search_name (str): The name being searched for
+        plant_name (str): The plant name in the database
+    
+    Returns:
+        bool: True if names match
+    """
+    search_normalized = _normalize_plant_name(search_name)
+    plant_normalized = _normalize_plant_name(plant_name)
+    
+    # Direct match after normalization
+    if search_normalized == plant_normalized:
+        return True
+    
+    # Substring match (original behavior)
+    if search_normalized in plant_normalized or plant_normalized in search_normalized:
+        return True
+    
+    # Word-based matching for compound names
+    search_words = search_normalized.split()
+    plant_words = plant_normalized.split()
+    
+    # Check if all search words are found in plant words
+    for search_word in search_words:
+        if not any(search_word in plant_word or plant_word in search_word for plant_word in plant_words):
+            return False
+    
+    return True
+
 def get_plant_data(plant_names=None) -> List[Dict]:
     """Get data for specified plants or all plants"""
     try:
@@ -55,7 +148,7 @@ def get_plant_data(plant_names=None) -> List[Dict]:
         
         values = result.get('values', [])
         if not values:
-            return "No plants found in the database"
+            return []
             
         headers = values[0]
         plants_data = []
@@ -73,7 +166,9 @@ def get_plant_data(plant_names=None) -> List[Dict]:
             print(f"Raw Photo URL: {plant_dict.get('Raw Photo URL', '')}")
             
             if plant_names:
-                if any(name.lower() in plant_dict['Plant Name'].lower() for name in plant_names):
+                # Use improved matching that handles plurals
+                plant_name = plant_dict.get('Plant Name', '')
+                if plant_name and any(_plant_names_match(name, plant_name) for name in plant_names):
                     plants_data.append(plant_dict)
                     print(f"\n=== DEBUG: Matching Plant Data ===")
                     print(f"Plant Name: {plant_dict['Plant Name']}")
@@ -90,7 +185,7 @@ def get_plant_data(plant_names=None) -> List[Dict]:
         
     except Exception as e:
         print(f"Error getting plant data: {e}")
-        return f"Error accessing plant database: {str(e)}"
+        return []
 
 def find_plant_by_id_or_name(identifier: str) -> Tuple[Optional[int], Optional[List]]:
     """Find a plant by ID or name"""
