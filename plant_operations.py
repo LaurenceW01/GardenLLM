@@ -578,3 +578,80 @@ def get_plant_list_cache_info() -> Dict:
         'is_valid': is_valid,
         'cache_duration_seconds': _plant_list_cache['cache_duration']
     } 
+
+def get_location_names_from_database() -> List[str]:
+    """
+    Get a list of unique location names from the database.
+    
+    This function extracts all unique location values from the database
+    to support location-based queries like "what plants are in the arboretum".
+    
+    Returns:
+        List[str]: List of unique location names from the database
+    """
+    try:
+        check_rate_limit()
+        result = sheets_client.values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range=RANGE_NAME
+        ).execute()
+        
+        values = result.get('values', [])
+        if not values:
+            return []
+            
+        headers = values[0]
+        location_idx = headers.index('Location') if 'Location' in headers else 3
+        
+        # Extract all location values
+        locations = set()
+        for row in values[1:]:
+            if len(row) > location_idx and row[location_idx]:
+                # Split by comma and clean up each location
+                location_parts = row[location_idx].split(',')
+                for part in location_parts:
+                    location = part.strip()
+                    if location:  # Only add non-empty locations
+                        locations.add(location)
+        
+        location_list = sorted(list(locations))
+        logger.info(f"Retrieved {len(location_list)} unique locations from database")
+        return location_list
+        
+    except Exception as e:
+        logger.error(f"Error getting location names from database: {e}")
+        return []
+
+def get_plants_by_location(location_names: List[str]) -> List[Dict]:
+    """
+    Get plants that are located in any of the specified locations (exact match only).
+    Args:
+        location_names (List[str]): List of location names to search for
+    Returns:
+        List[Dict]: List of plant data dictionaries for plants in the specified locations
+    """
+    try:
+        check_rate_limit()
+        result = sheets_client.values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range=RANGE_NAME
+        ).execute()
+        values = result.get('values', [])
+        if not values:
+            return []
+        headers = values[0]
+        location_idx = headers.index('Location') if 'Location' in headers else 3
+        matching_plants = []
+        location_names_lower = [loc.lower().strip() for loc in location_names]
+        for row in values[1:]:
+            if len(row) > location_idx and row[location_idx]:
+                plant_locations = [loc.strip().lower() for loc in row[location_idx].split(',') if loc.strip()]
+                if any(loc in location_names_lower for loc in plant_locations):
+                    row_data = row + [''] * (len(headers) - len(row))
+                    plant_dict = dict(zip(headers, row_data))
+                    matching_plants.append(plant_dict)
+        logger.info(f"Found {len(matching_plants)} plants in locations: {location_names}")
+        return matching_plants
+    except Exception as e:
+        logger.error(f"Error getting plants by location: {e}")
+        return [] 

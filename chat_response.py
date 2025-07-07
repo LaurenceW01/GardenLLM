@@ -423,10 +423,10 @@ def _add_photo_urls_to_response(response: str, plant_data: List[Dict]) -> str:
 
 def handle_database_only_query(query_type: str, plant_references: List[str], original_message: str) -> str:
     """
-    Handle database-only queries (LOCATION, PHOTO, LIST) directly from database.
+    Handle database-only queries (LOCATION, PHOTO, LIST, LOCATION_PLANTS) directly from database.
     
     Args:
-        query_type (str): The type of query (LOCATION, PHOTO, LIST)
+        query_type (str): The type of query (LOCATION, PHOTO, LIST, LOCATION_PLANTS)
         plant_references (List[str]): List of plant names referenced in the query
         original_message (str): The original user message
     
@@ -442,6 +442,12 @@ def handle_database_only_query(query_type: str, plant_references: List[str], ori
             return handle_location_query(plant_references)
         elif query_type == QueryType.PHOTO:
             return handle_photo_query(plant_references)
+        elif query_type == QueryType.LOCATION_PLANTS:
+            # Extract location references from the analysis result
+            from query_analyzer import analyze_query
+            analysis_result = analyze_query(original_message)
+            location_references = analysis_result.get('location_references', [])
+            return handle_location_plants_query(location_references)
         else:
             logger.warning(f"Unknown database-only query type: {query_type}")
             return get_chat_response_legacy(original_message)
@@ -593,6 +599,76 @@ def handle_photo_query(plant_references: List[str]) -> str:
     except Exception as e:
         logger.error(f"Error handling photo query: {e}")
         return "I encountered an error while looking up plant photos. Please try again."
+
+def handle_location_plants_query(location_references: List[str]) -> str:
+    """
+    Handle queries asking for plants in specific locations.
+    
+    Args:
+        location_references (List[str]): List of location names to search for
+    
+    Returns:
+        str: Formatted response with plants found in the specified locations
+    """
+    logger.info(f"Handling location plants query for locations: {location_references}")
+    
+    if not location_references:
+        return "I couldn't identify which locations you're asking about. Could you please specify the location names?"
+    
+    try:
+        # Get plants by location from database
+        from plant_operations import get_plants_by_location
+        plant_data = get_plants_by_location(location_references)
+        
+        if isinstance(plant_data, str):  # Error message
+            return f"Error looking up plants in locations {location_references}: {plant_data}"
+        
+        if not plant_data:
+            locations_str = ", ".join(location_references)
+            return f"I couldn't find any plants in the following locations: {locations_str}."
+        
+        # Format the response
+        response_parts = []
+        locations_str = ", ".join(location_references)
+        response_parts.append(f"Here are the plants I found in {locations_str}:")
+        
+        # Group plants by location for better organization
+        plants_by_location = {}
+        for plant in plant_data:
+            plant_name = plant.get('Plant Name', 'Unknown Plant')
+            location = plant.get('Location', 'Unknown Location')
+            
+            if location not in plants_by_location:
+                plants_by_location[location] = []
+            plants_by_location[location].append(plant_name)
+        
+        # Add plants grouped by location
+        for location, plants in plants_by_location.items():
+            if len(plants) == 1:
+                response_parts.append(f"• {location}: {plants[0]}")
+            else:
+                plants_list = ", ".join(plants)
+                response_parts.append(f"• {location}: {plants_list}")
+        
+        # Add photo URLs if available
+        photo_plants = []
+        for plant in plant_data:
+            plant_name = plant.get('Plant Name', 'Unknown Plant')
+            raw_photo_url = plant.get('Raw Photo URL', '')
+            if raw_photo_url:
+                if 'photos.google.com' in raw_photo_url:
+                    raw_photo_url = raw_photo_url.split('?')[0] + '?authuser=0'
+                photo_plants.append(f"{plant_name}: {raw_photo_url}")
+        
+        if photo_plants:
+            response_parts.append("\nPhotos available for:")
+            response_parts.extend([f"• {photo}" for photo in photo_plants])
+        
+        return "\n".join(response_parts)
+        
+    except Exception as e:
+        logger.error(f"Error handling location plants query: {e}")
+        return "I encountered an error while looking up plants in those locations. Please try again."
 
 def get_chat_response_with_analyzer(message: str) -> str:
     """Generate a chat response using the new query analyzer (Phase 4)"""
