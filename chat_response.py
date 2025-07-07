@@ -4,6 +4,7 @@ from typing import List, Dict, Optional, Tuple
 import re
 from plant_operations import get_plant_data, find_plant_by_id_or_name, update_plant_field
 from config import openai_client
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -423,10 +424,10 @@ def _add_photo_urls_to_response(response: str, plant_data: List[Dict]) -> str:
 
 def handle_database_only_query(query_type: str, plant_references: List[str], original_message: str) -> str:
     """
-    Handle database-only queries (LOCATION, PHOTO, LIST, LOCATION_PLANTS) directly from database.
+    Handle database-only queries (LOCATION, PHOTO, LIST) directly from database.
     
     Args:
-        query_type (str): The type of query (LOCATION, PHOTO, LIST, LOCATION_PLANTS)
+        query_type (str): The type of query (LOCATION, PHOTO, LIST)
         plant_references (List[str]): List of plant names referenced in the query
         original_message (str): The original user message
     
@@ -442,12 +443,7 @@ def handle_database_only_query(query_type: str, plant_references: List[str], ori
             return handle_location_query(plant_references)
         elif query_type == QueryType.PHOTO:
             return handle_photo_query(plant_references)
-        elif query_type == QueryType.LOCATION_PLANTS:
-            # Extract location references from the analysis result
-            from query_analyzer import analyze_query
-            analysis_result = analyze_query(original_message)
-            location_references = analysis_result.get('location_references', [])
-            return handle_location_plants_query(location_references)
+        # LOCATION_PLANTS queries are now handled by AI-driven approach in main chat handler
         else:
             logger.warning(f"Unknown database-only query type: {query_type}")
             return get_chat_response_legacy(original_message)
@@ -670,11 +666,188 @@ def handle_location_plants_query(location_references: List[str]) -> str:
         logger.error(f"Error handling location plants query: {e}")
         return "I encountered an error while looking up plants in those locations. Please try again."
 
+def ai_match_locations(user_query: str, valid_locations: List[str]) -> List[str]:
+    """
+    Use AI to match user query to valid locations from the database.
+    
+    Args:
+        user_query (str): The user's query (e.g., "what plants are in the arboretum")
+        valid_locations (List[str]): List of valid locations from the database
+    
+    Returns:
+        List[str]: List of matched location names
+    """
+    logger.info(f"AI matching locations for query: {user_query}")
+    logger.info(f"Valid locations: {valid_locations}")
+    
+    try:
+        # Build the prompt for AI location matching
+        locations_text = ", ".join(valid_locations)
+        prompt = f"""
+You are a gardening assistant that matches user queries to valid garden locations.
+
+Available locations in the garden database: {locations_text}
+
+User query: "{user_query}"
+
+Analyze the user query and return ONLY a JSON array of location names that match what the user is asking about. 
+If the user is asking about plants in a specific location, return that location name.
+If the user is asking about multiple locations, return all relevant location names.
+If no locations match, return an empty array.
+
+Examples:
+- "what plants are in the arboretum" → ["arboretum"]
+- "how many plants in the rear left bed" → ["rear left bed"]
+- "show me plants in the kitchen bed and office bed" → ["kitchen bed", "office bed"]
+- "what's in the garden" → [] (too vague)
+
+Return ONLY the JSON array, no other text:
+"""
+        
+        # Call OpenAI for location matching
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a gardening assistant that matches user queries to valid garden locations. Return only JSON arrays."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+            max_tokens=200
+        )
+        
+        ai_response = response.choices[0].message.content
+        if not ai_response:
+            logger.warning("Empty AI response for location matching")
+            return []
+        
+        # Parse the JSON response
+        try:
+            # Clean up the response
+            cleaned_response = ai_response.strip()
+            if cleaned_response.startswith('```json'):
+                cleaned_response = cleaned_response[7:]
+            if cleaned_response.endswith('```'):
+                cleaned_response = cleaned_response[:-3]
+            
+            matched_locations = json.loads(cleaned_response.strip())
+            
+            if not isinstance(matched_locations, list):
+                logger.warning(f"AI returned non-list response: {matched_locations}")
+                return []
+            
+            # Validate that all matched locations exist in the valid locations list
+            valid_matches = [loc for loc in matched_locations if loc in valid_locations]
+            
+            logger.info(f"AI matched locations: {matched_locations}")
+            logger.info(f"Valid matches: {valid_matches}")
+            
+            return valid_matches
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse AI location response: {e}")
+            logger.error(f"Raw response: {ai_response}")
+            return []
+            
+    except Exception as e:
+        logger.error(f"Error in AI location matching: {e}")
+        return []
+
+def handle_location_plants_query_with_ai(user_query: str) -> str:
+    """
+    Handle location-based plant queries using AI for location matching.
+    
+    Args:
+        user_query (str): The user's query (e.g., "what plants are in the arboretum")
+    
+    Returns:
+        str: Formatted response with plants found in the matched locations
+    """
+    logger.info(f"Handling location plants query with AI: {user_query}")
+    
+    try:
+        # Get all unique locations from the database
+        from plant_operations import get_location_names_from_database
+        valid_locations = get_location_names_from_database()
+        
+        if not valid_locations:
+            return "I couldn't find any location information in the database."
+        
+        # Use AI to match the user query to valid locations
+        matched_locations = ai_match_locations(user_query, valid_locations)
+        
+        if not matched_locations:
+            return f"I couldn't identify which locations you're asking about in your query: '{user_query}'. Please try being more specific about the location."
+        
+        # Get plants for the matched locations
+        from plant_operations import get_plants_by_location
+        plant_data = get_plants_by_location(matched_locations)
+        
+        if isinstance(plant_data, str):  # Error message
+            return f"Error looking up plants in locations {matched_locations}: {plant_data}"
+        
+        if not plant_data:
+            locations_str = ", ".join(matched_locations)
+            return f"I couldn't find any plants in the following locations: {locations_str}."
+        
+        # Format the response
+        response_parts = []
+        locations_str = ", ".join(matched_locations)
+        response_parts.append(f"Here are the plants I found in {locations_str}:")
+        
+        # Group plants by location for better organization
+        plants_by_location = {}
+        for plant in plant_data:
+            plant_name = plant.get('Plant Name', 'Unknown Plant')
+            location = plant.get('Location', 'Unknown Location')
+            
+            if location not in plants_by_location:
+                plants_by_location[location] = []
+            plants_by_location[location].append(plant_name)
+        
+        # Build the response
+        for location, plants in plants_by_location.items():
+            if len(plants) == 1:
+                response_parts.append(f"• {location}: {plants[0]}")
+            else:
+                plants_list = ", ".join(plants)
+                response_parts.append(f"• {location}: {plants_list}")
+        
+        # Add photo URLs
+        for plant in plant_data:
+            plant_name = plant.get('Plant Name', 'Unknown Plant')
+            raw_photo_url = plant.get('Raw Photo URL', '')
+            
+            if raw_photo_url:
+                # Format Google Photos URL if needed
+                if 'photos.google.com' in raw_photo_url:
+                    raw_photo_url = raw_photo_url.split('?')[0] + '?authuser=0'
+                response_parts.append(f"\nYou can see a photo of the {plant_name} here: {raw_photo_url}")
+        
+        return "\n".join(response_parts)
+        
+    except Exception as e:
+        logger.error(f"Error handling location plants query with AI: {e}")
+        return "I encountered an error while looking up plants by location. Please try again."
+
 def get_chat_response_with_analyzer(message: str) -> str:
     """Generate a chat response using the new query analyzer (Phase 4)"""
     logger.info(f"Processing message with analyzer: {message}")
     
     try:
+        # Check for location-based plant queries first (AI-driven approach)
+        msg_lower = message.lower()
+        location_patterns = [
+            'what plants are in', 'how many plants in', 'show me plants in',
+            'plants in the', 'plants in', 'what\'s in the', 'whats in the',
+            'how many different plants in', 'list plants in', 'plants located in'
+        ]
+        
+        is_location_plants_query = any(pattern in msg_lower for pattern in location_patterns)
+        
+        if is_location_plants_query:
+            logger.info(f"Detected location-based plant query: {message}")
+            return handle_location_plants_query_with_ai(message)
+        
         # Analyze the query using AI
         analysis_result = analyze_query(message)
         logger.info(f"Query analysis result: {analysis_result}")
