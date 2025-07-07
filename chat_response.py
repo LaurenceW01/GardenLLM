@@ -1,5 +1,6 @@
 import logging
-from typing import List, Dict, Optional
+import time
+from typing import List, Dict, Optional, Tuple
 import re
 from plant_operations import get_plant_data, find_plant_by_id_or_name, update_plant_field
 from config import openai_client
@@ -14,6 +15,52 @@ try:
 except ImportError as e:
     QUERY_ANALYZER_AVAILABLE = False
     logger.warning(f"Query analyzer module not available: {e}. Using legacy functionality.")
+
+# Phase 5: Performance monitoring
+class PerformanceMonitor:
+    """Monitor performance metrics for query processing"""
+    
+    def __init__(self):
+        self.metrics = {
+            'total_queries': 0,
+            'ai_analysis_calls': 0,
+            'ai_response_calls': 0,
+            'database_only_queries': 0,
+            'ai_enhanced_queries': 0,
+            'average_analysis_time': 0.0,
+            'average_response_time': 0.0,
+            'total_processing_time': 0.0,
+            'errors': 0
+        }
+    
+    def start_timer(self) -> float:
+        """Start a performance timer"""
+        return time.time()
+    
+    def record_metric(self, metric_name: str, value: float = 1.0):
+        """Record a performance metric"""
+        if metric_name in self.metrics:
+            if isinstance(self.metrics[metric_name], (int, float)):
+                self.metrics[metric_name] += value
+            else:
+                self.metrics[metric_name] = value
+    
+    def update_average(self, metric_name: str, new_value: float, count: int):
+        """Update an average metric"""
+        if metric_name in self.metrics:
+            current_avg = self.metrics[metric_name]
+            self.metrics[metric_name] = ((current_avg * (count - 1)) + new_value) / count
+    
+    def get_metrics(self) -> Dict:
+        """Get current performance metrics"""
+        return self.metrics.copy()
+    
+    def log_metrics(self):
+        """Log current performance metrics"""
+        logger.info(f"Performance Metrics: {self.metrics}")
+
+# Global performance monitor
+performance_monitor = PerformanceMonitor()
 
 def extract_search_terms(message: str) -> Optional[str]:
     """Extract plant names from the message using basic pattern matching"""
@@ -184,19 +231,9 @@ def parse_update_command(message: str) -> Optional[Dict]:
         return None
 
 def get_chat_response(message: str) -> str:
-    """Generate a chat response based on the user's message"""
-    logger.info(f"Processing message: {message}")
-    
-    try:
-        # Phase 1: Use query analyzer if available, otherwise fall back to legacy
-        if QUERY_ANALYZER_AVAILABLE:
-            return get_chat_response_with_analyzer(message)
-        else:
-            return get_chat_response_legacy(message)
-    except Exception as e:
-        logger.error(f"Error in get_chat_response: {e}")
-        # Fall back to legacy method if analyzer fails
-        return get_chat_response_legacy(message)
+    """Generate a chat response using the unified processing pipeline (Phase 5)"""
+    # Phase 5: Use the unified pipeline with performance monitoring and error handling
+    return process_query_with_pipeline(message)
 
 def handle_ai_enhanced_query(query_type: str, plant_references: List[str], original_message: str) -> str:
     """
@@ -763,3 +800,295 @@ def get_chat_response_legacy(message: str) -> str:
     except Exception as e:
         logger.error(f"Error generating chat response: {e}", exc_info=True)
         return "Sorry, there was an error processing your request. Please try again." 
+
+# Phase 5: Unified query processing pipeline
+def process_query_with_pipeline(message: str) -> str:
+    """
+    Unified query processing pipeline with performance monitoring and error handling.
+    
+    This is the main entry point for all queries, providing:
+    - Performance monitoring
+    - Comprehensive error handling
+    - Graceful degradation
+    - Two-AI-call workflow optimization
+    
+    Args:
+        message (str): User's query message
+    
+    Returns:
+        str: Response to user query
+    """
+    start_time = performance_monitor.start_timer()
+    performance_monitor.record_metric('total_queries')
+    
+    try:
+        logger.info(f"Phase 5: Processing query with unified pipeline: {message}")
+        
+        # Check if query analyzer is available
+        if not QUERY_ANALYZER_AVAILABLE:
+            logger.warning("Query analyzer not available, using legacy processing")
+            return get_chat_response_legacy(message)
+        
+        # Phase 5: Use enhanced processing with performance monitoring
+        response = get_chat_response_with_analyzer_optimized(message)
+        
+        # Record successful processing time
+        processing_time = time.time() - start_time
+        performance_monitor.record_metric('total_processing_time', processing_time)
+        
+        logger.info(f"Phase 5: Query processed successfully in {processing_time:.2f}s")
+        return response
+        
+    except Exception as e:
+        # Record error and attempt graceful degradation
+        performance_monitor.record_metric('errors')
+        logger.error(f"Phase 5: Error in unified pipeline: {e}")
+        
+        # Graceful degradation: try legacy method
+        try:
+            logger.info("Phase 5: Attempting graceful degradation with legacy method")
+            return get_chat_response_legacy(message)
+        except Exception as legacy_error:
+            logger.error(f"Phase 5: Legacy method also failed: {legacy_error}")
+            return "I apologize, but I'm experiencing technical difficulties. Please try again in a moment."
+
+def get_chat_response_with_analyzer_optimized(message: str) -> str:
+    """
+    Optimized version of chat response with analyzer, including performance monitoring.
+    
+    Args:
+        message (str): User's query message
+    
+    Returns:
+        str: Response to user query
+    """
+    analysis_start = performance_monitor.start_timer()
+    
+    try:
+        # Step 1: AI Analysis (First AI call)
+        logger.info("Phase 5: Starting AI analysis (first AI call)")
+        analysis_result = analyze_query(message)
+        analysis_time = time.time() - analysis_start
+        
+        # Record analysis metrics
+        performance_monitor.record_metric('ai_analysis_calls')
+        performance_monitor.update_average('average_analysis_time', analysis_time, 
+                                         performance_monitor.metrics['ai_analysis_calls'])
+        
+        logger.info(f"Phase 5: AI analysis completed in {analysis_time:.2f}s")
+        logger.info(f"Phase 5: Analysis result: {analysis_result}")
+        
+        query_type = analysis_result['query_type']
+        plant_references = analysis_result['plant_references']
+        requires_ai_response = analysis_result['requires_ai_response']
+        
+        # Step 2: Route to appropriate processor
+        if not requires_ai_response:
+            # Database-only processing
+            performance_monitor.record_metric('database_only_queries')
+            logger.info(f"Phase 5: Processing database-only query type: {query_type}")
+            return handle_database_only_query(query_type, plant_references, message)
+        else:
+            # AI-enhanced processing (Second AI call)
+            performance_monitor.record_metric('ai_enhanced_queries')
+            logger.info(f"Phase 5: Processing AI-enhanced query type: {query_type}")
+            return handle_ai_enhanced_query_optimized(query_type, plant_references, message)
+            
+    except Exception as e:
+        logger.error(f"Phase 5: Error in optimized analyzer: {e}")
+        raise
+
+def handle_ai_enhanced_query_optimized(query_type: str, plant_references: List[str], message: str) -> str:
+    """
+    Optimized AI-enhanced query processing with performance monitoring.
+    
+    Args:
+        query_type (str): Type of query (CARE, DIAGNOSIS, ADVICE, GENERAL)
+        plant_references (List[str]): Plant names referenced in query
+        message (str): Original user message
+    
+    Returns:
+        str: AI-generated response with database context
+    """
+    response_start = performance_monitor.start_timer()
+    
+    try:
+        # Build enhanced context with plant data
+        context = build_ai_context_with_plants(query_type, plant_references, message)
+        
+        # Generate AI response with context
+        ai_response = generate_ai_response_with_context(query_type, context, message)
+        
+        response_time = time.time() - response_start
+        
+        # Record response metrics
+        performance_monitor.record_metric('ai_response_calls')
+        performance_monitor.update_average('average_response_time', response_time,
+                                         performance_monitor.metrics['ai_response_calls'])
+        
+        logger.info(f"Phase 5: AI response generated in {response_time:.2f}s")
+        return ai_response
+        
+    except Exception as e:
+        logger.error(f"Phase 5: Error in AI-enhanced processing: {e}")
+        # Fallback to simple AI response without context
+        try:
+            logger.info("Phase 5: Attempting fallback AI response")
+            return generate_fallback_ai_response(message)
+        except Exception as fallback_error:
+            logger.error(f"Phase 5: Fallback AI response also failed: {fallback_error}")
+            raise
+
+def build_ai_context_with_plants(query_type: str, plant_references: List[str], message: str) -> str:
+    """
+    Build enhanced AI context with plant database data and Houston climate.
+    
+    Args:
+        query_type (str): Type of query
+        plant_references (List[str]): Plant names from analysis
+        message (str): Original user message
+    
+    Returns:
+        str: Enhanced context for AI
+    """
+    try:
+        # Get plant data from database
+        plant_data = []
+        if plant_references:
+            plant_data = get_plant_data(plant_references)
+        
+        # Build context based on query type
+        context_parts = []
+        
+        # Add Houston climate context
+        context_parts.append("Location: Houston, Texas (Zone 9a)")
+        context_parts.append("Climate: Humid subtropical with hot summers and mild winters")
+        context_parts.append("Growing season: Year-round with peak in spring/fall")
+        
+        # Add plant-specific context
+        if plant_data:
+            context_parts.append("\nRelevant plants in your garden:")
+            for plant in plant_data:
+                plant_info = f"- {plant.get('name', 'Unknown')}"
+                if plant.get('location'):
+                    plant_info += f" (Location: {plant['location']})"
+                if plant.get('care_info'):
+                    plant_info += f" - Care: {plant['care_info'][:100]}..."
+                context_parts.append(plant_info)
+        
+        # Add query-specific context
+        if query_type == QueryType.CARE:
+            context_parts.append("\nFocus: Plant care and maintenance advice")
+        elif query_type == QueryType.DIAGNOSIS:
+            context_parts.append("\nFocus: Plant health diagnosis and problem-solving")
+        elif query_type == QueryType.ADVICE:
+            context_parts.append("\nFocus: Gardening advice and best practices")
+        elif query_type == QueryType.GENERAL:
+            context_parts.append("\nFocus: General gardening information")
+        
+        return "\n".join(context_parts)
+        
+    except Exception as e:
+        logger.error(f"Error building AI context: {e}")
+        return "Location: Houston, Texas (Zone 9a)"
+
+def generate_ai_response_with_context(query_type: str, context: str, message: str) -> str:
+    """
+    Generate AI response with enhanced context.
+    
+    Args:
+        query_type (str): Type of query
+        context (str): Enhanced context with plant data
+        message (str): Original user message
+    
+    Returns:
+        str: AI-generated response
+    """
+    try:
+        # Create specialized prompt based on query type
+        if query_type == QueryType.CARE:
+            system_prompt = """You are a knowledgeable gardening assistant specializing in plant care. 
+            Provide specific, actionable care advice based on the user's plants and Houston climate."""
+        elif query_type == QueryType.DIAGNOSIS:
+            system_prompt = """You are a plant health expert. Help diagnose plant problems and provide 
+            solutions based on symptoms and Houston growing conditions."""
+        elif query_type == QueryType.ADVICE:
+            system_prompt = """You are a gardening expert. Provide practical advice and best practices 
+            for gardening in Houston's climate."""
+        else:  # GENERAL
+            system_prompt = """You are a helpful gardening assistant. Provide informative, accurate 
+            gardening advice tailored to Houston's climate and the user's garden."""
+        
+        # Create user prompt with context
+        user_prompt = f"""Context: {context}
+
+User Question: {message}
+
+Please provide a helpful, accurate response based on the context and user's question."""
+        
+        # Make AI call
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=500
+        )
+        
+        ai_response = response.choices[0].message.content
+        if ai_response is None:
+            raise ValueError("AI response content is None")
+        
+        return ai_response
+        
+    except Exception as e:
+        logger.error(f"Error generating AI response: {e}")
+        raise
+
+def generate_fallback_ai_response(message: str) -> str:
+    """
+    Generate a fallback AI response when context building fails.
+    
+    Args:
+        message (str): Original user message
+    
+    Returns:
+        str: Simple AI response
+    """
+    try:
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful gardening assistant for Houston, Texas."},
+                {"role": "user", "content": message}
+            ],
+            temperature=0.7,
+            max_tokens=300
+        )
+        
+        ai_response = response.choices[0].message.content
+        if ai_response is None:
+            return "I apologize, but I'm having trouble processing your request. Please try again."
+        
+        return ai_response
+        
+    except Exception as e:
+        logger.error(f"Error in fallback AI response: {e}")
+        return "I apologize, but I'm experiencing technical difficulties. Please try again in a moment."
+
+def get_performance_metrics() -> Dict:
+    """
+    Get current performance metrics for monitoring.
+    
+    Returns:
+        Dict: Current performance metrics
+    """
+    return performance_monitor.get_metrics()
+
+def log_performance_summary():
+    """
+    Log a summary of current performance metrics.
+    """
+    performance_monitor.log_metrics() 
