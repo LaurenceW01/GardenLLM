@@ -19,6 +19,7 @@ from sheets_client import initialize_sheet
 from weather_service import get_weather_summary, get_plant_care_recommendations
 from field_config import get_all_field_names, get_field_alias, get_canonical_field_name
 from climate_config import get_climate_context, get_default_location
+from chat_response import get_chat_response_with_analyzer_optimized
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -290,6 +291,34 @@ def api_weather():
         })
     except Exception as e:
         logger.error(f"Error getting weather via API: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    """Chat endpoint for garden assistant queries"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        message = data.get('message', '').strip()
+        conversation_id = data.get('conversation_id')
+        use_database = data.get('use_database', True)
+        
+        if not message:
+            return jsonify({'success': False, 'error': 'Message is required'}), 400
+        
+        # Use the optimized chat response function
+        response = get_chat_response_with_analyzer_optimized(message)
+        
+        return jsonify({
+            'success': True,
+            'response': response,
+            'conversation_id': conversation_id
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in chat endpoint: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/fields')
