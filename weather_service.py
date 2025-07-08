@@ -172,17 +172,25 @@ class WeatherService:
             
             Please provide specific, actionable plant care advice in this format:
             
-            **Watering Recommendations:**
+            <h4>Watering Recommendations:</h4>
+            <ul>
             [Specific watering advice based on current conditions]
+            </ul>
             
-            **Protection Measures:**
+            <h4>Protection Measures:</h4>
+            <ul>
             [Any protection needed for current weather]
+            </ul>
             
-            **Maintenance Tasks:**
+            <h4>Maintenance Tasks:</h4>
+            <ul>
             [General maintenance appropriate for these conditions]
+            </ul>
             
-            **Special Considerations:**
+            <h4>Special Considerations:</h4>
+            <ul>
             [Any specific advice for {self.default_location} climate]
+            </ul>
             
             Keep the advice practical, specific, and easy to follow. Use bullet points and clear language.
             """
@@ -217,22 +225,26 @@ class WeatherService:
             if not current_weather:
                 return "Unable to retrieve weather data."
             
-            # Build weather summary
+            # Build weather summary with HTML formatting
             summary_parts = [
-                f"**Current Weather for {self.default_location}**",
-                f"**Temperature:** {current_weather['temperature']}°F (feels like {current_weather['feels_like']}°F)",
-                f"**Conditions:** {current_weather['description']}",
-                f"**Humidity:** {current_weather['humidity']}%",
-                f"**Wind Speed:** {current_weather['wind_speed']} mph",
-                f"**Pressure:** {current_weather['pressure']} hPa"
+                f"<h3 class='text-lg font-semibold text-blue-900 mb-3'>Current Weather for {self.default_location}</h3>",
+                f"<div class='grid grid-cols-1 md:grid-cols-2 gap-4 mb-4'>",
+                f"<div class='bg-blue-100 p-3 rounded-lg'><strong>Temperature:</strong> {current_weather['temperature']}°F (feels like {current_weather['feels_like']}°F)</div>",
+                f"<div class='bg-blue-100 p-3 rounded-lg'><strong>Conditions:</strong> {current_weather['description'].title()}</div>",
+                f"<div class='bg-blue-100 p-3 rounded-lg'><strong>Humidity:</strong> {current_weather['humidity']}%</div>",
+                f"<div class='bg-blue-100 p-3 rounded-lg'><strong>Wind Speed:</strong> {current_weather['wind_speed']} mph</div>",
+                f"<div class='bg-blue-100 p-3 rounded-lg'><strong>Pressure:</strong> {current_weather['pressure']} hPa</div>",
+                f"</div>"
             ]
             
             if forecast:
-                summary_parts.append("\n**3-Day Forecast:**")
+                summary_parts.append("<h4 class='text-md font-semibold text-blue-800 mb-3'>3-Day Forecast</h4>")
+                summary_parts.append("<div class='space-y-2'>")
                 for day in forecast:
-                    summary_parts.append(f"• **{day['date'].strftime('%A, %B %d')}:** {day['temp_min']}°F - {day['temp_max']}°F, {day['description']}")
+                    summary_parts.append(f"<div class='bg-blue-50 p-3 rounded border-l-4 border-blue-300'><strong>{day['date'].strftime('%A, %B %d')}:</strong> {day['temp_min']}°F - {day['temp_max']}°F, {day['description'].title()}</div>")
+                summary_parts.append("</div>")
             
-            return "\n\n".join(summary_parts)
+            return "".join(summary_parts)
             
         except Exception as e:
             logger.error(f"Error getting weather summary: {e}")
