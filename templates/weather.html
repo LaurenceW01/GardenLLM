@@ -7,49 +7,41 @@
     <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
         <h1 class="text-3xl font-bold mb-4 text-green-700">Weather Forecast & Plant Care</h1>
         
-        <!-- Current Weather Summary -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <div class="bg-gray-50 p-4 rounded-lg">
-                <h3 class="font-bold text-lg mb-2">Today's Temperature</h3>
-                <p class="text-2xl">{{ weather.temp }}°F</p>
-            </div>
-            <div class="bg-gray-50 p-4 rounded-lg">
-                <h3 class="font-bold text-lg mb-2">Conditions</h3>
-                <p class="text-2xl">{{ weather.conditions }}</p>
-            </div>
-            <div class="bg-gray-50 p-4 rounded-lg">
-                <h3 class="font-bold text-lg mb-2">Humidity</h3>
-                <p class="text-2xl">{{ weather.humidity }}%</p>
+        <!-- Climate Context -->
+        {% if climate_context %}
+        <div class="bg-blue-50 p-4 rounded-lg mb-6">
+            <h3 class="font-bold text-lg mb-2 text-blue-700">Climate Context ({{ default_location }})</h3>
+            <p class="text-sm text-blue-600">{{ climate_context }}</p>
+        </div>
+        {% endif %}
+        
+        <!-- Weather Summary -->
+        {% if weather_summary %}
+        <div class="bg-gray-50 p-6 rounded-lg mb-8">
+            <h2 class="text-2xl font-bold mb-4 text-green-700">Weather Summary</h2>
+            <div class="prose max-w-none">
+                {{ weather_summary | safe }}
             </div>
         </div>
-
-        <!-- 5-Day Forecast -->
-        <div class="mb-8">
-            <h2 class="text-2xl font-bold mb-4 text-green-700">5-Day Forecast</h2>
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {% for day in forecast %}
-                <div class="bg-gray-50 p-4 rounded-lg">
-                    <h4 class="font-bold">{{ day.date }}</h4>
-                    <p>{{ day.temp_min }}°F to {{ day.temp_max }}°F</p>
-                    <p>{{ day.description }}</p>
-                    <p>Rain: {{ day.rain }}in</p>
-                    <p>Wind: {{ day.wind_speed }}mph</p>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
+        {% endif %}
 
         <!-- Plant Care Recommendations -->
+        {% if plant_care_recommendations %}
         <div class="bg-gray-50 p-6 rounded-lg">
             <h2 class="text-2xl font-bold mb-4 text-green-700">Plant Care Recommendations</h2>
             <div class="prose max-w-none">
-                {% for advice in plant_care %}
-                <div class="mb-4">
-                    {{ advice | safe }}
-                </div>
-                {% endfor %}
+                {{ plant_care_recommendations | safe }}
             </div>
         </div>
+        {% endif %}
+        
+        <!-- No Data Message -->
+        {% if not weather_summary and not plant_care_recommendations %}
+        <div class="bg-yellow-50 p-6 rounded-lg">
+            <h2 class="text-2xl font-bold mb-4 text-yellow-700">Weather Information Unavailable</h2>
+            <p class="text-yellow-600">Unable to retrieve weather information at this time. Please try again later.</p>
+        </div>
+        {% endif %}
     </div>
 </div>
 
