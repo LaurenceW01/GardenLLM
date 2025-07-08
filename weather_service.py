@@ -198,14 +198,47 @@ class WeatherService:
             response = openai_client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "You are a knowledgeable gardening expert specializing in weather-aware plant care."},
+                    {"role": "system", "content": "You are a knowledgeable gardening expert specializing in weather-aware plant care. Always format your responses with proper HTML tags including <h4>, <ul>, and <li> tags for structure."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
-                max_tokens=400
+                max_tokens=500
             )
             
-            return response.choices[0].message.content or "Unable to generate plant care recommendations."
+            content = response.choices[0].message.content or "Unable to generate plant care recommendations."
+            
+            # Post-process to ensure proper HTML formatting
+            import re
+            
+            # If the AI didn't use proper HTML, convert plain text to HTML
+            if not re.search(r'<h4>|<ul>|<li>', content):
+                # Split by sections and convert to HTML
+                sections = content.split('\n\n')
+                html_parts = []
+                
+                for section in sections:
+                    if section.strip():
+                        lines = section.strip().split('\n')
+                        if lines:
+                            # First line is the header
+                            header = lines[0].replace(':', '').strip()
+                            if header and not header.startswith('<'):
+                                html_parts.append(f'<h4 class="text-lg font-semibold text-green-800 mb-2">{header}</h4>')
+                                html_parts.append('<ul class="list-disc list-inside space-y-1 mb-4">')
+                                
+                                # Remaining lines are bullet points
+                                for line in lines[1:]:
+                                    line = line.strip()
+                                    if line and not line.startswith('<'):
+                                        # Remove common bullet point indicators
+                                        line = re.sub(r'^[-•*]\s*', '', line)
+                                        html_parts.append(f'<li class="text-gray-700">{line}</li>')
+                                
+                                html_parts.append('</ul>')
+                
+                content = '\n'.join(html_parts)
+            
+            return content
             
         except Exception as e:
             logger.error(f"Error getting plant care recommendations: {e}")
@@ -241,7 +274,23 @@ class WeatherService:
                 summary_parts.append("<h4 class='text-md font-semibold text-blue-800 mb-3'>3-Day Forecast</h4>")
                 summary_parts.append("<div class='space-y-2'>")
                 for day in forecast:
-                    summary_parts.append(f"<div class='bg-blue-50 p-3 rounded border-l-4 border-blue-300'><strong>{day['date'].strftime('%A, %B %d')}:</strong> {day['temp_min']}°F - {day['temp_max']}°F, {day['description'].title()}</div>")
+                    # Clean up the description to show the most common condition
+                    conditions = day['description'].split(', ')
+                    # Get the most frequent condition or the first one if all are unique
+                    if len(conditions) > 1:
+                        # Count occurrences and get the most common
+                        from collections import Counter
+                        condition_counts = Counter(conditions)
+                        primary_condition = condition_counts.most_common(1)[0][0]
+                        # If there are multiple conditions, show the primary one with a note
+                        if len(condition_counts) > 1:
+                            condition_display = f"{primary_condition.title()} (mixed conditions)"
+                        else:
+                            condition_display = primary_condition.title()
+                    else:
+                        condition_display = conditions[0].title()
+                    
+                    summary_parts.append(f"<div class='bg-blue-50 p-3 rounded border-l-4 border-blue-300'><strong>{day['date'].strftime('%A, %B %d')}:</strong> {day['temp_min']}°F - {day['temp_max']}°F, {condition_display}</div>")
                 summary_parts.append("</div>")
             
             return "".join(summary_parts)
