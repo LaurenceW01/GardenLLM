@@ -1,331 +1,291 @@
-from fastapi import FastAPI, HTTPException, Request, File, UploadFile
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from chat_response import get_chat_response
-from weather_service import get_weather_forecast, analyze_forecast_for_plants, handle_weather_query
-from plant_vision import analyze_plant_image, validate_image, save_image, conversation_manager, client, MODEL_NAME
-from plant_operations import update_plant
-from test_openai import parse_care_guide
-import logging
+"""
+Web interface for GardenLLM.
+Provides a Flask web application for interacting with the garden assistant.
+"""
+
 import os
-from typing import Optional, List, Dict
-import traceback
+import logging
 from datetime import datetime
-from openai import OpenAI
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+from werkzeug.utils import secure_filename
+import base64
+from io import BytesIO
+from PIL import Image
+import requests
+
+from config import openai_client
+from plant_operations import add_plant, get_plants, update_plant, delete_plant, search_plants
+from sheets_client import initialize_sheet
+from weather_service import get_weather_summary, get_plant_care_recommendations
+from field_config import get_all_field_names, get_field_alias, get_canonical_field_name
+from climate_config import get_climate_context, get_default_location
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize OpenAI client
-openai_client = OpenAI()
+app = Flask(__name__)
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
 
-app = FastAPI(title="GardenLLM API")
+# Configuration
+UPLOAD_FOLDER = 'static/uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Set up templates
-templates = Jinja2Templates(directory="templates")
+# Ensure upload directory exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Update CORS settings
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def allowed_file(filename):
+    """Check if file extension is allowed"""
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-class ChatRequest(BaseModel):
-    message: str
-    conversation_id: Optional[str] = None
-
-class WeatherResponse(BaseModel):
-    forecast: List[Dict]
-    plant_care_advice: List[str]
-
-class ImageAnalysisRequest(BaseModel):
-    message: Optional[str] = None
-    conversation_id: Optional[str] = None
-
-class AddPlantRequest(BaseModel):
-    """Request model for adding a plant"""
-    name: str
-    locations: List[str]
-    photo_url: Optional[str] = None
-
-@app.get("/", response_class=HTMLResponse)
-@app.head("/")
-async def home(request: Request):
-    # Get current weather for display
+def save_image_from_url(image_url):
+    """Save image from URL to local storage"""
     try:
-        forecast = get_weather_forecast()
-        if not forecast or len(forecast) == 0:
-            raise ValueError("No forecast data available")
-
-        # Get plant care advice
-        advice = analyze_forecast_for_plants(forecast)
+        response = requests.get(image_url, timeout=10)
+        response.raise_for_status()
         
-        # Extract the most relevant advice sections
-        advice_sections = []
-        current_section = []
+        # Generate filename
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"plant_{timestamp}.jpg"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         
-        for line in advice.split('\n'):
-            if line.strip():
-                if any(alert in line for alert in ['Alert:', '🌡️', '☀️', '💧', '🌧️', '💨']):
-                    if current_section:
-                        advice_sections.append('\n'.join(current_section))
-                        current_section = []
-                current_section.append(line.strip())
-        
-        if current_section:
-            advice_sections.append('\n'.join(current_section))
-        
-        # Take the first two most relevant sections
-        first_advice = '\n\n'.join(advice_sections[:2]) if advice_sections else "Check plants according to regular schedule"
-
-        current_weather = {
-            'temp': f"{forecast[0]['temp_max']}/{forecast[0]['temp_min']}" if forecast else "N/A",
-            'conditions': forecast[0]['description'] if forecast else "N/A",
-            'advice': first_advice
-        }
-        
-        logger.info(f"Weather data prepared for home page: {current_weather}")
-        
-    except Exception as e:
-        logger.error(f"Error getting weather for home page: {e}")
-        logger.error(traceback.format_exc())
-        current_weather = {
-            'temp': "N/A",
-            'conditions': "N/A",
-            'advice': "Check plants according to regular schedule"
-        }
-    
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "weather": current_weather}
-    )
-
-@app.get("/weather")
-async def weather_page(request: Request):
-    """Weather page with forecast and plant care advice"""
-    try:
-        # Get weather forecast
-        forecast = get_weather_forecast()
-        if not forecast:
-            return templates.TemplateResponse(
-                "weather.html",
-                {
-                    "request": request,
-                    "weather": {"temp": "N/A", "conditions": "N/A", "humidity": "N/A"},
-                    "forecast": [],
-                    "plant_care": ["Unable to retrieve weather data. Please try again later."]
-                }
-            )
-
-        # Get current weather
-        current_weather = {
-            'temp': f"{forecast[0]['temp_max']}/{forecast[0]['temp_min']}",
-            'conditions': forecast[0]['description'],
-            'humidity': forecast[0]['humidity']
-        }
-
-        # Get plant care advice
-        advice = analyze_forecast_for_plants(forecast)
-        # Split advice into sections for better display
-        advice_sections = [section for section in advice.split('\n\n') if section.strip()]
-
-        return templates.TemplateResponse(
-            "weather.html",
-            {
-                "request": request,
-                "weather": current_weather,
-                "forecast": forecast,
-                "plant_care": advice_sections
-            }
-        )
-    except Exception as e:
-        logger.error(f"Error in weather page: {e}")
-        logger.error(traceback.format_exc())
-        return templates.TemplateResponse(
-            "weather.html",
-            {
-                "request": request,
-                "weather": {"temp": "Error", "conditions": "Error", "humidity": "Error"},
-                "forecast": [],
-                "plant_care": [f"Error loading weather data: {str(e)}"]
-            }
-        )
-
-@app.post("/chat")
-async def chat(request: ChatRequest):
-    """Handle chat requests"""
-    try:
-        response = get_chat_response(request.message)
-        return {"response": response}
-    except Exception as e:
-        logger.error(f"Error in chat endpoint: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/health")
-@app.head("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy", "message": "GardenBot server is running"}
-
-@app.get("/api/weather")
-async def weather_api():
-    """Weather API endpoint for retrieving forecast and plant care advice"""
-    try:
-        forecast = get_weather_forecast()
-        if not forecast:
-            raise HTTPException(
-                status_code=500,
-                detail="Unable to retrieve weather forecast"
-            )
-        
-        advice = analyze_forecast_for_plants(forecast)
-        return WeatherResponse(
-            forecast=forecast,
-            plant_care_advice=advice.split("\n")
-        )
-    except Exception as e:
-        logger.error(f"Error in weather endpoint: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/analyze-plant")
-async def analyze_plant(
-    file: UploadFile = File(...),
-    message: Optional[str] = None,
-    conversation_id: Optional[str] = None
-):
-    """Endpoint for analyzing plant images"""
-    try:
-        # Read image data
-        image_data = await file.read()
-        
-        # Validate image
-        if not validate_image(image_data):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid image format. Please upload a JPEG, PNG, or GIF image."
-            )
-            
         # Save image
-        try:
-            file_path = save_image(image_data, file.filename)
-            logger.info(f"Image saved to {file_path}")
-        except Exception as e:
-            logger.error(f"Error saving image: {e}")
-            # Continue with analysis even if save fails
-            
-        # Generate new conversation ID if none provided
-        if not conversation_id:
-            conversation_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-            logger.info(f"Generated new conversation ID: {conversation_id}")
-            
-        # Analyze image with conversation history
-        analysis = analyze_plant_image(image_data, message, conversation_id)
+        with open(filepath, 'wb') as f:
+            f.write(response.content)
         
-        logger.info(f"Returning analysis with conversation ID: {conversation_id}")
-        return {"response": analysis, "conversation_id": conversation_id}
+        return f"/static/uploads/{filename}"
         
     except Exception as e:
-        logger.error(f"Error in analyze_plant endpoint: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error saving image from URL: {e}")
+        return None
 
-@app.post("/api/plants")
-async def add_plant(request: AddPlantRequest):
-    """Add a new plant to the database"""
+def process_image_upload(file):
+    """Process uploaded image file"""
     try:
-        # Create plant info request - using same format as CLI for consistency
-        prompt = (
-            f"Create a detailed plant care guide for {request.name} in Houston, TX. "
-            "Include care requirements, growing conditions, and maintenance tips. "
-            "Focus on practical advice for the specified locations: " + 
-            ', '.join(request.locations) + "\n\n" +
-            "Please include sections for:\n" +
-            "**Description:**\n" +
-            "**Light:**\n" +
-            "**Soil:**\n" +
-            "**Watering:**\n" +
-            "**Temperature:**\n" +
-            "**Pruning:**\n" +
-            "**Mulching:**\n" +
-            "**Fertilizing:**\n" +
-            "**Winter Care:**\n" +
-            "**Spacing:**"
-        )
-        
-        # Get plant care information from OpenAI
-        response = openai_client.chat.completions.create(
-            model="gpt-4-turbo-preview",
-            messages=[
-                {"role": "system", "content": "You are a gardening expert assistant. Provide detailed, practical plant care guides with specific instructions. Use the exact section titles provided without modification."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7,
-            max_tokens=1000
-        )
-        
-        # Extract the response text
-        care_guide = response.choices[0].message.content or ""
-        logger.info(f"Generated care guide: {care_guide}")
-        
-        # Parse the care guide to extract details
-        care_details = parse_care_guide(care_guide)
-        logger.info(f"Parsed care details: {care_details}")
-        
-        # Create plant data with all fields
-        plant_data = {
-            'Plant Name': request.name,
-            'Location': ', '.join(request.locations),
-            'Description': care_details.get('Description', ''),
-            'Light Requirements': care_details.get('Light Requirements', ''),
-            'Soil Preferences': care_details.get('Soil Preferences', ''),
-            'Watering Needs': care_details.get('Watering Needs', ''),
-            'Frost Tolerance': care_details.get('Frost Tolerance', ''),
-            'Pruning Instructions': care_details.get('Pruning Instructions', ''),
-            'Mulching Needs': care_details.get('Mulching Needs', ''),
-            'Fertilizing Schedule': care_details.get('Fertilizing Schedule', ''),
-            'Winterizing Instructions': care_details.get('Winterizing Instructions', ''),
-            'Spacing Requirements': care_details.get('Spacing Requirements', ''),
-            'Care Notes': care_guide,
-            'Photo URL': request.photo_url or ''
-        }
-        
-        logger.info(f"Final plant data: {plant_data}")
-        
-        # Add the plant to the spreadsheet
-        if update_plant(plant_data):
-            return {
-                "success": True,
-                "message": f"Added plant '{request.name}' to locations: {', '.join(request.locations)}",
-                "care_guide": care_guide,
-                "plant_data": plant_data
-            }
-        else:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error adding plant '{request.name}' to database"
-            )
-            
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"plant_{timestamp}_{filename}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            return f"/static/uploads/{filename}"
     except Exception as e:
-        logger.error(f"Error adding plant: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error processing image upload: {e}")
+    return None
 
-@app.get("/add-plant", response_class=HTMLResponse)
-async def add_plant_page(request: Request):
-    """Page for adding new plants"""
-    return templates.TemplateResponse(
-        "add_plant.html",
-        {"request": request}
-    )
+@app.route('/')
+def index():
+    """Main page with weather and plant list"""
+    try:
+        # Get weather summary
+        weather_summary = get_weather_summary()
+        
+        # Get all plants
+        plants = get_plants()
+        
+        # Get climate context for display
+        climate_context = get_climate_context()
+        default_location = get_default_location()
+        
+        return render_template('index.html', 
+                             plants=plants, 
+                             weather_summary=weather_summary,
+                             climate_context=climate_context,
+                             default_location=default_location)
+    except Exception as e:
+        logger.error(f"Error loading index page: {e}")
+        flash(f"Error loading page: {str(e)}", 'error')
+        return render_template('index.html', plants=[], weather_summary="", climate_context="", default_location="")
+
+@app.route('/add_plant', methods=['GET', 'POST'])
+def add_plant_route():
+    """Add a new plant"""
+    if request.method == 'POST':
+        try:
+            # Get form data
+            plant_name = request.form.get('plant_name', '').strip()
+            description = request.form.get('description', '').strip()
+            location = request.form.get('location', '').strip()
+            
+            # Process image upload
+            photo_url = None
+            if 'photo' in request.files:
+                file = request.files['photo']
+                if file.filename:
+                    photo_url = process_image_upload(file)
+            
+            # Validate required fields
+            if not plant_name:
+                flash('Plant name is required', 'error')
+                return render_template('add_plant.html')
+            
+            # Add plant using centralized field configuration
+            result = add_plant(plant_name, description, location, photo_url)
+            
+            if result.get('success'):
+                flash(f"Successfully added {plant_name} to your garden!", 'success')
+                return redirect(url_for('index'))
+            else:
+                flash(f"Error adding plant: {result.get('error', 'Unknown error')}", 'error')
+                
+        except Exception as e:
+            logger.error(f"Error adding plant: {e}")
+            flash(f"Error adding plant: {str(e)}", 'error')
+    
+    # Get field names for form
+    field_names = get_all_field_names()
+    return render_template('add_plant.html', field_names=field_names)
+
+@app.route('/weather')
+def weather():
+    """Weather information page"""
+    try:
+        weather_summary = get_weather_summary()
+        plant_care_recommendations = get_plant_care_recommendations()
+        climate_context = get_climate_context()
+        default_location = get_default_location()
+        
+        return render_template('weather.html', 
+                             weather_summary=weather_summary,
+                             plant_care_recommendations=plant_care_recommendations,
+                             climate_context=climate_context,
+                             default_location=default_location)
+    except Exception as e:
+        logger.error(f"Error loading weather page: {e}")
+        flash(f"Error loading weather information: {str(e)}", 'error')
+        return render_template('weather.html', 
+                             weather_summary="",
+                             plant_care_recommendations="",
+                             climate_context="",
+                             default_location="")
+
+@app.route('/api/plants')
+def api_plants():
+    """API endpoint to get all plants"""
+    try:
+        plants = get_plants()
+        return jsonify({'success': True, 'plants': plants})
+    except Exception as e:
+        logger.error(f"Error getting plants via API: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/plants/search')
+def api_search_plants():
+    """API endpoint to search plants"""
+    try:
+        query = request.args.get('q', '').strip()
+        if not query:
+            return jsonify({'success': False, 'error': 'Search query is required'}), 400
+        
+        results = search_plants(query)
+        return jsonify({'success': True, 'results': results})
+    except Exception as e:
+        logger.error(f"Error searching plants via API: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/plants/<int:plant_id>', methods=['GET', 'PUT', 'DELETE'])
+def api_plant(plant_id):
+    """API endpoint for individual plant operations"""
+    try:
+        if request.method == 'GET':
+            plants = get_plants()
+            plant = next((p for p in plants if p.get('ID') == str(plant_id)), None)
+            if plant:
+                return jsonify({'success': True, 'plant': plant})
+            else:
+                return jsonify({'success': False, 'error': 'Plant not found'}), 404
+        
+        elif request.method == 'PUT':
+            data = request.get_json()
+            if not data:
+                return jsonify({'success': False, 'error': 'No data provided'}), 400
+            
+            # Use field_config to validate field names
+            valid_fields = get_all_field_names()
+            update_data = {k: v for k, v in data.items() if k in valid_fields}
+            
+            result = update_plant(plant_id, update_data)
+            if result.get('success'):
+                return jsonify({'success': True, 'message': 'Plant updated successfully'})
+            else:
+                return jsonify({'success': False, 'error': result.get('error', 'Unknown error')}), 400
+        
+        elif request.method == 'DELETE':
+            result = delete_plant(plant_id)
+            if result.get('success'):
+                return jsonify({'success': True, 'message': 'Plant deleted successfully'})
+            else:
+                return jsonify({'success': False, 'error': result.get('error', 'Unknown error')}), 400
+    
+    except Exception as e:
+        logger.error(f"Error in plant API operation: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/weather')
+def api_weather():
+    """API endpoint for weather information"""
+    try:
+        weather_summary = get_weather_summary()
+        plant_care_recommendations = get_plant_care_recommendations()
+        climate_context = get_climate_context()
+        default_location = get_default_location()
+        
+        return jsonify({
+            'success': True,
+            'weather_summary': weather_summary,
+            'plant_care_recommendations': plant_care_recommendations,
+            'climate_context': climate_context,
+            'default_location': default_location
+        })
+    except Exception as e:
+        logger.error(f"Error getting weather via API: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/fields')
+def api_fields():
+    """API endpoint to get field configuration"""
+    try:
+        field_names = get_all_field_names()
+        field_info = {}
+        
+        for field in field_names:
+            alias = get_field_alias(field)
+            canonical = get_canonical_field_name(field)
+            field_info[field] = {
+                'alias': alias,
+                'canonical_name': canonical
+            }
+        
+        return jsonify({
+            'success': True,
+            'fields': field_info,
+            'climate_location': get_default_location()
+        })
+    except Exception as e:
+        logger.error(f"Error getting field configuration via API: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.errorhandler(404)
+def not_found(error):
+    """Handle 404 errors"""
+    return render_template('404.html'), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Handle 500 errors"""
+    logger.error(f"Internal server error: {error}")
+    return render_template('500.html'), 500
+
+if __name__ == '__main__':
+    # Initialize the sheet on startup
+    try:
+        initialize_sheet()
+        logger.info("Sheet initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing sheet: {e}")
+    
+    # Run the Flask app
+    app.run(debug=True, host='0.0.0.0', port=5000)

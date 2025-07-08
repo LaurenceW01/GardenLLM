@@ -4,6 +4,7 @@ import pytz
 from typing import List, Dict, Optional, Tuple, Union
 from config import sheets_client, SPREADSHEET_ID, RANGE_NAME
 from sheets_client import check_rate_limit, get_next_id
+from field_config import get_canonical_field_name, get_all_field_names, is_valid_field
 import re
 import time
 
@@ -22,8 +23,12 @@ def get_all_plants() -> List[Dict]:
         header = values[0] if values else []
         plants = []
         
-        name_idx = header.index('Plant Name') if 'Plant Name' in header else 1
-        location_idx = header.index('Location') if 'Location' in header else 3
+        # Use field_config to get canonical field names
+        plant_name_field = get_canonical_field_name('Plant Name')
+        location_field = get_canonical_field_name('Location')
+        
+        name_idx = header.index(plant_name_field) if plant_name_field in header else 1
+        location_idx = header.index(location_field) if location_field in header else 3
         
         for row in values[1:]:
             if len(row) > max(name_idx, location_idx):
@@ -147,24 +152,27 @@ def get_plant_data(plant_names=None) -> List[Dict]:
             row_data = row + [''] * (len(headers) - len(row))
             plant_dict = dict(zip(headers, row_data))
             
-            # Debug log the photo URLs
-            print(f"\n=== DEBUG: Photo URLs for {plant_dict.get('Plant Name', 'Unknown Plant')} ===")
-            print(f"Photo URL (formula): {plant_dict.get('Photo URL', '')}")
-            print(f"Raw Photo URL: {plant_dict.get('Raw Photo URL', '')}")
+            # Debug log the photo URLs using field_config
+            photo_url_field = get_canonical_field_name('Photo URL')
+            raw_photo_url_field = get_canonical_field_name('Raw Photo URL')
+            
+            print(f"\n=== DEBUG: Photo URLs for {plant_dict.get(get_canonical_field_name('Plant Name'), 'Unknown Plant')} ===")
+            print(f"Photo URL (formula): {plant_dict.get(photo_url_field, '')}")
+            print(f"Raw Photo URL: {plant_dict.get(raw_photo_url_field, '')}")
             
             if plant_names:
                 # Use improved matching that handles plurals
-                plant_name = plant_dict.get('Plant Name', '')
+                plant_name = plant_dict.get(get_canonical_field_name('Plant Name'), '')
                 if plant_name and any(_plant_names_match(name, plant_name) for name in plant_names):
                     plants_data.append(plant_dict)
                     print(f"\n=== DEBUG: Matching Plant Data ===")
-                    print(f"Plant Name: {plant_dict['Plant Name']}")
+                    print(f"Plant Name: {plant_dict[get_canonical_field_name('Plant Name')]}")
                     for key, value in plant_dict.items():
                         print(f"{key}: {value}")
             else:
                 plants_data.append(plant_dict)
                 print(f"\n=== DEBUG: Plant Data ===")
-                print(f"Plant Name: {plant_dict['Plant Name']}")
+                print(f"Plant Name: {plant_dict[get_canonical_field_name('Plant Name')]}")
                 for key, value in plant_dict.items():
                     print(f"{key}: {value}")
         
@@ -184,7 +192,9 @@ def find_plant_by_id_or_name(identifier: str) -> Tuple[Optional[int], Optional[L
         values = result.get('values', [])
         header = values[0] if values else []
         
-        name_idx = header.index('Plant Name') if 'Plant Name' in header else 1
+        # Use field_config to get canonical field name
+        plant_name_field = get_canonical_field_name('Plant Name')
+        name_idx = header.index(plant_name_field) if plant_name_field in header else 1
         
         try:
             plant_id = str(int(identifier))
@@ -241,7 +251,9 @@ def update_plant(plant_data: Dict) -> bool:
         values = result.get('values', [])
         header = values[0] if values else []
         
-        plant_name = plant_data.get('Plant Name')
+        # Use field_config to get canonical field names
+        plant_name_field = get_canonical_field_name('Plant Name')
+        plant_name = plant_data.get(plant_name_field)
         plant_row = None
         
         if plant_name:
@@ -251,32 +263,29 @@ def update_plant(plant_data: Dict) -> bool:
                     break
         
         # Handle photo URLs - store both the IMAGE formula and raw URL
-        photo_url = plant_data.get('Photo URL', '')
+        photo_url_field = get_canonical_field_name('Photo URL')
+        photo_url = plant_data.get(photo_url_field, '')
         photo_formula = f'=IMAGE("{photo_url}")' if photo_url else ''
         raw_photo_url = photo_url  # Store the raw URL directly
         
         est = pytz.timezone('US/Eastern')
         timestamp = datetime.now(est).strftime('%Y-%m-%d %H:%M:%S')
         
-        new_row = [
-            str(len(values) if plant_row is None else values[plant_row][0]),
-            plant_data.get('Plant Name', ''),
-            plant_data.get('Description', ''),
-            plant_data.get('Location', ''),
-            plant_data.get('Light Requirements', ''),
-            plant_data.get('Frost Tolerance', ''),
-            plant_data.get('Watering Needs', ''),
-            plant_data.get('Soil Preferences', ''),
-            plant_data.get('Pruning Instructions', ''),
-            plant_data.get('Mulching Needs', ''),
-            plant_data.get('Fertilizing Schedule', ''),
-            plant_data.get('Winterizing Instructions', ''),
-            plant_data.get('Spacing Requirements', ''),
-            plant_data.get('Care Notes', ''),
-            photo_formula,  # Photo URL as image formula
-            raw_photo_url,  # Raw Photo URL stored directly
-            timestamp
-        ]
+        # Build new row using field_config to get all field names
+        field_names = get_all_field_names()
+        new_row = []
+        
+        for field_name in field_names:
+            if field_name == get_canonical_field_name('ID'):
+                new_row.append(str(len(values) if plant_row is None else values[plant_row][0]))
+            elif field_name == photo_url_field:
+                new_row.append(photo_formula)  # Photo URL as image formula
+            elif field_name == get_canonical_field_name('Raw Photo URL'):
+                new_row.append(raw_photo_url)  # Raw Photo URL stored directly
+            elif field_name == get_canonical_field_name('Last Updated'):
+                new_row.append(timestamp)
+            else:
+                new_row.append(plant_data.get(field_name, ''))
         
         try:
             if plant_row is not None:
@@ -318,19 +327,25 @@ def update_plant_field(plant_row: int, field_name: str, new_value: str) -> bool:
         ).execute()
         header = result.get('values', [])[0]
         
+        # Use field_config to validate and get canonical field name
+        canonical_field_name = get_canonical_field_name(field_name)
+        if not canonical_field_name:
+            logger.error(f"Field {field_name} not found in field configuration")
+            return False
+        
         try:
-            col_idx = header.index(field_name)
+            col_idx = header.index(canonical_field_name)
         except ValueError:
-            logger.error(f"Field {field_name} not found in sheet")
+            logger.error(f"Field {canonical_field_name} not found in sheet")
             return False
             
-        if field_name == 'Photo URL':
+        if canonical_field_name == get_canonical_field_name('Photo URL'):
             # Update both Photo URL and Raw Photo URL columns
             formatted_value = f'=IMAGE("{new_value}")' if new_value else ''
             
             # Update Photo URL column with IMAGE formula
             range_name = f'Plants!{chr(65 + col_idx)}{plant_row + 1}'
-            logger.info(f"Updating {field_name} at {range_name}")
+            logger.info(f"Updating {canonical_field_name} at {range_name}")
             sheets_client.values().update(
                 spreadsheetId=SPREADSHEET_ID,
                 range=range_name,
@@ -340,7 +355,8 @@ def update_plant_field(plant_row: int, field_name: str, new_value: str) -> bool:
             
             # Update Raw Photo URL column with raw URL
             try:
-                raw_url_col_idx = header.index('Raw Photo URL')
+                raw_photo_url_field = get_canonical_field_name('Raw Photo URL')
+                raw_url_col_idx = header.index(raw_photo_url_field)
                 raw_range_name = f'Plants!{chr(65 + raw_url_col_idx)}{plant_row + 1}'
                 logger.info(f"Updating Raw Photo URL at {raw_range_name}")
                 sheets_client.values().update(
@@ -355,7 +371,7 @@ def update_plant_field(plant_row: int, field_name: str, new_value: str) -> bool:
         else:
             formatted_value = new_value
             range_name = f'Plants!{chr(65 + col_idx)}{plant_row + 1}'
-            logger.info(f"Updating {field_name} at {range_name}")
+            logger.info(f"Updating {canonical_field_name} at {range_name}")
             sheets_client.values().update(
                 spreadsheetId=SPREADSHEET_ID,
                 range=range_name,
@@ -490,21 +506,25 @@ _plant_list_cache = {
 
 def get_plant_names_from_database() -> List[str]:
     """
-    Get a list of plant names from the database with caching.
+    Get a list of all plant names from the database.
     
-    This function caches the plant names for 5 minutes to reduce database calls
-    and improve performance for the query analyzer.
+    This function uses caching to improve performance and reduce API calls.
+    The cache is invalidated when plants are added or updated.
     
     Returns:
         List[str]: List of plant names currently in the database
     """
-    global _plant_list_cache
+    # Import here to avoid circular imports
+    from plant_operations import _plant_list_cache
     
     current_time = time.time()
+    cache_duration = 300  # 5 minutes
     
     # Check if cache is still valid
-    if (current_time - _plant_list_cache['last_updated']) < _plant_list_cache['cache_duration']:
-        logger.info(f"Using cached plant list with {len(_plant_list_cache['names'])} plants")
+    if (_plant_list_cache['names'] and 
+        _plant_list_cache['last_updated'] and 
+        current_time - _plant_list_cache['last_updated'] < cache_duration):
+        logger.info(f"Returning cached plant list with {len(_plant_list_cache['names'])} plants")
         return _plant_list_cache['names'].copy()
     
     try:
@@ -524,7 +544,9 @@ def get_plant_names_from_database() -> List[str]:
             return []
         
         headers = values[0]
-        name_idx = headers.index('Plant Name') if 'Plant Name' in headers else 1
+        # Use field_config to get canonical field name
+        plant_name_field = get_canonical_field_name('Plant Name')
+        name_idx = headers.index(plant_name_field) if plant_name_field in headers else 1
         
         # Extract plant names from all rows except header
         plant_names = []
@@ -601,7 +623,9 @@ def get_location_names_from_database() -> List[str]:
             return []
             
         headers = values[0]
-        location_idx = headers.index('Location') if 'Location' in headers else 3
+        # Use field_config to get canonical field name
+        location_field = get_canonical_field_name('Location')
+        location_idx = headers.index(location_field) if location_field in headers else 3
         
         # Extract all location values
         locations = set()

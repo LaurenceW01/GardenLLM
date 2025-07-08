@@ -4,6 +4,8 @@ from typing import List, Dict, Optional, Tuple
 import re
 from plant_operations import get_plant_data, find_plant_by_id_or_name, update_plant_field
 from config import openai_client
+from field_config import get_canonical_field_name, is_valid_field, get_all_field_names
+from climate_config import get_climate_context, get_default_location
 import json
 
 logger = logging.getLogger(__name__)
@@ -124,9 +126,9 @@ def parse_update_command(message: str) -> Optional[Dict]:
         command_parts = message[len('update plant '):].strip()
         
         # Find the plant identifier (first part before any field keyword)
-        field_keywords = ['location', 'url', 'photo url', 'raw photo url', 'description', 'light requirements', 'frost tolerance', 
-                         'watering needs', 'soil preferences', 'pruning instructions', 'mulching needs',
-                         'fertilizing schedule', 'winterizing instructions', 'spacing requirements', 'care notes']
+        # Use field_config to get all possible field keywords
+        from field_config import FIELD_ALIASES
+        field_keywords = list(FIELD_ALIASES.keys())
         
         # Find the first field keyword to identify plant identifier
         first_field_index = -1
@@ -194,33 +196,18 @@ def parse_update_command(message: str) -> Optional[Dict]:
         if not updates:
             return None
         
-        # Map user-friendly field names to actual database field names
-        field_mapping = {
-            'location': 'Location',
-            'url': 'Photo URL',  # Alias for photo url
-            'photo url': 'Photo URL',
-            'raw photo url': 'Raw Photo URL',
-            'description': 'Description',
-            'light requirements': 'Light Requirements',
-            'frost tolerance': 'Frost Tolerance',
-            'watering needs': 'Watering Needs',
-            'soil preferences': 'Soil Preferences',
-            'pruning instructions': 'Pruning Instructions',
-            'mulching needs': 'Mulching Needs',
-            'fertilizing schedule': 'Fertilizing Schedule',
-            'winterizing instructions': 'Winterizing Instructions',
-            'spacing requirements': 'Spacing Requirements',
-            'care notes': 'Care Notes'
-        }
-        
-        # Convert updates to use actual field names
+        # Convert updates to use actual field names using field_config
         actual_updates = []
         for update in updates:
-            actual_field_name = field_mapping.get(update['field'].lower(), update['field'].title())
-            actual_updates.append({
-                'field_name': actual_field_name,
-                'new_value': update['value']
-            })
+            # Use field_config to get canonical field name
+            actual_field_name = get_canonical_field_name(update['field'])
+            if actual_field_name:
+                actual_updates.append({
+                    'field_name': actual_field_name,
+                    'new_value': update['value']
+                })
+            else:
+                logger.warning(f"Unknown field alias: {update['field']}")
         
         return {
             'plant_identifier': plant_identifier,
@@ -288,45 +275,66 @@ def _build_ai_context(query_type: str, plant_data: List[Dict], original_message:
     """
     context_parts = []
     
-    # Add Houston climate context (as per project requirements)
-    context_parts.append("Location: Houston, Texas (Zone 9a)")
-    context_parts.append("Climate: Hot and humid subtropical climate with mild winters")
-    context_parts.append("Growing season: Year-round with peak in spring and fall")
+    # Add climate context using climate_config (Houston, TX, USA as default)
+    climate_context = get_climate_context()
+    context_parts.append(climate_context)
     
     # Add plant-specific context if available
     if plant_data:
         context_parts.append("\nRelevant plants in your garden:")
         for plant in plant_data:
-            plant_name = plant.get('Plant Name', 'Unknown')
+            # Use field_config to get canonical field names
+            plant_name_field = get_canonical_field_name('Plant Name')
+            plant_name = plant.get(plant_name_field, 'Unknown')
             plant_info = []
             
             # Add relevant plant details based on query type
             if query_type == QueryType.CARE:
-                care_fields = ['Light Requirements', 'Watering Needs', 'Soil Preferences', 
-                              'Fertilizing Schedule', 'Pruning Instructions', 'Care Notes']
+                care_fields = [
+                    get_canonical_field_name('Light Requirements'),
+                    get_canonical_field_name('Watering Needs'),
+                    get_canonical_field_name('Soil Preferences'),
+                    get_canonical_field_name('Fertilizing Schedule'),
+                    get_canonical_field_name('Pruning Instructions'),
+                    get_canonical_field_name('Care Notes')
+                ]
                 for field in care_fields:
-                    if plant.get(field):
+                    if field and plant.get(field):
                         plant_info.append(f"{field}: {plant.get(field)}")
             
             elif query_type == QueryType.DIAGNOSIS:
                 # Include care info for diagnosis context
-                care_fields = ['Light Requirements', 'Watering Needs', 'Soil Preferences', 'Care Notes']
+                care_fields = [
+                    get_canonical_field_name('Light Requirements'),
+                    get_canonical_field_name('Watering Needs'),
+                    get_canonical_field_name('Soil Preferences'),
+                    get_canonical_field_name('Care Notes')
+                ]
                 for field in care_fields:
-                    if plant.get(field):
+                    if field and plant.get(field):
                         plant_info.append(f"{field}: {plant.get(field)}")
             
             elif query_type == QueryType.ADVICE:
                 # Include general plant info for advice
-                advice_fields = ['Light Requirements', 'Watering Needs', 'Soil Preferences', 
-                               'Pruning Instructions', 'Mulching Needs', 'Spacing Requirements']
+                advice_fields = [
+                    get_canonical_field_name('Light Requirements'),
+                    get_canonical_field_name('Watering Needs'),
+                    get_canonical_field_name('Soil Preferences'),
+                    get_canonical_field_name('Pruning Instructions'),
+                    get_canonical_field_name('Mulching Needs'),
+                    get_canonical_field_name('Spacing Requirements')
+                ]
                 for field in advice_fields:
-                    if plant.get(field):
+                    if field and plant.get(field):
                         plant_info.append(f"{field}: {plant.get(field)}")
             
             else:  # GENERAL
                 # Include all relevant plant info
                 for key, value in plant.items():
-                    if value and key not in ['Photo URL', 'Raw Photo URL']:
+                    # Exclude photo URL fields from general info
+                    photo_url_field = get_canonical_field_name('Photo URL')
+                    raw_photo_url_field = get_canonical_field_name('Raw Photo URL')
+                    if value and key not in [photo_url_field, raw_photo_url_field]:
                         plant_info.append(f"{key}: {value}")
             
             if plant_info:
@@ -347,25 +355,40 @@ def _generate_ai_response(query_type: str, context: str, original_message: str) 
     Returns:
         str: AI-generated response
     """
+    # Get climate context for the system prompt
+    climate_context = get_climate_context()
+    
     # Build system prompt based on query type
     if query_type == QueryType.CARE:
-        system_prompt = """You are a knowledgeable gardening assistant specializing in plant care. 
+        system_prompt = f"""You are a knowledgeable gardening assistant specializing in plant care. 
         Provide specific, actionable care advice based on the plant information provided. 
-        Consider the Houston climate and growing conditions. Be encouraging and practical."""
+        Consider the {get_default_location()} climate and growing conditions. Be encouraging and practical.
+        
+        Climate Context:
+        {climate_context}"""
         
     elif query_type == QueryType.DIAGNOSIS:
-        system_prompt = """You are a plant health expert. Help diagnose plant problems based on symptoms described. 
-        Consider the plant's care requirements and Houston climate. Provide both diagnosis and treatment recommendations."""
+        system_prompt = f"""You are a plant health expert. Help diagnose plant problems based on symptoms described. 
+        Consider the plant's care requirements and {get_default_location()} climate. Provide both diagnosis and treatment recommendations.
+        
+        Climate Context:
+        {climate_context}"""
         
     elif query_type == QueryType.ADVICE:
-        system_prompt = """You are an experienced gardener providing practical advice. 
-        Give specific, actionable recommendations based on the plant information and Houston growing conditions. 
-        Focus on best practices and proven techniques."""
+        system_prompt = f"""You are an experienced gardener providing practical advice. 
+        Give specific, actionable recommendations based on the plant information and {get_default_location()} growing conditions. 
+        Focus on best practices and proven techniques.
+        
+        Climate Context:
+        {climate_context}"""
         
     else:  # GENERAL
-        system_prompt = """You are a helpful gardening assistant with expertise in Houston gardening. 
+        system_prompt = f"""You are a helpful gardening assistant with expertise in {get_default_location()} gardening. 
         Provide informative, practical answers to gardening questions. 
-        Consider the local climate and growing conditions in your responses."""
+        Consider the local climate and growing conditions in your responses.
+        
+        Climate Context:
+        {climate_context}"""
     
     # Build user prompt
     user_prompt = f"""Context: {context}
@@ -397,7 +420,7 @@ def _add_photo_urls_to_response(response: str, plant_data: List[Dict]) -> str:
     
     Args:
         response (str): The AI-generated response
-        plant_data (List[Dict]): Plant data with photo URLs
+        plant_data (List[Dict]): Plant data from database
     
     Returns:
         str: Response with photo URLs added
@@ -405,20 +428,21 @@ def _add_photo_urls_to_response(response: str, plant_data: List[Dict]) -> str:
     if not plant_data:
         return response
     
-    photo_sections = []
+    # Use field_config to get canonical field names
+    raw_photo_url_field = get_canonical_field_name('Raw Photo URL')
+    
+    photo_urls = []
     for plant in plant_data:
-        plant_name = plant.get('Plant Name', 'Unknown Plant')
-        raw_photo_url = plant.get('Raw Photo URL', '')
+        # Use field_config to get canonical field names
+        plant_name_field = get_canonical_field_name('Plant Name')
+        plant_name = plant.get(plant_name_field, 'Unknown Plant')
+        raw_photo_url = plant.get(raw_photo_url_field, '')
         
         if raw_photo_url:
-            # Format Google Photos URL if needed
-            if 'photos.google.com' in raw_photo_url:
-                raw_photo_url = raw_photo_url.split('?')[0] + '?authuser=0'
-            
-            photo_sections.append(f"\nYou can see a photo of {plant_name} here: {raw_photo_url}")
+            photo_urls.append(f"{plant_name}: {raw_photo_url}")
     
-    if photo_sections:
-        response += "\n" + "\n".join(photo_sections)
+    if photo_urls:
+        response += "\n\nPhoto URLs:\n" + "\n".join(photo_urls)
     
     return response
 
@@ -546,55 +570,48 @@ def handle_location_query(plant_references: List[str]) -> str:
 
 def handle_photo_query(plant_references: List[str]) -> str:
     """
-    Handle queries asking for plant photos.
+    Handle photo queries for specific plants.
     
     Args:
-        plant_references (List[str]): List of plant names to look up
+        plant_references (List[str]): List of plant names to get photos for
     
     Returns:
-        str: Formatted photo information
+        str: Formatted response with photo URLs
     """
-    logger.info(f"Handling photo query for plants: {plant_references}")
-    
-    if not plant_references:
-        return "I couldn't identify which plants you're asking about. Could you please specify the plant names?"
-    
     try:
-        response_parts = []
-        
+        # Get plant data for the referenced plants
+        plant_data = []
         for plant_name in plant_references:
-            # Get plant data from database
-            plant_data = get_plant_data([plant_name])
-            
-            if isinstance(plant_data, str):  # Error message
-                response_parts.append(f"Error looking up {plant_name}: {plant_data}")
-                continue
-            
-            if not plant_data:
-                response_parts.append(f"I couldn't find any plants matching '{plant_name}' in the database.")
-                continue
-            
-            # Process each matching plant
-            for plant in plant_data:
-                plant_name_actual = plant.get('Plant Name', plant_name)
-                raw_photo_url = plant.get('Raw Photo URL', '')
-                
-                if raw_photo_url:
-                    # Format Google Photos URL if needed
-                    if 'photos.google.com' in raw_photo_url:
-                        raw_photo_url = raw_photo_url.split('?')[0] + '?authuser=0'
-                    response_parts.append(f"Here's what {plant_name_actual} looks like:\n{raw_photo_url}")
-                else:
-                    response_parts.append(f"I found {plant_name_actual}, but there's no photo available.")
+            plant_info = get_plant_data([plant_name])
+            if isinstance(plant_info, list) and plant_info:
+                plant_data.extend(plant_info)
         
-        if not response_parts:
-            return "I couldn't find photos for the plants you mentioned."
+        if not plant_data:
+            return "I couldn't find any plants matching your request in your garden database."
         
-        return "\n\n".join(response_parts)
+        # Use field_config to get canonical field names
+        raw_photo_url_field = get_canonical_field_name('Raw Photo URL')
+        
+        response_parts = []
+        for plant in plant_data:
+            # Use field_config to get canonical field names
+            plant_name_field = get_canonical_field_name('Plant Name')
+            plant_name = plant.get(plant_name_field, 'Unknown Plant')
+            raw_photo_url = plant.get(raw_photo_url_field, '')
+            
+            if raw_photo_url:
+                response_parts.append(f"**{plant_name}**: {raw_photo_url}")
+            else:
+                response_parts.append(f"**{plant_name}**: No photo available")
+        
+        if response_parts:
+            return "Here are the photos for your plants:\n\n" + "\n".join(response_parts)
+        else:
+            return "I found the plants but no photos are available for them."
         
     except Exception as e:
         logger.error(f"Error handling photo query: {e}")
-        return "I encountered an error while looking up plant photos. Please try again."
+        return "I encountered an error while retrieving the photos."
 
 def handle_location_plants_query(location_references: List[str]) -> str:
     """
@@ -940,180 +957,45 @@ def get_chat_response_with_analyzer(message: str) -> str:
         return get_chat_response_legacy(message)
 
 def get_chat_response_legacy(message: str) -> str:
-    """Legacy chat response function - preserves existing functionality"""
-    logger.info(f"Processing message with legacy method: {message}")
-    
+    """Legacy chat response function for fallback"""
     try:
-        # Check for update commands first
-        update_data = parse_update_command(message)
-        if update_data:
-            try:
-                # Find the plant by ID or name
-                plant_row, plant_data = find_plant_by_id_or_name(update_data['plant_identifier'])
-                
-                if plant_row is None:
-                    return f"Plant '{update_data['plant_identifier']}' not found. Please check the plant name or ID and try again."
-                
-                # Process multiple updates
-                results = []
-                plant_name = plant_data[1] if plant_data and len(plant_data) > 1 else update_data['plant_identifier']
-                
-                for update in update_data['updates']:
-                    success = update_plant_field(plant_row, update['field_name'], update['new_value'])
-                    
-                    if success:
-                        results.append(f"Successfully updated {update['field_name']} to: {update['new_value']}")
-                    else:
-                        results.append(f"Failed to update {update['field_name']}")
-                
-                return f"Updates for {plant_name}:\n" + "\n".join(results)
-                    
-            except Exception as e:
-                logger.error(f"Error processing update command: {e}")
-                return f"Error processing update command: {str(e)}"
+        # Get climate context for the system prompt
+        climate_context = get_climate_context()
         
-        msg_lower = message.lower()
-        search_term = extract_search_terms(message)
-        logger.info(f"Extracted search term: {search_term}")
+        system_prompt = f"""You are a knowledgeable gardening expert with access to the user's garden database. 
+        You can answer general gardening questions and provide advice on any plant species. 
+        You may reference the user's garden database if relevant, but you're not limited to plants in their database. 
+        You can also provide weather-aware gardening advice when appropriate. 
+        Focus on providing practical, actionable gardening advice.
+
+        Climate Context:
+        {climate_context}
+
+        When referencing the garden database, use these field names: {', '.join(get_all_field_names())}.
+
+        ADD/UPDATE PLANT OPERATIONS (EXACT CURRENT FUNCTIONALITY):
+        - Command format: "Add/Update plant [plant name]" or "Add/Update [plant name]"
+        - Only Plant Name is required; optional fields are ONLY location and photo URL
+        - AI automatically generates comprehensive care information that gets parsed and loaded/updated in garden database
+        - Automatically suggest climate-appropriate care requirements (default: {get_default_location()})
+        - Support both Photo URL and Raw Photo URL fields
+        - Show confirmation summary before adding/updating to database"""
+
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": message}
+            ],
+            temperature=0.7,
+            max_tokens=500
+        )
         
-        # Handle image-related queries
-        is_image_query = any(pattern in msg_lower for pattern in ['look like', 'show me', 'picture of', 'photo of'])
-        # Handle location queries
-        is_location_query = any(pattern in msg_lower for pattern in ['where is', 'where are', 'location of', 'where can i find'])
-        
-        # Special handling for general plant list query
-        if search_term == '*':
-            try:
-                # Get all plants
-                plant_data = get_plant_data([])  # Empty list should return all plants
-                logger.info(f"Retrieved data for all plants, count: {len(plant_data) if isinstance(plant_data, list) else 'error'}")
-                
-                if not isinstance(plant_data, list):
-                    return "I encountered an error while retrieving the plant list. Please try again."
-                
-                if not plant_data:
-                    return "There are currently no plants in the database."
-                
-                # Generate response using OpenAI
-                plant_names = [plant.get('Plant Name', '') for plant in plant_data if plant.get('Plant Name')]
-                plant_names_str = ", ".join(plant_names)
-                
-                prompt = f"The following plants are in the garden: {plant_names_str}. Please provide a natural, conversational response listing these plants and mentioning that these are the plants currently in the database."
-                
-                response = openai_client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": "You are a helpful gardening assistant."},
-                        {"role": "user", "content": prompt}
-                    ]
-                )
-                
-                return response.choices[0].message.content or "No response generated"
-                
-            except Exception as e:
-                logger.error(f"Error handling general plant query: {e}", exc_info=True)
-                # Fallback to simple list if OpenAI fails
-                plant_names = [plant.get('Plant Name', '') for plant in plant_data if plant.get('Plant Name')]
-                return "Here are the plants currently in the database:\n\n" + "\n".join(f"- {name}" for name in plant_names)
-        
-        if search_term:
-            plant_data = get_plant_data([search_term])
-            logger.info(f"Retrieved plant data for query: {plant_data}")
-            
-            if isinstance(plant_data, str):  # Error message
-                return plant_data
-            
-            if not plant_data:
-                return f"I couldn't find any plants matching '{search_term}' in the database."
-            
-            # Log available data for debugging
-            for plant in plant_data:
-                logger.info(f"Plant data - Name: {plant.get('Plant Name')}")
-                logger.info(f"Photo URL: {plant.get('Photo URL')}")
-                logger.info(f"Raw Photo URL: {plant.get('Raw Photo URL')}")
-            
-            # Handle location queries
-            if is_location_query:
-                response_parts = []
-                for plant in plant_data:
-                    plant_name = plant.get('Plant Name', '')
-                    location = plant.get('Location', '')
-                    if location:
-                        response_parts.append(f"The {plant_name} is located in the {location}.")
-                    else:
-                        response_parts.append(f"I found {plant_name}, but its location is not specified.")
-                
-                # Add photos to location responses if available
-                for plant in plant_data:
-                    raw_photo_url = plant.get('Raw Photo URL', '')
-                    if raw_photo_url:
-                        if 'photos.google.com' in raw_photo_url:
-                            raw_photo_url = raw_photo_url.split('?')[0] + '?authuser=0'
-                        response_parts.append(f"\nYou can see a photo of the {plant['Plant Name']} here: {raw_photo_url}")
-                
-                return "\n".join(response_parts)
-            
-            # Handle image queries
-            if is_image_query:
-                response_parts = []
-                for plant in plant_data:
-                    plant_name = plant.get('Plant Name', '')
-                    raw_photo_url = plant.get('Raw Photo URL', '')
-                    logger.info(f"Processing image query for {plant_name} - Raw Photo URL: {raw_photo_url}")
-                    
-                    if raw_photo_url:
-                        # Format Google Photos URL if needed
-                        if 'photos.google.com' in raw_photo_url:
-                            raw_photo_url = raw_photo_url.split('?')[0] + '?authuser=0'
-                        response_parts.append(f"Here's what {plant_name} looks like:\n{raw_photo_url}")
-                    else:
-                        response_parts.append(f"I found {plant_name}, but there's no photo available.")
-                
-                return "\n\n".join(response_parts)
-            
-            # Handle general information queries
-            try:
-                # Generate response using OpenAI
-                plant_info = []
-                for plant in plant_data:
-                    # Exclude photo URLs from the OpenAI prompt
-                    info = {k: v for k, v in plant.items() if v and k not in ['Photo URL', 'Raw Photo URL']}
-                    plant_info.append(info)
-                
-                prompt = f"Please provide information about the following plants in a natural, conversational way. Focus on the most relevant details for a gardener. Plant data: {plant_info}"
-                
-                response = openai_client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": "You are a helpful gardening assistant."},
-                        {"role": "user", "content": prompt}
-                    ]
-                )
-                
-                chat_response = response.choices[0].message.content or ""
-                
-                # Add photo URLs to the response if available
-                for plant in plant_data:
-                    raw_photo_url = plant.get('Raw Photo URL', '')
-                    if raw_photo_url:
-                        if 'photos.google.com' in raw_photo_url:
-                            raw_photo_url = raw_photo_url.split('?')[0] + '?authuser=0'
-                        chat_response += f"\n\nYou can see a photo of {plant.get('Plant Name', 'Unknown Plant')} here: {raw_photo_url}"
-                
-                return chat_response
-                
-            except Exception as e:
-                logger.error(f"OpenAI API error: {e}")
-                # Fallback to basic response if API fails
-                return "\n\n".join([f"Here's what I know about {plant.get('Plant Name')}:\n" + 
-                                  "\n".join([f"{k}: {v}" for k, v in plant.items() if v and k not in ['Photo URL', 'Raw Photo URL']])
-                                  for plant in plant_data])
-        
-        return "I'm not sure what you're asking about. Could you please rephrase your question or specify a plant name?"
+        return response.choices[0].message.content or "I'm sorry, I couldn't generate a response at this time."
         
     except Exception as e:
-        logger.error(f"Error generating chat response: {e}", exc_info=True)
-        return "Sorry, there was an error processing your request. Please try again." 
+        logger.error(f"Error in legacy chat response: {e}")
+        return "I'm sorry, I encountered an error while processing your request."
 
 # Phase 5: Unified query processing pipeline
 def process_query_with_pipeline(message: str) -> str:
@@ -1288,7 +1170,7 @@ def build_ai_context_with_plants(query_type: str, plant_references: List[str], m
         # Build context based on query type
         context_parts = []
         
-        # Add Houston climate context
+        # Add climate context
         context_parts.append("Location: Houston, Texas (Zone 9a)")
         context_parts.append("Climate: Humid subtropical with hot summers and mild winters")
         context_parts.append("Growing season: Year-round with peak in spring/fall")

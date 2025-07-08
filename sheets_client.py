@@ -6,6 +6,7 @@ from config import (
     sheets_client, SPREADSHEET_ID, RANGE_NAME, SHEETS_REQUESTS,
     MAX_REQUESTS_PER_MINUTE, QUOTA_RESET_INTERVAL, SHEET_GID
 )
+from field_config import get_all_field_names
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +40,8 @@ def initialize_sheet(start_cli=False):
     spreadsheet = sheets_client.get(spreadsheetId=SPREADSHEET_ID).execute()
     sheet_id = int(SHEET_GID)
     
-    headers = [
-        'ID', 'Plant Name', 'Description', 'Location', 'Light Requirements',
-        'Frost Tolerance', 'Watering Needs', 'Soil Preferences', 'Pruning Instructions',
-        'Mulching Needs', 'Fertilizing Schedule', 'Winterizing Instructions',
-        'Spacing Requirements', 'Care Notes', 'Photo URL', 'Raw Photo URL', 'Last Updated'
-    ]
+    # Use field_config to get all field names
+    headers = get_all_field_names()
     
     # Check if headers exist
     result = sheets_client.values().get(

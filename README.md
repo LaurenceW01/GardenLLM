@@ -1,59 +1,61 @@
-# GardenLLM Server
+# GardenLLM
 
-A FastAPI server for managing garden plants with AI assistance and weather monitoring.
+A comprehensive gardening assistant that helps you manage your garden with AI-powered plant care advice, weather integration, and database management.
 
-## Environment Variables Required
+## Features
 
+- **AI-Powered Plant Care**: Get personalized care advice for your plants
+- **Weather Integration**: Receive weather-aware gardening recommendations
+- **Database Management**: Track your plants with Google Sheets integration
+- **Image Analysis**: Analyze plant photos for identification and care advice
+- **Houston Climate Focus**: Optimized for Houston, Texas growing conditions
+
+## Database Configuration
+
+### Field Configuration
+All database field names and mappings are centrally configured in `field_config.py`. This module serves as the single source of truth for:
+- Database field names (matching Google Sheet columns)
+- User-friendly field aliases
+- Field categories (basic info, care, media, metadata)
+- Field validation and mapping functions
+
+**Usage:**
+```python
+from field_config import get_canonical_field_name, is_valid_field
+
+# Get canonical field name from alias
+field_name = get_canonical_field_name('name')  # Returns 'Plant Name'
+
+# Validate field
+is_valid = is_valid_field('location')  # Returns True
 ```
-OPENAI_API_KEY=your_openai_api_key
-OPENWEATHER_API_KEY=your_openweather_api_key
-```
 
-## Local Development
+### Database Schema
+The system uses a Google Sheet with 17 columns:
+- ID, Plant Name, Description, Location
+- Light Requirements, Frost Tolerance, Watering Needs, Soil Preferences
+- Pruning Instructions, Mulching Needs, Fertilizing Schedule
+- Winterizing Instructions, Spacing Requirements, Care Notes
+- Photo URL, Raw Photo URL, Last Updated
 
-1. Install dependencies:
+## Installation
+
+1. Clone the repository
+2. Install dependencies: `pip install -r requirements.txt`
+3. Set up environment variables (see `.env.example`)
+4. Run the application: `python run_server.py`
+
+## Usage
+
+Start the web interface and interact with your garden assistant through the chat interface. The system supports natural language queries about your plants and provides AI-powered care advice.
+
+## Testing
+
+Run tests with:
 ```bash
-pip install -r requirements.txt
+python tests/test_field_config.py  # Field configuration tests
 ```
 
-2. Create a `.env` file with your API keys
+## Contributing
 
-3. Run the server:
-```bash
-python run_server.py
-```
-
-## Deployment Instructions
-
-### Deploying to Render.com
-
-1. Create a new account on [Render.com](https://render.com)
-
-2. Click "New +" and select "Web Service"
-
-3. Connect your GitHub repository
-
-4. Configure the service:
-   - Name: gardenllm-server
-   - Environment: Python 3
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `uvicorn web:app --host 0.0.0.0 --port $PORT`
-
-5. Add environment variables:
-   - OPENAI_API_KEY
-   - OPENWEATHER_API_KEY
-   - Add your Google Sheets credentials as GOOGLE_CREDENTIALS (JSON content)
-
-6. Click "Create Web Service"
-
-## API Endpoints
-
-- `/chat` (POST): Send garden-related queries
-- `/weather` (GET): Get weather forecast and plant care advice
-- `/health` (GET): Check server status
-
-## Security Notes
-
-- Keep your API keys secure
-- Never commit .env files or credentials
-- Use environment variables for all sensitive data 
+Please follow the existing code style and ensure all changes preserve existing functionality. 

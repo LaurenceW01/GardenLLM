@@ -302,94 +302,85 @@ def parse_care_guide(response: str) -> Dict[str, str]:
     """Parse the care guide response from OpenAI into a structured dictionary.
     Handles **Section:**, ### Section:, and #### Section: headers, and maps short names to full field names.
     """
+    # Use field_config to get canonical field names for mapping
+    from field_config import get_canonical_field_name
+    
     # Mapping from possible section names to spreadsheet field names
     section_map = {
-        'Description': 'Description',
-        'Light': 'Light Requirements',
-        'Light Requirements': 'Light Requirements',
-        'Soil': 'Soil Preferences',
-        'Soil Preferences': 'Soil Preferences',
-        'Watering': 'Watering Needs',
-        'Watering Needs': 'Watering Needs',
-        'Temperature': 'Frost Tolerance',  # Map Temperature to Frost Tolerance field
-        'Frost Tolerance': 'Frost Tolerance',
-        'Pruning': 'Pruning Instructions',
-        'Pruning Instructions': 'Pruning Instructions',
-        'Mulching': 'Mulching Needs',
-        'Mulching Needs': 'Mulching Needs',
-        'Fertilizing': 'Fertilizing Schedule',
-        'Fertilizing Schedule': 'Fertilizing Schedule',
-        'Winter Care': 'Winterizing Instructions',  # Map Winter Care to Winterizing Instructions
-        'Winterizing Instructions': 'Winterizing Instructions',
-        'Spacing': 'Spacing Requirements',
-        'Spacing Requirements': 'Spacing Requirements',
+        'Description': get_canonical_field_name('Description'),
+        'Light': get_canonical_field_name('Light Requirements'),
+        'Light Requirements': get_canonical_field_name('Light Requirements'),
+        'Soil': get_canonical_field_name('Soil Preferences'),
+        'Soil Preferences': get_canonical_field_name('Soil Preferences'),
+        'Watering': get_canonical_field_name('Watering Needs'),
+        'Watering Needs': get_canonical_field_name('Watering Needs'),
+        'Temperature': get_canonical_field_name('Frost Tolerance'),  # Map Temperature to Frost Tolerance field
+        'Frost Tolerance': get_canonical_field_name('Frost Tolerance'),
+        'Pruning': get_canonical_field_name('Pruning Instructions'),
+        'Pruning Instructions': get_canonical_field_name('Pruning Instructions'),
+        'Mulching': get_canonical_field_name('Mulching Needs'),
+        'Mulching Needs': get_canonical_field_name('Mulching Needs'),
+        'Fertilizing': get_canonical_field_name('Fertilizing Schedule'),
+        'Fertilizing Schedule': get_canonical_field_name('Fertilizing Schedule'),
+        'Winter Care': get_canonical_field_name('Winterizing Instructions'),  # Map Winter Care to Winterizing Instructions
+        'Winterizing Instructions': get_canonical_field_name('Winterizing Instructions'),
+        'Spacing': get_canonical_field_name('Spacing Requirements'),
+        'Spacing Requirements': get_canonical_field_name('Spacing Requirements'),
     }
-    care_details = {k: '' for k in [
-        'Description',
-        'Light Requirements',
-        'Soil Preferences',
-        'Watering Needs',
-        'Frost Tolerance',
-        'Pruning Instructions',
-        'Mulching Needs',
-        'Fertilizing Schedule',
-        'Winterizing Instructions',
-        'Spacing Requirements',
-    ]}
-    try:
-        logger.info(f"Raw response to parse: {response}")
-        current_section = None
-        current_content = []
-        for line in response.split('\n'):
-            line = line.strip()
-            if not line:
-                continue
-            is_section_header = False
-            section_name = None
-            # **Section:**
-            if line.startswith('**') and line.endswith(':**'):
-                is_section_header = True
-                section_name = line.strip('*:').strip()
-            # ### Section:
-            elif line.startswith('###'):
-                is_section_header = True
-                section_name = line.replace('###', '').strip()
-            # #### Section:
-            elif line.startswith('####'):
-                is_section_header = True
-                section_name = line.replace('####', '').strip()
-            # Remove trailing colon and any leading # if present
-            if section_name:
-                section_name = section_name.rstrip(':').strip()
-                # Remove any leading # that might remain
-                if section_name.startswith('#'):
-                    section_name = section_name.lstrip('#').strip()
-            if is_section_header:
-                # Save previous section
-                if current_section and current_content:
-                    mapped = section_map.get(current_section)
-                    if mapped:
-                        care_details[mapped] = ' '.join(current_content).strip()
-                        logger.info(f"Saved section {mapped}: {care_details[mapped][:50]}...")
-                    else:
-                        logger.warning(f"No mapping found for section: '{current_section}'")
-                current_section = section_name
-                current_content = []
-                logger.info(f"Starting new section: '{section_name}'")
-            elif current_section:
-                current_content.append(line)
-        # Save last section
-        if current_section and current_content:
-            mapped = section_map.get(current_section)
-            if mapped:
-                care_details[mapped] = ' '.join(current_content).strip()
-                logger.info(f"Saved final section {mapped}: {care_details[mapped][:50]}...")
-        for section, content in care_details.items():
-            if content:
-                logger.info(f"Successfully parsed {section}")
-            else:
-                logger.warning(f"Missing content for section: {section}")
-    except Exception as e:
-        logger.error(f"Error parsing care guide: {e}")
-        logger.error(f"Response: {response}")
+    
+    # Initialize care details with all possible fields from field_config
+    from field_config import get_all_field_names
+    care_fields = get_all_field_names()
+    care_details = {field: '' for field in care_fields}
+    
+    # Remove system-managed fields from care details
+    system_fields = [get_canonical_field_name('ID'), get_canonical_field_name('Last Updated')]
+    for field in system_fields:
+        if field in care_details:
+            del care_details[field]
+    
+    # Parse the response
+    lines = response.split('\n')
+    current_section = None
+    current_content = []
+    
+    for line in lines:
+        line = line.strip()
+        
+        # Check for section headers
+        if line.startswith('**') and line.endswith('**'):
+            # Save previous section
+            if current_section and current_content:
+                section_name = current_section.strip('*').strip()
+                field_name = section_map.get(section_name, section_name)
+                if field_name:
+                    care_details[field_name] = '\n'.join(current_content).strip()
+            
+            # Start new section
+            current_section = line
+            current_content = []
+            
+        elif line.startswith('### ') or line.startswith('#### '):
+            # Save previous section
+            if current_section and current_content:
+                section_name = current_section.strip('*').strip()
+                field_name = section_map.get(section_name, section_name)
+                if field_name:
+                    care_details[field_name] = '\n'.join(current_content).strip()
+            
+            # Start new section
+            current_section = line.lstrip('#').strip()
+            current_content = []
+            
+        elif current_section and line:
+            # Add content to current section
+            current_content.append(line)
+    
+    # Save the last section
+    if current_section and current_content:
+        section_name = current_section.strip('*').strip()
+        field_name = section_map.get(section_name, section_name)
+        if field_name:
+            care_details[field_name] = '\n'.join(current_content).strip()
+    
     return care_details
