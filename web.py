@@ -105,25 +105,31 @@ def add_plant_route():
     """Add a new plant"""
     if request.method == 'POST':
         try:
-            # Get form data
-            plant_name = request.form.get('plant_name', '').strip()
-            description = request.form.get('description', '').strip()
-            location = request.form.get('location', '').strip()
-            
-            # Process image upload
-            photo_url = None
-            if 'photo' in request.files:
-                file = request.files['photo']
-                if file.filename:
-                    photo_url = process_image_upload(file)
+            # Get form data from the template format
+            plant_name = request.form.get('plantName', '').strip()
+            locations = request.form.getlist('location')  # Get all location inputs
+            photo_url = request.form.get('photoUrl', '').strip()
             
             # Validate required fields
             if not plant_name:
                 flash('Plant name is required', 'error')
                 return render_template('add_plant.html')
             
+            if not locations or not any(loc.strip() for loc in locations):
+                flash('At least one location is required', 'error')
+                return render_template('add_plant.html')
+            
+            # Convert locations to comma-separated string
+            location_string = ', '.join([loc.strip() for loc in locations if loc.strip()])
+            
+            # Process image upload if provided
+            if 'photo' in request.files:
+                file = request.files['photo']
+                if file.filename:
+                    photo_url = process_image_upload(file)
+            
             # Add plant using centralized field configuration
-            result = add_plant(plant_name, description, location, photo_url)
+            result = add_plant(plant_name, "", location_string, photo_url or "")
             
             if result.get('success'):
                 flash(f"Successfully added {plant_name} to your garden!", 'success')
@@ -162,15 +168,57 @@ def weather():
                              climate_context="",
                              default_location="")
 
-@app.route('/api/plants')
+@app.route('/api/plants', methods=['GET', 'POST'])
 def api_plants():
-    """API endpoint to get all plants"""
-    try:
-        plants = get_plants()
-        return jsonify({'success': True, 'plants': plants})
-    except Exception as e:
-        logger.error(f"Error getting plants via API: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+    """API endpoint to get all plants or add a new plant"""
+    if request.method == 'GET':
+        try:
+            plants = get_plants()
+            return jsonify({'success': True, 'plants': plants})
+        except Exception as e:
+            logger.error(f"Error getting plants via API: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    elif request.method == 'POST':
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({'success': False, 'error': 'No data provided'}), 400
+            
+            # Extract data from frontend format
+            plant_name = data.get('name', '').strip()
+            locations = data.get('locations', [])
+            photo_url = data.get('photo_url')
+            
+            # Validate required fields
+            if not plant_name:
+                return jsonify({'success': False, 'error': 'Plant name is required'}), 400
+            
+            if not locations:
+                return jsonify({'success': False, 'error': 'At least one location is required'}), 400
+            
+            # Convert locations array to comma-separated string
+            location_string = ', '.join(locations)
+            
+            # Add plant using centralized field configuration
+            photo_url_str = photo_url if photo_url else ""
+            result = add_plant(plant_name, "", location_string, photo_url_str)
+            
+            if result.get('success'):
+                # Generate simple care guide
+                care_guide = f"Care guide for {plant_name}:\n\n{plant_name} has been added to your garden in {location_string}. Please research specific care requirements for this plant based on your local climate and growing conditions."
+                
+                return jsonify({
+                    'success': True,
+                    'message': result.get('message', f'Added {plant_name} to garden'),
+                    'care_guide': care_guide
+                })
+            else:
+                return jsonify({'success': False, 'error': result.get('error', 'Unknown error')}), 400
+                
+        except Exception as e:
+            logger.error(f"Error adding plant via API: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/plants/search')
 def api_search_plants():
