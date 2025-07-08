@@ -5,21 +5,18 @@
 {% block content %}
 <div class="max-w-4xl mx-auto">
     <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
-        <h1 class="text-3xl font-bold mb-4 text-green-700">Weather Forecast & Plant Care</h1>
-        
-        <!-- Climate Context -->
-        {% if climate_context %}
-        <div class="bg-blue-50 p-4 rounded-lg mb-6">
-            <h3 class="font-bold text-lg mb-2 text-blue-700">Climate Context ({{ default_location }})</h3>
-            <p class="text-sm text-blue-600">{{ climate_context }}</p>
-        </div>
-        {% endif %}
+        <h1 class="text-3xl font-bold mb-6 text-green-700">Weather Forecast & Plant Care</h1>
         
         <!-- Weather Summary -->
         {% if weather_summary %}
-        <div class="bg-gray-50 p-6 rounded-lg mb-8">
-            <h2 class="text-2xl font-bold mb-4 text-green-700">Weather Summary</h2>
-            <div class="prose max-w-none">
+        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-lg mb-8 border border-blue-200">
+            <h2 class="text-2xl font-bold mb-4 text-blue-800 flex items-center">
+                <svg class="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
+                </svg>
+                Current Weather & Forecast
+            </h2>
+            <div class="weather-content text-gray-800 leading-relaxed">
                 {{ weather_summary | safe }}
             </div>
         </div>
@@ -27,9 +24,14 @@
 
         <!-- Plant Care Recommendations -->
         {% if plant_care_recommendations %}
-        <div class="bg-gray-50 p-6 rounded-lg">
-            <h2 class="text-2xl font-bold mb-4 text-green-700">Plant Care Recommendations</h2>
-            <div class="prose max-w-none">
+        <div class="bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-lg border border-green-200">
+            <h2 class="text-2xl font-bold mb-4 text-green-800 flex items-center">
+                <svg class="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd"/>
+                </svg>
+                Plant Care Recommendations
+            </h2>
+            <div class="care-content text-gray-800 leading-relaxed">
                 {{ plant_care_recommendations | safe }}
             </div>
         </div>
@@ -37,8 +39,13 @@
         
         <!-- No Data Message -->
         {% if not weather_summary and not plant_care_recommendations %}
-        <div class="bg-yellow-50 p-6 rounded-lg">
-            <h2 class="text-2xl font-bold mb-4 text-yellow-700">Weather Information Unavailable</h2>
+        <div class="bg-yellow-50 p-6 rounded-lg border border-yellow-200">
+            <h2 class="text-2xl font-bold mb-4 text-yellow-700 flex items-center">
+                <svg class="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                </svg>
+                Weather Information Unavailable
+            </h2>
             <p class="text-yellow-600">Unable to retrieve weather information at this time. Please try again later.</p>
         </div>
         {% endif %}
@@ -46,36 +53,82 @@
 </div>
 
 <style>
-/* Add some basic markdown styling */
-.prose {
-    @apply text-gray-900;
+/* Enhanced styling for weather content */
+.weather-content, .care-content {
+    @apply text-gray-800;
 }
-.prose h1 {
-    @apply text-2xl font-bold mb-4;
+
+.weather-content h1, .care-content h1 {
+    @apply text-xl font-bold mb-3 text-blue-900;
 }
-.prose h2 {
-    @apply text-xl font-bold mb-3;
+
+.weather-content h2, .care-content h2 {
+    @apply text-lg font-semibold mb-2 text-blue-800;
 }
-.prose h3 {
-    @apply text-lg font-bold mb-2;
+
+.weather-content h3, .care-content h3 {
+    @apply text-base font-semibold mb-2 text-blue-700;
 }
-.prose p {
-    @apply mb-2;
+
+.weather-content p, .care-content p {
+    @apply mb-3 leading-relaxed;
 }
-.prose ul {
-    @apply list-disc list-inside mb-2;
+
+.weather-content ul, .care-content ul {
+    @apply list-disc list-inside mb-3 ml-4 space-y-1;
 }
-.prose ol {
-    @apply list-decimal list-inside mb-2;
+
+.weather-content ol, .care-content ol {
+    @apply list-decimal list-inside mb-3 ml-4 space-y-1;
 }
-.prose code {
-    @apply bg-gray-100 px-1 rounded;
+
+.weather-content li, .care-content li {
+    @apply mb-1;
 }
-.prose pre {
-    @apply bg-gray-100 p-2 rounded mb-2 overflow-x-auto;
+
+.weather-content strong, .care-content strong {
+    @apply font-semibold text-blue-900;
 }
-.prose blockquote {
-    @apply border-l-4 border-gray-300 pl-4 italic;
+
+.weather-content em, .care-content em {
+    @apply italic text-blue-700;
+}
+
+/* Special styling for temperature and weather conditions */
+.weather-content p:contains("°F") {
+    @apply font-semibold text-blue-900;
+}
+
+.weather-content p:contains("Current Conditions") {
+    @apply text-lg font-semibold text-blue-800 bg-blue-100 p-2 rounded;
+}
+
+/* Plant care specific styling */
+.care-content h1, .care-content h2, .care-content h3 {
+    @apply text-green-800;
+}
+
+.care-content strong {
+    @apply font-semibold text-green-900;
+}
+
+.care-content em {
+    @apply italic text-green-700;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .weather-content, .care-content {
+        @apply text-sm;
+    }
+    
+    .weather-content h1, .care-content h1 {
+        @apply text-lg;
+    }
+    
+    .weather-content h2, .care-content h2 {
+        @apply text-base;
+    }
 }
 </style>
 {% endblock %} 

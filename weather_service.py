@@ -161,10 +161,7 @@ class WeatherService:
             
             # Build the prompt with weather and climate information
             prompt = f"""
-            Based on the current weather conditions and {self.default_location} climate, provide plant care recommendations.
-            
-            Climate Context:
-            {climate_context}
+            Based on the current weather conditions and {self.default_location} climate, provide clear, actionable plant care recommendations.
             
             Current Weather:
             - Temperature: {weather_data['temperature']}°F
@@ -173,13 +170,21 @@ class WeatherService:
             - Conditions: {weather_data['description']}
             - Wind Speed: {weather_data['wind_speed']} mph
             
-            Please provide specific, actionable plant care advice considering:
-            1. Watering needs based on temperature and humidity
-            2. Protection measures if needed (frost, heat, wind)
-            3. General maintenance tasks appropriate for these conditions
-            4. Any special considerations for {self.default_location} climate
+            Please provide specific, actionable plant care advice in this format:
             
-            Keep the advice practical and specific to the current conditions.
+            **Watering Recommendations:**
+            [Specific watering advice based on current conditions]
+            
+            **Protection Measures:**
+            [Any protection needed for current weather]
+            
+            **Maintenance Tasks:**
+            [General maintenance appropriate for these conditions]
+            
+            **Special Considerations:**
+            [Any specific advice for {self.default_location} climate]
+            
+            Keep the advice practical, specific, and easy to follow. Use bullet points and clear language.
             """
             
             response = openai_client.chat.completions.create(
@@ -200,10 +205,10 @@ class WeatherService:
     
     def get_weather_summary(self) -> str:
         """
-        Get a comprehensive weather summary with plant care advice
+        Get a comprehensive weather summary (without plant care advice)
         
         Returns:
-            str: Weather summary and plant care recommendations
+            str: Weather summary only
         """
         try:
             current_weather = self.get_current_weather()
@@ -214,23 +219,20 @@ class WeatherService:
             
             # Build weather summary
             summary_parts = [
-                f"Weather Summary for {self.default_location}",
-                f"Current Conditions: {current_weather['temperature']}°F, {current_weather['description']}",
-                f"Humidity: {current_weather['humidity']}%",
-                f"Wind: {current_weather['wind_speed']} mph"
+                f"**Current Weather for {self.default_location}**",
+                f"**Temperature:** {current_weather['temperature']}°F (feels like {current_weather['feels_like']}°F)",
+                f"**Conditions:** {current_weather['description']}",
+                f"**Humidity:** {current_weather['humidity']}%",
+                f"**Wind Speed:** {current_weather['wind_speed']} mph",
+                f"**Pressure:** {current_weather['pressure']} hPa"
             ]
             
             if forecast:
-                summary_parts.append("\n3-Day Forecast:")
+                summary_parts.append("\n**3-Day Forecast:**")
                 for day in forecast:
-                    summary_parts.append(f"- {day['date'].strftime('%A, %B %d')}: {day['temp_min']}°F - {day['temp_max']}°F, {day['description']}")
+                    summary_parts.append(f"• **{day['date'].strftime('%A, %B %d')}:** {day['temp_min']}°F - {day['temp_max']}°F, {day['description']}")
             
-            # Get plant care recommendations
-            care_recommendations = self.get_plant_care_recommendations(current_weather)
-            
-            summary_parts.append(f"\nPlant Care Recommendations:\n{care_recommendations}")
-            
-            return "\n".join(summary_parts)
+            return "\n\n".join(summary_parts)
             
         except Exception as e:
             logger.error(f"Error getting weather summary: {e}")
