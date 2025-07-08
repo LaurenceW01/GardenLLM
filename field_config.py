@@ -176,11 +176,42 @@ def get_all_field_names() -> list:
 
 # Function to get all aliases for a canonical field name
 def get_aliases_for_field(field_name: str) -> list:
-    """Return a list of all aliases for a given canonical field name."""
-    # Lowercase the canonical field name for matching
-    field_lc = field_name.strip().lower()
-    # Collect all aliases that map to this field
-    return [alias for alias, canonical in FIELD_ALIASES.items() if canonical.lower() == field_lc]
+    """
+    Get all aliases for a given canonical field name.
+    
+    Args:
+        field_name (str): The canonical field name
+        
+    Returns:
+        list: List of aliases for the field
+    """
+    aliases = []
+    for alias, canonical in FIELD_ALIASES.items():
+        if canonical == field_name:
+            aliases.append(alias)
+    return aliases
+
+def get_field_alias(field_name: str) -> str:
+    """
+    Get the primary user-friendly alias for a given canonical field name.
+    
+    Args:
+        field_name (str): The canonical field name
+        
+    Returns:
+        str: The primary alias for the field, or the field name itself if no alias exists
+    """
+    # First check if the field name itself is an alias
+    if field_name in FIELD_ALIASES:
+        return field_name
+    
+    # Look for aliases that map to this field name
+    for alias, canonical in FIELD_ALIASES.items():
+        if canonical == field_name:
+            return alias
+    
+    # If no alias found, return the field name itself
+    return field_name
 
 # Function to get the category for a field name
 def get_field_category(field_name: str) -> Optional[str]:

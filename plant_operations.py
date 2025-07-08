@@ -237,8 +237,8 @@ def find_plant_by_id_or_name(identifier: str) -> Tuple[Optional[int], Optional[L
         logger.error(f"Error finding plant: {e}")
         return None, None
 
-def update_plant(plant_data: Dict) -> bool:
-    """Update or add a plant in the Google Sheet"""
+def update_plant_legacy(plant_data: Dict) -> bool:
+    """Update or add a plant in the Google Sheet (legacy function)"""
     try:
         check_rate_limit()
         logger.info("Starting plant update process")
@@ -317,6 +317,47 @@ def update_plant(plant_data: Dict) -> bool:
     except Exception as e:
         logger.error(f"Error updating plant: {e}")
         return False
+
+def update_plant(plant_id: Union[int, str], update_data: Dict) -> Dict[str, Union[bool, str]]:
+    """
+    Update a plant in the database by ID.
+    
+    Args:
+        plant_id (Union[int, str]): ID of the plant to update
+        update_data (Dict): Dictionary of field names and new values
+        
+    Returns:
+        Dict[str, Union[bool, str]]: Result with success status and message
+    """
+    try:
+        plant_id = str(plant_id)
+        
+        # Find the plant row
+        plant_row, plant_data = find_plant_by_id_or_name(plant_id)
+        if not plant_row:
+            return {"success": False, "error": "Plant not found"}
+        
+        # Update each field
+        for field_name, new_value in update_data.items():
+            # Validate field name using field_config
+            if not is_valid_field(field_name):
+                logger.warning(f"Invalid field name: {field_name}")
+                continue
+            
+            success = update_plant_field(plant_row, field_name, str(new_value))
+            if not success:
+                return {"success": False, "error": f"Failed to update field {field_name}"}
+        
+        # Invalidate cache
+        invalidate_plant_list_cache()
+        
+        plant_name = plant_data[0][1] if plant_data and len(plant_data[0]) > 1 else "Unknown"
+        logger.info(f"Successfully updated plant: {plant_name}")
+        return {"success": True, "message": f"Updated {plant_name}"}
+        
+    except Exception as e:
+        logger.error(f"Error updating plant {plant_id}: {e}")
+        return {"success": False, "error": str(e)}
 
 def update_plant_field(plant_row: int, field_name: str, new_value: str) -> bool:
     """Update a specific field for a plant"""
@@ -496,6 +537,156 @@ def add_test_photo_url():
         
     except Exception as e:
         return f"Failed to add test photo URL: {str(e)}"
+
+# Public API functions for web.py compatibility
+def get_plants() -> List[Dict]:
+    """
+    Get all plants from the database (alias for get_all_plants).
+    
+    Returns:
+        List[Dict]: List of plant dictionaries
+    """
+    return get_all_plants()
+
+def add_plant(plant_name: str, description: str = "", location: str = "", photo_url: str = "") -> Dict[str, Union[bool, str]]:
+    """
+    Add a new plant to the database.
+    
+    Args:
+        plant_name (str): Name of the plant
+        description (str): Plant description
+        location (str): Plant location
+        photo_url (str): URL to plant photo
+        
+    Returns:
+        Dict[str, Union[bool, str]]: Result with success status and message
+    """
+    try:
+        # Get next available ID
+        next_id = get_next_id()
+        if not next_id:
+            return {"success": False, "error": "Could not generate plant ID"}
+        
+        # Prepare plant data using field_config
+        plant_data = {
+            get_canonical_field_name('ID'): next_id,
+            get_canonical_field_name('Plant Name'): plant_name,
+            get_canonical_field_name('Description'): description,
+            get_canonical_field_name('Location'): location,
+            get_canonical_field_name('Photo URL'): photo_url,
+            get_canonical_field_name('Last Updated'): datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        # Add empty values for all other fields
+        all_fields = get_all_field_names()
+        for field in all_fields:
+            if field not in plant_data:
+                plant_data[field] = ""
+        
+        # Convert to list format for Google Sheets
+        headers = get_all_field_names()
+        row_data = [plant_data.get(field, "") for field in headers]
+        
+        # Add to sheet
+        check_rate_limit()
+        sheets_client.values().append(
+            spreadsheetId=SPREADSHEET_ID,
+            range=RANGE_NAME,
+            valueInputOption='RAW',
+            body={'values': [row_data]}
+        ).execute()
+        
+        # Invalidate cache
+        invalidate_plant_list_cache()
+        
+        logger.info(f"Successfully added plant: {plant_name}")
+        return {"success": True, "message": f"Added {plant_name} to garden"}
+        
+    except Exception as e:
+        logger.error(f"Error adding plant {plant_name}: {e}")
+        return {"success": False, "error": str(e)}
+
+def delete_plant(plant_id: Union[int, str]) -> Dict[str, Union[bool, str]]:
+    """
+    Delete a plant from the database by ID.
+    
+    Args:
+        plant_id (Union[int, str]): ID of the plant to delete
+        
+    Returns:
+        Dict[str, Union[bool, str]]: Result with success status and message
+    """
+    try:
+        plant_id = str(plant_id)
+        
+        # Find the plant row
+        plant_row, plant_data = find_plant_by_id_or_name(plant_id)
+        if not plant_row:
+            return {"success": False, "error": "Plant not found"}
+        
+        # Delete the row
+        check_rate_limit()
+        sheets_client.spreadsheets().values().clear(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f'Plants!A{plant_row}:Q{plant_row}'
+        ).execute()
+        
+        # Invalidate cache
+        invalidate_plant_list_cache()
+        
+        plant_name = plant_data[0][1] if plant_data and len(plant_data[0]) > 1 else "Unknown"
+        logger.info(f"Successfully deleted plant: {plant_name}")
+        return {"success": True, "message": f"Deleted {plant_name}"}
+        
+    except Exception as e:
+        logger.error(f"Error deleting plant {plant_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+def search_plants(query: str) -> List[Dict]:
+    """
+    Search plants by name or other criteria.
+    
+    Args:
+        query (str): Search query
+        
+    Returns:
+        List[Dict]: List of matching plant dictionaries
+    """
+    try:
+        # Get all plants
+        all_plants = get_plant_data()
+        
+        if not query.strip():
+            return all_plants
+        
+        query_lower = query.lower().strip()
+        matching_plants = []
+        
+        for plant in all_plants:
+            # Search in plant name
+            plant_name = plant.get(get_canonical_field_name('Plant Name'), '').lower()
+            if query_lower in plant_name:
+                matching_plants.append(plant)
+                continue
+            
+            # Search in description
+            description = plant.get(get_canonical_field_name('Description'), '').lower()
+            if query_lower in description:
+                matching_plants.append(plant)
+                continue
+            
+            # Search in location
+            location = plant.get(get_canonical_field_name('Location'), '').lower()
+            if query_lower in location:
+                matching_plants.append(plant)
+                continue
+        
+        logger.info(f"Search for '{query}' found {len(matching_plants)} plants")
+        return matching_plants
+        
+    except Exception as e:
+        logger.error(f"Error searching plants for '{query}': {e}")
+        return []
 
 # Phase 2: Plant List Caching System
 _plant_list_cache = {
