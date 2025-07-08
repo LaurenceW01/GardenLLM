@@ -1,6 +1,5 @@
-import uvicorn
 import logging
-from test_openai import initialize_sheet, display_weather_advice
+from test_openai import initialize_sheet
 import os
 from dotenv import load_dotenv
 import multiprocessing
@@ -9,6 +8,7 @@ import sys
 import socket
 import time
 import traceback
+from web import app
 
 # Set up logging with a cleaner format
 logging.basicConfig(
@@ -68,15 +68,12 @@ def run_server():
         port = find_available_port()
         logger.info(f"Using port: {port}")
         
-        config = uvicorn.Config(
-            "web:app",
+        # Use Flask's built-in development server for WSGI
+        app.run(
             host="127.0.0.1",
             port=port,
-            reload=False,
-            log_level="info"
+            debug=False
         )
-        server = uvicorn.Server(config)
-        server.run()
     except Exception as e:
         logger.error(f"Server failed to start: {e}")
         logger.error(traceback.format_exc())
@@ -101,18 +98,8 @@ def main():
         # Wait a bit for the server to initialize
         time.sleep(2)
 
-        # Display weather report after server is running
-        try:
-            if weather_key:
-                logger.info("Retrieving weather forecast...")
-                display_weather_advice()
-                logger.info("Weather forecast displayed")
-            else:
-                logger.warning("Skipping weather forecast - no API key available")
-        except Exception as e:
-            logger.error(f"Error displaying weather forecast: {e}")
-            logger.error(traceback.format_exc())
-            logger.info("Continuing despite weather forecast error")
+        # Weather forecast functionality removed - not needed for web server
+        logger.info("Weather forecast display skipped - web server mode")
 
         try:
             server_process.join()
