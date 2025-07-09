@@ -172,23 +172,23 @@ class WeatherService:
             
             Please provide specific, actionable plant care advice in this format:
             
-            <h4>Watering Recommendations:</h4>
-            <ul>
+            <h4 class="text-lg font-semibold text-green-800 mb-2">Watering Recommendations:</h4>
+            <ul class="list-disc list-inside space-y-1 mb-4">
             [Specific watering advice based on current conditions]
             </ul>
             
-            <h4>Protection Measures:</h4>
-            <ul>
+            <h4 class="text-lg font-semibold text-green-800 mb-2">Protection Measures:</h4>
+            <ul class="list-disc list-inside space-y-1 mb-4">
             [Any protection needed for current weather]
             </ul>
             
-            <h4>Maintenance Tasks:</h4>
-            <ul>
+            <h4 class="text-lg font-semibold text-green-800 mb-2">Maintenance Tasks:</h4>
+            <ul class="list-disc list-inside space-y-1 mb-4">
             [General maintenance appropriate for these conditions]
             </ul>
             
-            <h4>Special Considerations:</h4>
-            <ul>
+            <h4 class="text-lg font-semibold text-green-800 mb-2">Special Considerations:</h4>
+            <ul class="list-disc list-inside space-y-1 mb-4">
             [Any specific advice for {self.default_location} climate]
             </ul>
             
@@ -237,6 +237,14 @@ class WeatherService:
                                 html_parts.append('</ul>')
                 
                 content = '\n'.join(html_parts)
+            else:
+                # If AI provided HTML, ensure it has proper CSS classes
+                # Add classes to h4 tags if missing
+                content = re.sub(r'<h4(?![^>]*class=)', r'<h4 class="text-lg font-semibold text-green-800 mb-2"', content)
+                # Add classes to ul tags if missing
+                content = re.sub(r'<ul(?![^>]*class=)', r'<ul class="list-disc list-inside space-y-1 mb-4"', content)
+                # Add classes to li tags if missing
+                content = re.sub(r'<li(?![^>]*class=)', r'<li class="text-gray-700"', content)
             
             return content
             
