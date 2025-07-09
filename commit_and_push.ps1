@@ -49,7 +49,7 @@ Write-Host "Adding all changes to git..."
 git add -A
 
 # Commit with a descriptive message
-$commitMessage = "Fix: Weather forecast now starts at next local hour and uses correct Houston daylight savings time (CDT, UTC-5). Hourly forecast and current time are now accurate."
+$commitMessage = "Fix: Improve current weather conditions parsing from METAR (VelocityWeather) for Houston. Now uses best available description from weather code, cloud cover, and raw METAR."
 Write-Host "Committing with message: $commitMessage"
 git commit -m "$commitMessage"
 

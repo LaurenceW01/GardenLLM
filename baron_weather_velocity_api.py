@@ -275,14 +275,17 @@ class BaronWeatherVelocityAPI:
             
             # Extract weather description from weather code
             weather_code_data = metar.get('weather_code', {})
-            weather_text = weather_code_data.get('text', 'Partly cloudy')
+            weather_text = weather_code_data.get('text', '')
             
             # Extract cloud cover
             cloud_data = metar.get('cloud_cover', {})
-            cloud_text = cloud_data.get('text', 'Partly cloudy')
+            cloud_text = cloud_data.get('text', '')
             
-            # Use weather text if available, otherwise cloud cover
-            description = weather_text if weather_text else cloud_text
+            # Extract raw METAR for additional context
+            raw_metar = metar.get('raw_metar', '')
+            
+            # Determine the best weather description
+            description = self._determine_weather_description(weather_text, cloud_text, raw_metar)
             
             houston_now = self._get_houston_time()
             return {
@@ -301,6 +304,81 @@ class BaronWeatherVelocityAPI:
         except Exception as e:
             logger.error(f"Error parsing METAR current data: {e}")
             return None
+    
+    def _determine_weather_description(self, weather_text: str, cloud_text: str, raw_metar: str) -> str:
+        """
+        Determine the best weather description from METAR data
+        
+        Args:
+            weather_text (str): Weather code text from API
+            cloud_text (str): Cloud cover text from API
+            raw_metar (str): Raw METAR string
+            
+        Returns:
+            str: Best weather description
+        """
+        # Priority order: weather conditions > cloud cover > default
+        
+        # Check for significant weather conditions first
+        if weather_text:
+            weather_lower = weather_text.lower()
+            if 'thunderstorm' in weather_lower:
+                return "Thunderstorms"
+            elif 'rain' in weather_lower or 'shower' in weather_lower:
+                return "Rain"
+            elif 'snow' in weather_lower:
+                return "Snow"
+            elif 'fog' in weather_lower or 'mist' in weather_lower:
+                return "Fog"
+            elif 'haze' in weather_lower:
+                return "Hazy"
+            elif 'drizzle' in weather_lower:
+                return "Drizzle"
+        
+        # Check cloud cover if no significant weather
+        if cloud_text:
+            cloud_lower = cloud_text.lower()
+            if 'overcast' in cloud_lower:
+                return "Cloudy"
+            elif 'broken' in cloud_lower:
+                return "Partly Cloudy"
+            elif 'scattered' in cloud_lower:
+                return "Partly Cloudy"
+            elif 'clear' in cloud_lower:
+                return "Clear"
+            elif 'few' in cloud_lower:
+                return "Mostly Clear"
+        
+        # Parse raw METAR for additional context
+        if raw_metar:
+            raw_lower = raw_metar.lower()
+            if 'br' in raw_lower:  # Mist/fog
+                return "Mist"
+            elif 'fg' in raw_lower:  # Fog
+                return "Fog"
+            elif 'ra' in raw_lower:  # Rain
+                return "Rain"
+            elif 'ts' in raw_lower:  # Thunderstorm
+                return "Thunderstorms"
+            elif 'sn' in raw_lower:  # Snow
+                return "Snow"
+            elif 'dz' in raw_lower:  # Drizzle
+                return "Drizzle"
+            elif 'hz' in raw_lower:  # Haze
+                return "Hazy"
+            elif 'clr' in raw_lower or 'skc' in raw_lower:  # Clear
+                return "Clear"
+            elif 'bkn' in raw_lower:  # Broken
+                return "Partly Cloudy"
+            elif 'ovc' in raw_lower:  # Overcast
+                return "Cloudy"
+            elif 'sct' in raw_lower:  # Scattered
+                return "Partly Cloudy"
+            elif 'few' in raw_lower:  # Few clouds
+                return "Mostly Clear"
+        
+        # Default fallback
+        return "Partly Cloudy"
     
     def _parse_metar_conditions(self, conditions: List[Dict[str, Any]]) -> str:
         """
