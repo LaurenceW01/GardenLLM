@@ -42,48 +42,19 @@ Write-Log "Checking git status..." "Yellow"
 $gitStatus = git status 2>&1
 Write-Log $gitStatus "White"
 
+$ErrorActionPreference = 'Stop'
+
 # Add all changes
-Write-Log "Adding all changes..." "Yellow"
-$gitAdd = git add . 2>&1
-if ($gitAdd) {
-    Write-Log $gitAdd "White"
-}
+Write-Host "Adding all changes to git..."
+git add -A
 
-# Check if there are changes to commit
-$status = git status --porcelain 2>&1
-if (-not $status) {
-    Write-Log "No changes to commit!" "Yellow"
-    exit 0
-}
+# Commit with a descriptive message
+$commitMessage = "Fix: Weather forecast now starts at next local hour and uses correct Houston daylight savings time (CDT, UTC-5). Hourly forecast and current time are now accurate."
+Write-Host "Committing with message: $commitMessage"
+git commit -m "$commitMessage"
 
-# Create commit message
-$commitMessage = "Fix timezone issues and improve hourly forecast: use Houston timezone (CST), scrape actual hourly data from Click2Houston, get all 24 hours instead of 12, fix time display to show correct current time"
+# Push to main
+Write-Host "Pushing to origin/main..."
+git push origin main
 
-# Commit changes
-Write-Log "Committing changes..." "Yellow"
-Write-Log "Commit message: $commitMessage" "Cyan"
-$gitCommit = git commit -m $commitMessage 2>&1
-Write-Log $gitCommit "White"
-
-# Check if commit was successful
-if ($LASTEXITCODE -eq 0) {
-    Write-Log "Commit successful!" "Green"
-    
-    # Push to remote
-    Write-Log "Pushing to remote repository..." "Yellow"
-    $gitPush = git push 2>&1
-    Write-Log $gitPush "White"
-    
-    if ($LASTEXITCODE -eq 0) {
-        Write-Log "Push successful! Changes have been deployed." "Green"
-    } else {
-        Write-Log "Error: Push failed!" "Red"
-        exit 1
-    }
-} else {
-    Write-Log "Error: Commit failed!" "Red"
-    exit 1
-}
-
-Write-Log "Git commit and push process completed successfully!" "Green"
-Write-Log "Log saved to: $logFile" "Cyan" 
+Write-Host "Commit and push complete!" 

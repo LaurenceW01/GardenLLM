@@ -65,7 +65,7 @@ class EnhancedWeatherService:
             hourly_forecast = self.weather_api.get_hourly_forecast(hours=48)  # Get 48-hour forecast
             # No daily forecast endpoint, so generate from hourly if needed
             daily_forecast = None  # Placeholder for future expansion
-            if current_weather:
+            if current_weather and hourly_forecast:
                 self._weather_cache = {
                     'current_weather': current_weather,
                     'hourly_forecast': hourly_forecast,
@@ -75,7 +75,9 @@ class EnhancedWeatherService:
                 self._last_cache_update = time.time()
                 logger.info(f"Got {len(hourly_forecast) if hourly_forecast else 0} hours of hourly forecast from BaronWeatherVelocityAPI")
                 return True
-            return False
+            else:
+                logger.warning("Baron Weather API returned no data - weather service unavailable")
+                return False
         except Exception as e:
             logger.error(f"Error updating weather cache: {e}")
             return False

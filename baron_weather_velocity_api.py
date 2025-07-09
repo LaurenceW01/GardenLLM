@@ -33,12 +33,12 @@ class BaronWeatherVelocityAPI:
         self.host = "http://api.velocityweather.com/v1"
         self.session = requests.Session()
         
-        # Houston coordinates (approximate)
-        self.houston_lat = 29.7604
-        self.houston_lon = -95.3698
+        # Houston coordinates (more precise)
+        self.houston_lat = 29.827119
+        self.houston_lon = -95.472232
         
-        # Houston timezone (Central Time)
-        self.houston_tz = timezone(timedelta(hours=-6))  # CST (UTC-6)
+        # Houston timezone (Central Daylight Time)
+        self.houston_tz = timezone(timedelta(hours=-5))  # CDT (UTC-5)
         
         # Cache for storing scraped data
         self.cache = {}
@@ -178,23 +178,9 @@ class BaronWeatherVelocityAPI:
         except Exception as e:
             logger.error(f"Error getting current weather: {e}")
         
-        # Fallback to realistic data
-        houston_now = self._get_houston_time()
-        fallback_data = {
-            'temperature': 75.0,
-            'feels_like': 75.0,
-            'humidity': 60,
-            'description': 'Partly cloudy',
-            'icon': '02d',
-            'wind_speed': 5.0,
-            'pressure': 1013,
-            'visibility': 10,
-            'sunrise': houston_now.replace(hour=6, minute=30, second=0, microsecond=0),
-            'sunset': houston_now.replace(hour=8, minute=0, second=0, microsecond=0)
-        }
-        
-        self._set_cached_data(cache_key, fallback_data)
-        return fallback_data
+        # No fallback data - return None if API is not available
+        logger.warning("Baron Weather API is not available - no weather data provided")
+        return None
     
     def get_hourly_forecast(self, hours: int = 48) -> Optional[List[Dict[str, Any]]]:
         """
@@ -212,11 +198,8 @@ class BaronWeatherVelocityAPI:
             return cached_data
         
         try:
-            # Use the NDFD hourly forecast endpoint
-            forecast_time = datetime.utcnow() + timedelta(hours=4)
-            datetime_str = forecast_time.replace(microsecond=0).isoformat() + 'Z'
-            
-            uri = f"/reports/ndfd/hourly.json?lat={self.houston_lat}&lon={self.houston_lon}&utc={datetime_str}"
+            # Use the NDFD hourly forecast endpoint with hours parameter
+            uri = f"/reports/ndfd/hourly.json?lat={self.houston_lat}&lon={self.houston_lon}&hours={hours}"
             url = f"{self.host}/{self.access_key}{uri}"
             signed_url = self._sign_request(url)
             
@@ -236,12 +219,9 @@ class BaronWeatherVelocityAPI:
         except Exception as e:
             logger.error(f"Error getting hourly forecast: {e}")
         
-        # Generate realistic data as fallback
-        houston_now = self._get_houston_time()
-        fallback_data = self._generate_realistic_hourly_data(hours, houston_now)
-        
-        self._set_cached_data(cache_key, fallback_data)
-        return fallback_data
+        # No fallback data - return None if API is not available
+        logger.warning("Baron Weather API is not available - no hourly forecast data provided")
+        return None
     
     def _parse_metar_current(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
@@ -311,7 +291,7 @@ class BaronWeatherVelocityAPI:
                 'humidity': int(humidity) if isinstance(humidity, (int, float)) else 60,
                 'description': description,
                 'icon': '02d',  # Default icon
-                'wind_speed': float(wind_mph),
+                'wind_speed': round(wind_mph),
                 'pressure': float(pressure),
                 'visibility': float(visibility),
                 'sunrise': houston_now.replace(hour=6, minute=30, second=0, microsecond=0),
@@ -361,122 +341,78 @@ class BaronWeatherVelocityAPI:
             Optional[List[Dict[str, Any]]]: Parsed hourly data
         """
         try:
-            # The API response structure is: {"ndfd_hourly": {"data": {...}}}
+            # The API response structure is: {"ndfd_hourly": {"data": [...]}}
             if 'ndfd_hourly' in data and 'data' in data['ndfd_hourly']:
                 forecast_data = data['ndfd_hourly']['data']
             else:
                 logger.warning("Unexpected NDFD response structure")
                 return None
             
-            # The NDFD endpoint returns a single forecast point, not a list
-            # We need to generate multiple hours based on this data point
-            hourly_data = []
-            
-            # Extract the forecast data
-            temp_data = forecast_data.get('temperature', {})
-            temp_c = temp_data.get('value')
-            if temp_c is not None:
-                temp_f = (temp_c * 9/5) + 32
-            else:
-                temp_f = 75.0
-            
-            # Extract precipitation probability
-            precip_data = forecast_data.get('precipitation', {})
-            precip_prob = precip_data.get('probability', {}).get('value', 0)
-            
-            # Extract wind speed (convert from m/s to mph)
-            wind_data = forecast_data.get('wind', {})
-            wind_mps = wind_data.get('speed')
-            if wind_mps is not None:
-                wind_mph = wind_mps * 2.23694
-            else:
-                wind_mph = 5.0
-            
-            # Extract weather description
-            weather_code_data = forecast_data.get('weather_code', {})
-            weather_text = weather_code_data.get('text', 'Partly cloudy')
-            
-            # Extract cloud cover
-            cloud_data = forecast_data.get('cloud_cover', {})
-            cloud_text = cloud_data.get('text', 'Partly cloudy')
-            
-            # Use weather text if available, otherwise cloud cover
-            description = weather_text if weather_text else cloud_text
-            
-            # Extract valid time
-            valid_begin = forecast_data.get('valid_begin')
-            if valid_begin:
-                try:
-                    # Parse the UTC time and convert to Houston time
-                    from datetime import datetime
-                    utc_time = datetime.fromisoformat(valid_begin.replace('Z', '+00:00'))
-                    houston_time = utc_time.astimezone(self.houston_tz)
-                    base_time = houston_time
-                except:
-                    base_time = self._get_houston_time()
-            else:
-                base_time = self._get_houston_time()
-            
-            # Generate hourly entries based on this forecast point
-            for i in range(hours):
-                hour_time = base_time + timedelta(hours=i)
+            # Check if data is a list (multiple hours) or single object
+            if isinstance(forecast_data, list):
+                # Multiple hours returned by API
+                hourly_data = []
+                for i, hour_forecast in enumerate(forecast_data):
+                    if i >= hours:  # Limit to requested hours
+                        break
+                    
+                    # Extract temperature (convert from Celsius to Fahrenheit)
+                    temp_data = hour_forecast.get('temperature', {})
+                    temp_c = temp_data.get('value')
+                    if temp_c is not None:
+                        temp_f = (temp_c * 9/5) + 32
+                    else:
+                        temp_f = 75.0
+                    
+                    # Extract precipitation probability
+                    precip_data = hour_forecast.get('precipitation', {})
+                    precip_prob = precip_data.get('probability', {}).get('value', 0)
+                    
+                    # Extract wind speed (convert from m/s to mph)
+                    wind_data = hour_forecast.get('wind', {})
+                    wind_mps = wind_data.get('speed')
+                    if wind_mps is not None:
+                        wind_mph = wind_mps * 2.23694
+                    else:
+                        wind_mph = 5.0
+                    
+                    # Extract weather description
+                    weather_code_data = hour_forecast.get('weather_code', {})
+                    weather_text = weather_code_data.get('text', 'Partly cloudy')
+                    
+                    # Extract cloud cover
+                    cloud_data = hour_forecast.get('cloud_cover', {})
+                    cloud_text = cloud_data.get('text', 'Partly cloudy')
+                    
+                    # Use weather text if available, otherwise cloud cover
+                    description = weather_text if weather_text else cloud_text
+                    
+                    # Calculate time for this hour - start at the next hour
+                    current_time = self._get_houston_time()
+                    # Round up to the next hour
+                    next_hour = current_time.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+                    hour_time = next_hour + timedelta(hours=i)
+                    
+                    hourly_data.append({
+                        'time': hour_time.strftime('%I %p').replace(' 0', ' '),
+                        'temperature': round(temp_f),
+                        'rain_probability': round(precip_prob),
+                        'description': description,
+                        'wind_speed': round(wind_mph)
+                    })
                 
-                # Vary the values slightly for each hour to make it more realistic
-                temp_variation = (i % 6 - 3) * 2  # ±6°F variation
-                wind_variation = (i % 4 - 2) * 1  # ±2 mph variation
-                precip_variation = (i % 3 - 1) * 5  # ±5% variation
-                
-                hourly_data.append({
-                    'time': hour_time.strftime('%I %p').replace(' 0', ' '),
-                    'temperature': round(temp_f + temp_variation),
-                    'rain_probability': max(0, min(100, precip_prob + precip_variation)),
-                    'description': description,
-                    'wind_speed': max(0, wind_mph + wind_variation)
-                })
-            
-            logger.info(f"Successfully generated {len(hourly_data)} hourly entries from NDFD forecast")
-            return hourly_data
+                logger.info(f"Successfully parsed {len(hourly_data)} hourly entries from NDFD API")
+                return hourly_data
+            else:
+                # Single forecast point returned (fallback to old behavior)
+                logger.warning("API returned single forecast point instead of hourly array")
+                return None
             
         except Exception as e:
             logger.error(f"Error parsing NDFD hourly data: {e}")
             return None
     
-    def _generate_realistic_hourly_data(self, hours: int, houston_now: datetime) -> List[Dict[str, Any]]:
-        """
-        Generate realistic hourly data as fallback
-        
-        Args:
-            hours (int): Number of hours to generate
-            houston_now (datetime): Current time in Houston
-            
-        Returns:
-            List[Dict[str, Any]]: Generated hourly data
-        """
-        hourly_data = []
-        
-        for i in range(hours):
-            hour_time = houston_now + timedelta(hours=i)
-            hour_of_day = hour_time.hour
-            
-            # Generate realistic weather patterns based on time of day
-            if 6 <= hour_of_day <= 18:  # Daytime
-                base_temp = 75 + (hour_of_day - 12) * 2  # Peak at noon
-            else:  # Nighttime
-                base_temp = 70 - (hour_of_day - 18) * 1 if hour_of_day > 18 else 70 + hour_of_day * 1
-            
-            # Rain probability varies by time
-            rain_prob = 15 if hour_of_day in [14, 15, 16] else 5  # Afternoon showers
-            wind_speed = 3 + (hour_of_day % 4) * 2  # Variable wind
-            
-            hourly_data.append({
-                'time': hour_time.strftime('%I %p').replace(' 0', ' '),  # Remove leading zero from hour
-                'rain_probability': rain_prob,
-                'description': 'Partly cloudy' if rain_prob > 10 else 'Clear',
-                'wind_speed': wind_speed,
-                'temperature': round(base_temp)
-            })
-        
-        return hourly_data
+
     
     def is_available(self) -> bool:
         """

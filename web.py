@@ -173,9 +173,15 @@ def weather():
                 <div class='bg-blue-100 p-3 rounded-lg'><strong>Data Source:</strong> Baron Weather API</div>
             </div>
             """
+        else:
+            weather_summary = """
+            <div class='bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4'>
+                <h3 class='text-lg font-semibold mb-2'>Weather Service Temporarily Unavailable</h3>
+                <p>The Baron Weather API is currently not responding. Please try again later for current weather information.</p>
+            </div>
+            """
         
         # Generate plant care recommendations based on current weather
-        plant_care_recommendations = "Plant care recommendations based on current weather conditions."
         if current_weather:
             temp = current_weather.get('temperature', 75)
             humidity = current_weather.get('humidity', 60)
@@ -202,6 +208,15 @@ def weather():
                     {''.join(f'<li class="text-gray-700">{rec}</li>' for rec in recommendations)}
                 </ul>
                 """
+            else:
+                plant_care_recommendations = "No specific plant care recommendations for current weather conditions."
+        else:
+            plant_care_recommendations = """
+            <div class='bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4'>
+                <h4 class="text-lg font-semibold mb-2">Plant Care Recommendations Unavailable</h4>
+                <p>Weather data is currently unavailable. Please check back later for plant care recommendations based on current conditions.</p>
+            </div>
+            """
         
         climate_context = get_climate_context()
         default_location = get_default_location()
