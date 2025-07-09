@@ -321,6 +321,41 @@ def chat():
         logger.error(f"Error in chat endpoint: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/analyze-plant', methods=['POST'])
+def analyze_plant():
+    """Image analysis endpoint for plant identification and care advice"""
+    try:
+        # Check if image file is present in request
+        if 'image' not in request.files:
+            return jsonify({'success': False, 'error': 'No image file provided'}), 400
+        
+        file = request.files['image']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No image file selected'}), 400
+        
+        # Get optional user message
+        user_message = request.form.get('message', '').strip()
+        conversation_id = request.form.get('conversation_id')
+        
+        # Read image data
+        image_data = file.read()
+        
+        # Import the analyze_plant_image function from plant_vision
+        from plant_vision import analyze_plant_image
+        
+        # Analyze the plant image
+        response = analyze_plant_image(image_data, user_message, conversation_id)
+        
+        return jsonify({
+            'success': True,
+            'response': response,
+            'conversation_id': conversation_id
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in analyze-plant endpoint: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/fields')
 def api_fields():
     """API endpoint to get field configuration"""
