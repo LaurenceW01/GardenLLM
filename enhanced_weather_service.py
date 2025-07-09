@@ -79,8 +79,8 @@ class EnhancedWeatherService:
                 current_weather = self.scraper.get_current_weather()
                 daily_forecast = self.scraper.get_daily_forecast(5)
                 
-                # Get hourly forecast (24 hours to get all available)
-                hourly_forecast = self.scraper.get_hourly_forecast(hours=24)
+                # Get hourly forecast (48 hours to get all available)
+                hourly_forecast = self.scraper.get_hourly_forecast(hours=48)
                 
                 if current_weather:
                     self._weather_cache = {
@@ -101,8 +101,8 @@ class EnhancedWeatherService:
                 current_weather = self.fallback_service.get_current_weather()
                 daily_forecast = self.fallback_service.get_weather_forecast(5)
                 
-                # Get hourly forecast (24 hours to get all available)
-                hourly_forecast = self.fallback_service.get_hourly_rain_forecast(hours=24)
+                # Get hourly forecast (48 hours to get all available)
+                hourly_forecast = self.fallback_service.get_hourly_rain_forecast(hours=48)
                 
                 if current_weather:
                     self._weather_cache = {

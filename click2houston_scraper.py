@@ -264,12 +264,12 @@ class Click2HoustonScraper:
             logger.error(f"Error scraping current weather: {e}")
             return None
     
-    def get_hourly_forecast(self, hours: int = 24) -> Optional[List[Dict[str, Any]]]:
+    def get_hourly_forecast(self, hours: int = 48) -> Optional[List[Dict[str, Any]]]:
         """
         Get hourly forecast from Click2Houston
         
         Args:
-            hours (int): Number of hours to forecast (default: 24 to get all available)
+            hours (int): Number of hours to forecast (default: 48 to get all available)
             
         Returns:
             Optional[List[Dict[str, Any]]]: Hourly forecast data or None if error
@@ -287,56 +287,113 @@ class Click2HoustonScraper:
             hourly_data = []
             houston_now = self._get_houston_time()
             
-            # Try to find hourly forecast elements on the page
-            # Look for common hourly forecast patterns
+            # Try multiple approaches to find hourly forecast elements
+            hourly_elements = []
+            
+            # Approach 1: Look for common hourly forecast containers
             hourly_selectors = [
                 '.hourly-forecast',
                 '.hourly-weather',
                 '.hourly-data',
+                '.weather-hourly',
+                '.forecast-hourly',
                 '[class*="hourly"]',
                 '[class*="forecast"]',
-                '.weather-hourly',
-                '.forecast-hourly'
+                '.hourly-forecast-container',
+                '.hourly-weather-container',
+                '.hourly-grid',
+                '.hourly-list',
+                '.hourly-items',
+                '.hourly-row',
+                '.hourly-item'
             ]
             
-            hourly_elements = []
             for selector in hourly_selectors:
                 elements = soup.select(selector)
                 if elements:
+                    logger.info(f"Found {len(elements)} elements with selector: {selector}")
                     hourly_elements.extend(elements)
-                    break
+            
+            # Approach 2: Look for time patterns in the page
+            time_patterns = soup.find_all(text=re.compile(r'\d{1,2}:\d{2}\s*(AM|PM|am|pm)'))
+            if time_patterns:
+                logger.info(f"Found {len(time_patterns)} time patterns in page")
+                # Get parent elements containing these times
+                for time_pattern in time_patterns:
+                    parent = time_pattern.parent
+                    if parent and parent not in hourly_elements:
+                        hourly_elements.append(parent)
+            
+            # Approach 3: Look for temperature patterns
+            temp_patterns = soup.find_all(text=re.compile(r'\d+°'))
+            if temp_patterns:
+                logger.info(f"Found {len(temp_patterns)} temperature patterns in page")
+                # Get parent elements containing these temperatures
+                for temp_pattern in temp_patterns:
+                    parent = temp_pattern.parent
+                    if parent and parent not in hourly_elements:
+                        hourly_elements.append(parent)
+            
+            # Approach 4: Look for table rows or list items that might contain hourly data
+            table_rows = soup.find_all('tr')
+            list_items = soup.find_all('li')
+            
+            # Filter for rows/items that contain time or temperature data
+            for row in table_rows:
+                row_text = row.get_text()
+                if re.search(r'\d{1,2}:\d{2}\s*(AM|PM|am|pm)', row_text) or re.search(r'\d+°', row_text):
+                    if row not in hourly_elements:
+                        hourly_elements.append(row)
+            
+            for item in list_items:
+                item_text = item.get_text()
+                if re.search(r'\d{1,2}:\d{2}\s*(AM|PM|am|pm)', item_text) or re.search(r'\d+°', item_text):
+                    if item not in hourly_elements:
+                        hourly_elements.append(item)
+            
+            logger.info(f"Total hourly elements found: {len(hourly_elements)}")
             
             # If we found hourly elements, try to parse them
             if hourly_elements:
-                logger.info("Found hourly forecast elements, attempting to parse")
+                logger.info("Attempting to parse hourly forecast elements")
                 for i, element in enumerate(hourly_elements[:hours]):
                     try:
+                        element_text = element.get_text()
+                        
                         # Extract time
-                        time_elem = element.find(text=re.compile(r'\d{1,2}:\d{2}\s*(AM|PM|am|pm)'))
-                        if time_elem:
-                            time_str = time_elem.strip()
+                        time_match = re.search(r'(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)', element_text)
+                        if time_match:
+                            hour = int(time_match.group(1))
+                            minute = int(time_match.group(2))
+                            ampm = time_match.group(3).upper()
+                            
+                            # Convert to 24-hour format for comparison
+                            if ampm == 'PM' and hour != 12:
+                                hour += 12
+                            elif ampm == 'AM' and hour == 12:
+                                hour = 0
+                            
+                            # Create time string
+                            time_str = f"{hour:02d}:{minute:02d} {ampm}"
                         else:
                             # Calculate time based on current time + hours
                             hour_time = houston_now + timedelta(hours=i)
                             time_str = hour_time.strftime('%I %p').replace(' 0', ' ')
                         
                         # Extract temperature
-                        temp_elem = element.find(text=re.compile(r'\d+°'))
-                        temp_match = re.search(r'(\d+)°', str(temp_elem)) if temp_elem else None
+                        temp_match = re.search(r'(\d+)°', element_text)
                         temperature = int(temp_match.group(1)) if temp_match else 75
                         
                         # Extract rain probability
-                        rain_elem = element.find(text=re.compile(r'\d+%'))
-                        rain_match = re.search(r'(\d+)%', str(rain_elem)) if rain_elem else None
+                        rain_match = re.search(r'(\d+)%', element_text)
                         rain_prob = int(rain_match.group(1)) if rain_match else 10
                         
                         # Extract description
-                        desc_elem = element.find(text=re.compile(r'(sunny|cloudy|rainy|stormy|clear|partly)', re.IGNORECASE))
-                        description = desc_elem.strip().title() if desc_elem else 'Partly Cloudy'
+                        desc_match = re.search(r'(sunny|cloudy|rainy|stormy|clear|partly|overcast|foggy|misty)', element_text, re.IGNORECASE)
+                        description = desc_match.group(1).title() if desc_match else 'Partly Cloudy'
                         
                         # Extract wind speed
-                        wind_elem = element.find(text=re.compile(r'\d+\s*mph', re.IGNORECASE))
-                        wind_match = re.search(r'(\d+)\s*mph', str(wind_elem), re.IGNORECASE) if wind_elem else None
+                        wind_match = re.search(r'(\d+)\s*mph', element_text, re.IGNORECASE)
                         wind_speed = int(wind_match.group(1)) if wind_match else 5
                         
                         hourly_data.append({
@@ -376,6 +433,7 @@ class Click2HoustonScraper:
                         'temperature': round(base_temp)
                     })
             
+            logger.info(f"Successfully parsed {len(hourly_data)} hourly forecast entries")
             self._set_cached_data(cache_key, hourly_data)
             return hourly_data
             
