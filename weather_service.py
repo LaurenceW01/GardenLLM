@@ -109,7 +109,8 @@ class WeatherService:
                         'humidity': [],
                         'description': set(),
                         'wind_speed': [],
-                        'pressure': []
+                        'pressure': [],
+                        'rain_probability': []
                     }
                 
                 daily_data[date]['temp_min'] = min(daily_data[date]['temp_min'], item['main']['temp_min'])
@@ -118,6 +119,12 @@ class WeatherService:
                 daily_data[date]['description'].add(item['weather'][0]['description'])
                 daily_data[date]['wind_speed'].append(item['wind']['speed'])
                 daily_data[date]['pressure'].append(item['main']['pressure'])
+                
+                # Add rain probability (pop = probability of precipitation)
+                if 'pop' in item:
+                    daily_data[date]['rain_probability'].append(item['pop'])
+                else:
+                    daily_data[date]['rain_probability'].append(0)
             
             # Calculate averages and format descriptions
             forecast = []
@@ -129,7 +136,8 @@ class WeatherService:
                     'humidity': round(sum(day_data['humidity']) / len(day_data['humidity'])),
                     'description': ', '.join(sorted(day_data['description'])),
                     'wind_speed': round(sum(day_data['wind_speed']) / len(day_data['wind_speed']), 1),
-                    'pressure': round(sum(day_data['pressure']) / len(day_data['pressure']))
+                    'pressure': round(sum(day_data['pressure']) / len(day_data['pressure'])),
+                    'rain_probability': round(sum(day_data['rain_probability']) / len(daily_data[date]['rain_probability']) * 100, 1)
                 }
                 forecast.append(day)
             
@@ -137,6 +145,49 @@ class WeatherService:
             
         except Exception as e:
             logger.error(f"Error getting weather forecast: {e}")
+            return None
+    
+    def get_hourly_rain_forecast(self) -> Optional[List[Dict[str, Any]]]:
+        """
+        Get hourly rain probability forecast for the current day
+        
+        Returns:
+            Optional[List[Dict[str, Any]]]: Hourly rain data or None if error
+        """
+        try:
+            url = f"{self.base_url}/forecast"
+            params = {
+                'lat': self.latitude,
+                'lon': self.longitude,
+                'appid': self.api_key,
+                'units': 'imperial'
+            }
+            
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Get current date
+            current_date = datetime.now().date()
+            
+            # Filter for current day and next 24 hours
+            hourly_data = []
+            for item in data['list']:
+                item_date = datetime.fromtimestamp(item['dt']).date()
+                if item_date == current_date:
+                    hourly_data.append({
+                        'time': datetime.fromtimestamp(item['dt']).strftime('%I %p'),
+                        'rain_probability': round(item.get('pop', 0) * 100, 1),
+                        'wind_speed': round(item['wind']['speed'], 1),
+                        'temperature': round(item['main']['temp'], 1),
+                        'description': item['weather'][0]['description']
+                    })
+            
+            return hourly_data
+            
+        except Exception as e:
+            logger.error(f"Error getting hourly rain forecast: {e}")
             return None
     
     def get_plant_care_recommendations(self, weather_data: Optional[Dict[str, Any]] = None) -> str:
@@ -262,6 +313,7 @@ class WeatherService:
         try:
             current_weather = self.get_current_weather()
             forecast = self.get_weather_forecast(3)  # 3-day forecast
+            hourly_rain = self.get_hourly_rain_forecast()  # Hourly rain data
             
             if not current_weather:
                 return "Unable to retrieve weather data."
@@ -277,6 +329,19 @@ class WeatherService:
                 f"<div class='bg-blue-100 p-3 rounded-lg'><strong>Pressure:</strong> {current_weather['pressure']} hPa</div>",
                 f"</div>"
             ]
+            
+            # Add hourly rain forecast for current day
+            if hourly_rain:
+                summary_parts.append("<h4 class='text-md font-semibold text-blue-800 mb-3'>Today's Hourly Rain Forecast</h4>")
+                summary_parts.append("<div class='grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 mb-4'>")
+                for hour in hourly_rain[:12]:  # Show next 12 hours
+                    rain_color = "bg-red-100" if hour['rain_probability'] > 50 else "bg-yellow-100" if hour['rain_probability'] > 20 else "bg-green-100"
+                    summary_parts.append(f"<div class='{rain_color} p-2 rounded text-center text-sm'>")
+                    summary_parts.append(f"<div class='font-semibold'>{hour['time']}</div>")
+                    summary_parts.append(f"<div class='text-blue-600'>{hour['rain_probability']}%</div>")
+                    summary_parts.append(f"<div class='text-gray-600'>{hour['wind_speed']} mph</div>")
+                    summary_parts.append("</div>")
+                summary_parts.append("</div>")
             
             if forecast:
                 summary_parts.append("<h4 class='text-md font-semibold text-blue-800 mb-3'>3-Day Forecast</h4>")
@@ -298,7 +363,12 @@ class WeatherService:
                     else:
                         condition_display = conditions[0].title()
                     
-                    summary_parts.append(f"<div class='bg-blue-50 p-3 rounded border-l-4 border-blue-300'><strong>{day['date'].strftime('%A, %B %d')}:</strong> {day['temp_min']}°F - {day['temp_max']}°F, {condition_display}</div>")
+                    # Add rain probability and wind speed to daily forecast
+                    rain_color = "border-red-300" if day['rain_probability'] > 50 else "border-yellow-300" if day['rain_probability'] > 20 else "border-blue-300"
+                    summary_parts.append(f"<div class='bg-blue-50 p-3 rounded border-l-4 {rain_color}'>")
+                    summary_parts.append(f"<strong>{day['date'].strftime('%A, %B %d')}:</strong> {day['temp_min']}°F - {day['temp_max']}°F, {condition_display}")
+                    summary_parts.append(f"<br><span class='text-sm text-blue-600'>Rain: {day['rain_probability']}% | Wind: {day['wind_speed']} mph</span>")
+                    summary_parts.append("</div>")
                 summary_parts.append("</div>")
             
             return "".join(summary_parts)
@@ -378,6 +448,11 @@ def get_weather_forecast() -> List[Dict[str, Any]]:
     """Get weather forecast for Houston area"""
     forecast = weather_service.get_weather_forecast()
     return forecast if forecast else []
+
+def get_hourly_rain_forecast() -> List[Dict[str, Any]]:
+    """Get hourly rain forecast for Houston area"""
+    hourly_rain = weather_service.get_hourly_rain_forecast()
+    return hourly_rain if hourly_rain else []
 
 def get_weather_summary() -> str:
     """Get comprehensive weather summary with plant care advice"""
