@@ -149,15 +149,23 @@ class WeatherService:
             response = requests.get(url, params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
-            now = datetime.now().timestamp()
+            
+            # Use UTC time for comparison since OpenWeather API returns UTC timestamps
+            from datetime import timezone
+            now_utc = datetime.now(timezone.utc).timestamp()
+            
             # Only include blocks from now forward
             hourly_data = []
             for item in data['list']:
-                if item['dt'] >= now:
+                if item['dt'] >= now_utc:
+                    # Convert UTC timestamp to local time for display
+                    local_time = datetime.fromtimestamp(item['dt'])
                     hourly_data.append({
-                        'time': datetime.fromtimestamp(item['dt']).strftime('%a %I %p'),
+                        'time': local_time.strftime('%a %I %p'),
                         'rain_probability': round(item.get('pop', 0) * 100, 1),
-                        'description': item['weather'][0]['description'].capitalize()
+                        'description': item['weather'][0]['description'].capitalize(),
+                        'wind_speed': round(item.get('wind', {}).get('speed', 0), 1),
+                        'temperature': round(item.get('main', {}).get('temp', 0), 1)
                     })
             return hourly_data[:hours]
         except Exception as e:
