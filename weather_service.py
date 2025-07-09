@@ -126,7 +126,7 @@ class WeatherService:
                 else:
                     daily_data[date]['rain_probability'].append(0)
             
-            # Calculate averages and format descriptions
+            # Calculate daily max rain probability and format descriptions
             forecast = []
             for date, day_data in sorted(daily_data.items()):
                 day = {
@@ -137,7 +137,7 @@ class WeatherService:
                     'description': ', '.join(sorted(day_data['description'])),
                     'wind_speed': round(sum(day_data['wind_speed']) / len(day_data['wind_speed']), 1),
                     'pressure': round(sum(day_data['pressure']) / len(day_data['pressure'])),
-                    'rain_probability': round(sum(day_data['rain_probability']) / len(daily_data[date]['rain_probability']) * 100, 1)
+                    'rain_probability': round(max(day_data['rain_probability']) * 100, 1) if day_data['rain_probability'] else 0.0
                 }
                 forecast.append(day)
             
