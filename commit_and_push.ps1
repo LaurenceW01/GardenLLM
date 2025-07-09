@@ -49,7 +49,7 @@ Write-Host "Adding all changes to git..."
 git add -A
 
 # Commit with a descriptive message
-$commitMessage = "Fix: Improve current weather conditions parsing from METAR (VelocityWeather) for Houston. Now uses best available description from weather code, cloud cover, and raw METAR."
+$commitMessage = "Release v1.00.04: Enhanced weather integration with Baron Weather VelocityWeather API. Features real-time METAR data, accurate hourly forecasts, and improved weather condition parsing for Houston."
 Write-Host "Committing with message: $commitMessage"
 git commit -m "$commitMessage"
 

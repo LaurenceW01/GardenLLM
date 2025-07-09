@@ -1,7 +1,7 @@
 # GardenLLM Version Information
-VERSION=v1.0.0-20250704-125248
-COMMIT_HASH=66de13bd
-CREATED_AT=2025-07-04T12:52:48.701512
+VERSION=v1.00.04
+COMMIT_HASH=d396166
+CREATED_AT=2025-07-09T15:02:00.000000
 
 # Current Features:
 # - Plant care guide parsing functionality
@@ -10,3 +10,7 @@ CREATED_AT=2025-07-04T12:52:48.701512
 # - Multiple field update support
 # - Photo URL handling
 # - OpenAI integration for plant care recommendations
+# - Real-time weather data from Baron Weather VelocityWeather API
+# - Accurate hourly forecasts starting at next local hour
+# - Improved current weather conditions parsing from METAR data
+# - Houston timezone support (CDT/UTC-5)
