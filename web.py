@@ -326,10 +326,10 @@ def analyze_plant():
     """Image analysis endpoint for plant identification and care advice"""
     try:
         # Check if image file is present in request
-        if 'image' not in request.files:
+        if 'file' not in request.files:
             return jsonify({'success': False, 'error': 'No image file provided'}), 400
         
-        file = request.files['image']
+        file = request.files['file']
         if file.filename == '':
             return jsonify({'success': False, 'error': 'No image file selected'}), 400
         
