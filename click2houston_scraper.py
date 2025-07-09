@@ -41,6 +41,11 @@ class Click2HoustonScraper:
         # Request delay to be respectful
         self.last_request_time = 0
         self.min_request_delay = 2  # Minimum 2 seconds between requests
+        
+        # Cache for HTML content to avoid multiple requests
+        self._html_cache = None
+        self._html_cache_time = 0
+        self._html_cache_timeout = 5 * 60  # 5 minutes for HTML cache
     
     def _respectful_request(self, url: str) -> Optional[requests.Response]:
         """
@@ -71,6 +76,53 @@ class Click2HoustonScraper:
         except Exception as e:
             logger.error(f"Unexpected error scraping {url}: {e}")
             return None
+    
+    def _get_cached_html(self) -> Optional[BeautifulSoup]:
+        """
+        Get cached HTML content if still valid
+        
+        Returns:
+            Optional[BeautifulSoup]: Parsed HTML or None if expired
+        """
+        if (time.time() - self._html_cache_time) < self._html_cache_timeout:
+            return self._html_cache
+        return None
+    
+    def _fetch_and_cache_html(self) -> Optional[BeautifulSoup]:
+        """
+        Fetch HTML content and cache it
+        
+        Returns:
+            Optional[BeautifulSoup]: Parsed HTML or None if failed
+        """
+        try:
+            response = self._respectful_request(self.base_url)
+            if not response:
+                return None
+            
+            soup = BeautifulSoup(response.content, 'html.parser')
+            self._html_cache = soup
+            self._html_cache_time = time.time()
+            return soup
+            
+        except Exception as e:
+            logger.error(f"Error fetching HTML: {e}")
+            return None
+    
+    def _get_html_content(self) -> Optional[BeautifulSoup]:
+        """
+        Get HTML content (cached or fresh)
+        
+        Returns:
+            Optional[BeautifulSoup]: Parsed HTML content
+        """
+        # Try cache first
+        cached_html = self._get_cached_html()
+        if cached_html:
+            return cached_html
+        
+        # Fetch fresh content
+        return self._fetch_and_cache_html()
     
     def _is_cache_valid(self, cache_key: str) -> bool:
         """
@@ -128,17 +180,16 @@ class Click2HoustonScraper:
             return cached_data
         
         try:
-            response = self._respectful_request(self.base_url)
-            if not response:
+            soup = self._get_html_content()
+            if not soup:
                 return None
-            
-            soup = BeautifulSoup(response.content, 'html.parser')
             
             # Extract current temperature (look for temperature display)
             temperature = None
             temp_elements = soup.find_all(text=re.compile(r'\d+°'))
             for element in temp_elements:
-                temp_match = re.search(r'(\d+)°', element)
+                element_text = str(element)
+                temp_match = re.search(r'(\d+)°', element_text)
                 if temp_match:
                     temperature = float(temp_match.group(1))
                     break
@@ -181,12 +232,14 @@ class Click2HoustonScraper:
             # Look for weather description
             desc_elements = soup.find_all(text=re.compile(r'(sunny|cloudy|rainy|stormy|clear|partly)', re.IGNORECASE))
             if desc_elements:
-                weather_data['description'] = desc_elements[0].strip().lower()
+                desc_text = str(desc_elements[0]).strip().lower()
+                weather_data['description'] = desc_text
             
             # Look for wind information
             wind_elements = soup.find_all(text=re.compile(r'wind|mph', re.IGNORECASE))
             for element in wind_elements:
-                wind_match = re.search(r'(\d+)\s*mph', element, re.IGNORECASE)
+                element_text = str(element)
+                wind_match = re.search(r'(\d+)\s*mph', element_text, re.IGNORECASE)
                 if wind_match:
                     weather_data['wind_speed'] = float(wind_match.group(1))
                     break
@@ -194,7 +247,8 @@ class Click2HoustonScraper:
             # Look for humidity
             humidity_elements = soup.find_all(text=re.compile(r'humidity|humid', re.IGNORECASE))
             for element in humidity_elements:
-                humidity_match = re.search(r'(\d+)%', element)
+                element_text = str(element)
+                humidity_match = re.search(r'(\d+)%', element_text)
                 if humidity_match:
                     weather_data['humidity'] = int(humidity_match.group(1))
                     break
@@ -222,12 +276,6 @@ class Click2HoustonScraper:
             return cached_data
         
         try:
-            response = self._respectful_request(self.base_url)
-            if not response:
-                return None
-            
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
             # Generate mock hourly data since specific hourly elements may not be easily scrapable
             # This is a reasonable fallback that provides useful data
             hourly_data = []
@@ -272,12 +320,6 @@ class Click2HoustonScraper:
             return cached_data
         
         try:
-            response = self._respectful_request(self.base_url)
-            if not response:
-                return None
-            
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
             # Generate mock daily data since specific daily elements may not be easily scrapable
             # This provides reasonable forecast data for plant care purposes
             daily_data = []
@@ -316,6 +358,10 @@ class Click2HoustonScraper:
             bool: True if available, False otherwise
         """
         try:
+            # Use cached HTML if available to avoid extra requests
+            if self._get_cached_html():
+                return True
+            
             response = self._respectful_request(self.base_url)
             return response is not None and response.status_code == 200
         except Exception as e:

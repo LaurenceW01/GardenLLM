@@ -11,6 +11,7 @@ from config import openai_client
 from climate_config import get_climate_context, get_default_location, get_hardiness_zone
 from click2houston_scraper import Click2HoustonScraper
 from weather_service import WeatherService
+import time
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -45,32 +46,93 @@ class EnhancedWeatherService:
         
         # Track which service was used last
         self.last_service_used = None
+        
+        # Cache for consolidated weather data to reduce requests
+        self._weather_cache = {}
+        self._cache_timeout = 15 * 60  # 15 minutes
+        self._last_cache_update = 0
+    
+    def _get_cached_weather_data(self) -> Optional[Dict[str, Any]]:
+        """
+        Get cached weather data if still valid
+        
+        Returns:
+            Optional[Dict[str, Any]]: Cached weather data or None if expired
+        """
+        if (time.time() - self._last_cache_update) < self._cache_timeout:
+            return self._weather_cache
+        return None
+    
+    def _update_weather_cache(self) -> bool:
+        """
+        Update the weather cache with fresh data from scraper or API
+        
+        Returns:
+            bool: True if cache was updated successfully, False otherwise
+        """
+        try:
+            # Try scraper first
+            if self.scraper.is_available():
+                logger.info("Using Click2Houston scraper for weather data")
+                
+                # Get all weather data in one go to minimize requests
+                current_weather = self.scraper.get_current_weather()
+                daily_forecast = self.scraper.get_daily_forecast(5)
+                hourly_forecast = self.scraper.get_hourly_forecast(12)
+                
+                if current_weather:
+                    self._weather_cache = {
+                        'current_weather': current_weather,
+                        'daily_forecast': daily_forecast,
+                        'hourly_forecast': hourly_forecast,
+                        'timestamp': time.time()
+                    }
+                    self._last_cache_update = time.time()
+                    self.last_service_used = "scraper"
+                    return True
+            
+            # Fallback to API if available
+            if self.fallback_service:
+                logger.info("Falling back to OpenWeather API for weather data")
+                
+                current_weather = self.fallback_service.get_current_weather()
+                daily_forecast = self.fallback_service.get_weather_forecast(5)
+                hourly_forecast = self.fallback_service.get_hourly_rain_forecast(12)
+                
+                if current_weather:
+                    self._weather_cache = {
+                        'current_weather': current_weather,
+                        'daily_forecast': daily_forecast,
+                        'hourly_forecast': hourly_forecast,
+                        'timestamp': time.time()
+                    }
+                    self._last_cache_update = time.time()
+                    self.last_service_used = "api"
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error updating weather cache: {e}")
+            return False
     
     def get_current_weather(self) -> Optional[Dict[str, Any]]:
         """
-        Get current weather conditions (scraper first, API fallback)
+        Get current weather conditions (uses cached data when possible)
         
         Returns:
             Optional[Dict[str, Any]]: Current weather data or None if error
         """
         try:
-            # Try scraper first
-            if self.scraper.is_available():
-                logger.info("Using Click2Houston scraper for current weather")
-                weather_data = self.scraper.get_current_weather()
-                if weather_data:
-                    self.last_service_used = "scraper"
-                    return weather_data
+            # Check cache first
+            cached_data = self._get_cached_weather_data()
+            if cached_data and 'current_weather' in cached_data:
+                return cached_data['current_weather']
             
-            # Fallback to API if available
-            if self.fallback_service:
-                logger.info("Falling back to OpenWeather API for current weather")
-                weather_data = self.fallback_service.get_current_weather()
-                if weather_data:
-                    self.last_service_used = "api"
-                    return weather_data
+            # Update cache if needed
+            if self._update_weather_cache():
+                return self._weather_cache.get('current_weather')
             
-            logger.error("Both scraper and API failed to get current weather")
             return None
             
         except Exception as e:
@@ -79,7 +141,7 @@ class EnhancedWeatherService:
     
     def get_weather_forecast(self, days: int = 5) -> Optional[List[Dict[str, Any]]]:
         """
-        Get daily forecast (scraper first, API fallback)
+        Get daily forecast (uses cached data when possible)
         
         Args:
             days (int): Number of days to forecast
@@ -88,23 +150,17 @@ class EnhancedWeatherService:
             Optional[List[Dict[str, Any]]]: Daily forecast data or None if error
         """
         try:
-            # Try scraper first
-            if self.scraper.is_available():
-                logger.info("Using Click2Houston scraper for daily forecast")
-                forecast_data = self.scraper.get_daily_forecast(days)
-                if forecast_data:
-                    self.last_service_used = "scraper"
-                    return forecast_data
+            # Check cache first
+            cached_data = self._get_cached_weather_data()
+            if cached_data and 'daily_forecast' in cached_data:
+                forecast = cached_data['daily_forecast']
+                return forecast[:days] if forecast else None
             
-            # Fallback to API if available
-            if self.fallback_service:
-                logger.info("Falling back to OpenWeather API for daily forecast")
-                forecast_data = self.fallback_service.get_weather_forecast(days)
-                if forecast_data:
-                    self.last_service_used = "api"
-                    return forecast_data
+            # Update cache if needed
+            if self._update_weather_cache():
+                forecast = self._weather_cache.get('daily_forecast')
+                return forecast[:days] if forecast else None
             
-            logger.error("Both scraper and API failed to get daily forecast")
             return None
             
         except Exception as e:
@@ -113,7 +169,7 @@ class EnhancedWeatherService:
     
     def get_hourly_rain_forecast(self, hours: int = 12) -> Optional[List[Dict[str, Any]]]:
         """
-        Get hourly rain forecast (scraper first, API fallback)
+        Get hourly rain forecast (uses cached data when possible)
         
         Args:
             hours (int): Number of hours to forecast
@@ -122,23 +178,17 @@ class EnhancedWeatherService:
             Optional[List[Dict[str, Any]]]: Hourly forecast data or None if error
         """
         try:
-            # Try scraper first
-            if self.scraper.is_available():
-                logger.info("Using Click2Houston scraper for hourly forecast")
-                hourly_data = self.scraper.get_hourly_forecast(hours)
-                if hourly_data:
-                    self.last_service_used = "scraper"
-                    return hourly_data
+            # Check cache first
+            cached_data = self._get_cached_weather_data()
+            if cached_data and 'hourly_forecast' in cached_data:
+                forecast = cached_data['hourly_forecast']
+                return forecast[:hours] if forecast else None
             
-            # Fallback to API if available
-            if self.fallback_service:
-                logger.info("Falling back to OpenWeather API for hourly forecast")
-                hourly_data = self.fallback_service.get_hourly_rain_forecast(hours)
-                if hourly_data:
-                    self.last_service_used = "api"
-                    return hourly_data
+            # Update cache if needed
+            if self._update_weather_cache():
+                forecast = self._weather_cache.get('hourly_forecast')
+                return forecast[:hours] if forecast else None
             
-            logger.error("Both scraper and API failed to get hourly forecast")
             return None
             
         except Exception as e:
@@ -219,9 +269,16 @@ Keep the response concise but comprehensive, focusing on practical advice that H
             str: Weather summary text
         """
         try:
-            current_weather = self.get_current_weather()
-            forecast = self.get_weather_forecast(3)  # Next 3 days
-            hourly_rain = self.get_hourly_rain_forecast(12)  # Next 12 hours
+            # Use cached data to avoid multiple requests
+            cached_data = self._get_cached_weather_data()
+            if not cached_data:
+                if not self._update_weather_cache():
+                    return "Unable to retrieve weather information at this time."
+                cached_data = self._weather_cache
+            
+            current_weather = cached_data.get('current_weather')
+            forecast = cached_data.get('daily_forecast', [])[:3]  # Next 3 days
+            hourly_rain = cached_data.get('hourly_forecast', [])[:12]  # Next 12 hours
             
             if not current_weather:
                 return "Unable to retrieve weather information at this time."
