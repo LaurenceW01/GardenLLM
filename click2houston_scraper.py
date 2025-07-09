@@ -287,114 +287,33 @@ class Click2HoustonScraper:
             hourly_data = []
             houston_now = self._get_houston_time()
             
-            # Try multiple approaches to find hourly forecast elements
-            hourly_elements = []
+            # Look for the specific hourly data structure shown in Click2Houston
+            # The data appears as: "11 PM 80° 0% 4" format
             
-            # Approach 1: Look for common hourly forecast containers
-            hourly_selectors = [
-                '.hourly-forecast',
-                '.hourly-weather',
-                '.hourly-data',
-                '.weather-hourly',
-                '.forecast-hourly',
-                '[class*="hourly"]',
-                '[class*="forecast"]',
-                '.hourly-forecast-container',
-                '.hourly-weather-container',
-                '.hourly-grid',
-                '.hourly-list',
-                '.hourly-items',
-                '.hourly-row',
-                '.hourly-item'
-            ]
+            # Approach 1: Look for text patterns that match the hourly format
+            # Pattern: time (AM/PM) + temperature + precipitation + wind
+            hourly_pattern = re.compile(r'(\d{1,2}\s*(?:AM|PM|am|pm))\s*(\d+)°\s*(\d+)%\s*(\d+)', re.IGNORECASE)
             
-            for selector in hourly_selectors:
-                elements = soup.select(selector)
-                if elements:
-                    logger.info(f"Found {len(elements)} elements with selector: {selector}")
-                    hourly_elements.extend(elements)
+            # Search through all text content for this pattern
+            page_text = soup.get_text()
+            matches = hourly_pattern.findall(page_text)
             
-            # Approach 2: Look for time patterns in the page
-            time_patterns = soup.find_all(text=re.compile(r'\d{1,2}:\d{2}\s*(AM|PM|am|pm)'))
-            if time_patterns:
-                logger.info(f"Found {len(time_patterns)} time patterns in page")
-                # Get parent elements containing these times
-                for time_pattern in time_patterns:
-                    parent = time_pattern.parent
-                    if parent and parent not in hourly_elements:
-                        hourly_elements.append(parent)
-            
-            # Approach 3: Look for temperature patterns
-            temp_patterns = soup.find_all(text=re.compile(r'\d+°'))
-            if temp_patterns:
-                logger.info(f"Found {len(temp_patterns)} temperature patterns in page")
-                # Get parent elements containing these temperatures
-                for temp_pattern in temp_patterns:
-                    parent = temp_pattern.parent
-                    if parent and parent not in hourly_elements:
-                        hourly_elements.append(parent)
-            
-            # Approach 4: Look for table rows or list items that might contain hourly data
-            table_rows = soup.find_all('tr')
-            list_items = soup.find_all('li')
-            
-            # Filter for rows/items that contain time or temperature data
-            for row in table_rows:
-                row_text = row.get_text()
-                if re.search(r'\d{1,2}:\d{2}\s*(AM|PM|am|pm)', row_text) or re.search(r'\d+°', row_text):
-                    if row not in hourly_elements:
-                        hourly_elements.append(row)
-            
-            for item in list_items:
-                item_text = item.get_text()
-                if re.search(r'\d{1,2}:\d{2}\s*(AM|PM|am|pm)', item_text) or re.search(r'\d+°', item_text):
-                    if item not in hourly_elements:
-                        hourly_elements.append(item)
-            
-            logger.info(f"Total hourly elements found: {len(hourly_elements)}")
-            
-            # If we found hourly elements, try to parse them
-            if hourly_elements:
-                logger.info("Attempting to parse hourly forecast elements")
-                for i, element in enumerate(hourly_elements[:hours]):
+            if matches:
+                logger.info(f"Found {len(matches)} hourly data matches using pattern matching")
+                for i, match in enumerate(matches[:hours]):
                     try:
-                        element_text = element.get_text()
+                        time_str = match[0].strip()
+                        temperature = int(match[1])
+                        rain_prob = int(match[2])
+                        wind_speed = int(match[3])
                         
-                        # Extract time
-                        time_match = re.search(r'(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)', element_text)
-                        if time_match:
-                            hour = int(time_match.group(1))
-                            minute = int(time_match.group(2))
-                            ampm = time_match.group(3).upper()
-                            
-                            # Convert to 24-hour format for comparison
-                            if ampm == 'PM' and hour != 12:
-                                hour += 12
-                            elif ampm == 'AM' and hour == 12:
-                                hour = 0
-                            
-                            # Create time string
-                            time_str = f"{hour:02d}:{minute:02d} {ampm}"
+                        # Determine description based on rain probability
+                        if rain_prob > 50:
+                            description = "Rainy"
+                        elif rain_prob > 20:
+                            description = "Partly Cloudy"
                         else:
-                            # Calculate time based on current time + hours
-                            hour_time = houston_now + timedelta(hours=i)
-                            time_str = hour_time.strftime('%I %p').replace(' 0', ' ')
-                        
-                        # Extract temperature
-                        temp_match = re.search(r'(\d+)°', element_text)
-                        temperature = int(temp_match.group(1)) if temp_match else 75
-                        
-                        # Extract rain probability
-                        rain_match = re.search(r'(\d+)%', element_text)
-                        rain_prob = int(rain_match.group(1)) if rain_match else 10
-                        
-                        # Extract description
-                        desc_match = re.search(r'(sunny|cloudy|rainy|stormy|clear|partly|overcast|foggy|misty)', element_text, re.IGNORECASE)
-                        description = desc_match.group(1).title() if desc_match else 'Partly Cloudy'
-                        
-                        # Extract wind speed
-                        wind_match = re.search(r'(\d+)\s*mph', element_text, re.IGNORECASE)
-                        wind_speed = int(wind_match.group(1)) if wind_match else 5
+                            description = "Clear"
                         
                         hourly_data.append({
                             'time': time_str,
@@ -405,10 +324,132 @@ class Click2HoustonScraper:
                         })
                         
                     except Exception as e:
-                        logger.warning(f"Error parsing hourly element {i}: {e}")
+                        logger.warning(f"Error parsing hourly match {i}: {e}")
                         continue
             
-            # If we couldn't parse hourly elements, generate realistic data based on current time
+            # Approach 2: Look for table rows or list items that might contain this data
+            if not hourly_data:
+                logger.info("Trying table/list approach for hourly data")
+                
+                # Look for table rows
+                table_rows = soup.find_all('tr')
+                for row in table_rows:
+                    row_text = row.get_text()
+                    # Look for the pattern in table rows
+                    row_matches = hourly_pattern.findall(row_text)
+                    if row_matches:
+                        for match in row_matches[:hours]:
+                            try:
+                                time_str = match[0].strip()
+                                temperature = int(match[1])
+                                rain_prob = int(match[2])
+                                wind_speed = int(match[3])
+                                
+                                # Determine description based on rain probability
+                                if rain_prob > 50:
+                                    description = "Rainy"
+                                elif rain_prob > 20:
+                                    description = "Partly Cloudy"
+                                else:
+                                    description = "Clear"
+                                
+                                hourly_data.append({
+                                    'time': time_str,
+                                    'rain_probability': rain_prob,
+                                    'description': description,
+                                    'wind_speed': wind_speed,
+                                    'temperature': temperature
+                                })
+                                
+                            except Exception as e:
+                                logger.warning(f"Error parsing table row match: {e}")
+                                continue
+                
+                # Look for list items
+                list_items = soup.find_all('li')
+                for item in list_items:
+                    item_text = item.get_text()
+                    # Look for the pattern in list items
+                    item_matches = hourly_pattern.findall(item_text)
+                    if item_matches:
+                        for match in item_matches[:hours]:
+                            try:
+                                time_str = match[0].strip()
+                                temperature = int(match[1])
+                                rain_prob = int(match[2])
+                                wind_speed = int(match[3])
+                                
+                                # Determine description based on rain probability
+                                if rain_prob > 50:
+                                    description = "Rainy"
+                                elif rain_prob > 20:
+                                    description = "Partly Cloudy"
+                                else:
+                                    description = "Clear"
+                                
+                                hourly_data.append({
+                                    'time': time_str,
+                                    'rain_probability': rain_prob,
+                                    'description': description,
+                                    'wind_speed': wind_speed,
+                                    'temperature': temperature
+                                })
+                                
+                            except Exception as e:
+                                logger.warning(f"Error parsing list item match: {e}")
+                                continue
+            
+            # Approach 3: Look for div elements that might contain hourly data
+            if not hourly_data:
+                logger.info("Trying div approach for hourly data")
+                
+                # Look for divs that might contain hourly data
+                divs = soup.find_all('div')
+                for div in divs:
+                    div_text = div.get_text()
+                    # Look for the pattern in divs
+                    div_matches = hourly_pattern.findall(div_text)
+                    if div_matches:
+                        for match in div_matches[:hours]:
+                            try:
+                                time_str = match[0].strip()
+                                temperature = int(match[1])
+                                rain_prob = int(match[2])
+                                wind_speed = int(match[3])
+                                
+                                # Determine description based on rain probability
+                                if rain_prob > 50:
+                                    description = "Rainy"
+                                elif rain_prob > 20:
+                                    description = "Partly Cloudy"
+                                else:
+                                    description = "Clear"
+                                
+                                hourly_data.append({
+                                    'time': time_str,
+                                    'rain_probability': rain_prob,
+                                    'description': description,
+                                    'wind_speed': wind_speed,
+                                    'temperature': temperature
+                                })
+                                
+                            except Exception as e:
+                                logger.warning(f"Error parsing div match: {e}")
+                                continue
+            
+            # Remove duplicates while preserving order
+            if hourly_data:
+                seen = set()
+                unique_hourly_data = []
+                for item in hourly_data:
+                    # Create a unique key for each hour
+                    key = (item['time'], item['temperature'], item['rain_probability'], item['wind_speed'])
+                    if key not in seen:
+                        seen.add(key)
+                        unique_hourly_data.append(item)
+                hourly_data = unique_hourly_data
+            
+            # If we still couldn't parse hourly elements, generate realistic data based on current time
             if not hourly_data:
                 logger.info("Could not parse hourly elements, generating realistic data")
                 for i in range(hours):
@@ -426,7 +467,7 @@ class Click2HoustonScraper:
                     wind_speed = 3 + (hour_of_day % 4) * 2  # Variable wind
                     
                     hourly_data.append({
-                        'time': hour_time.strftime('%a %I %p').replace(' 0', ' '),  # Remove leading zero from hour
+                        'time': hour_time.strftime('%I %p').replace(' 0', ' '),  # Remove leading zero from hour
                         'rain_probability': rain_prob,
                         'description': 'Partly cloudy' if rain_prob > 10 else 'Clear',
                         'wind_speed': wind_speed,
