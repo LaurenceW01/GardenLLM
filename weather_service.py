@@ -76,13 +76,9 @@ class WeatherService:
     
     def get_weather_forecast(self, days: int = 5) -> Optional[List[Dict[str, Any]]]:
         """
-        Get weather forecast for specified location
-        
-        Args:
-            days (int): Number of days to forecast (default: 5)
-            
+        Get daily forecast with max pop and associated weather description for each day
         Returns:
-            Optional[List[Dict[str, Any]]]: Forecast data or None if error
+            List of dicts: [{date, max_rain_probability, description, ...}]
         """
         try:
             url = f"{self.base_url}/forecast"
@@ -92,67 +88,55 @@ class WeatherService:
                 'appid': self.api_key,
                 'units': 'imperial'
             }
-            
             response = requests.get(url, params=params, timeout=10)
             response.raise_for_status()
-            
             data = response.json()
-            
-            # Group forecast data by day
             daily_data = {}
             for item in data['list']:
                 date = datetime.fromtimestamp(item['dt']).date()
+                pop = item.get('pop', 0)
+                desc = item['weather'][0]['description'].capitalize()
                 if date not in daily_data:
                     daily_data[date] = {
                         'temp_min': float('inf'),
                         'temp_max': float('-inf'),
+                        'max_pop': 0,
+                        'max_pop_desc': '',
                         'humidity': [],
-                        'description': set(),
                         'wind_speed': [],
-                        'pressure': [],
-                        'rain_probability': []
+                        'pressure': []
                     }
-                
                 daily_data[date]['temp_min'] = min(daily_data[date]['temp_min'], item['main']['temp_min'])
                 daily_data[date]['temp_max'] = max(daily_data[date]['temp_max'], item['main']['temp_max'])
                 daily_data[date]['humidity'].append(item['main']['humidity'])
-                daily_data[date]['description'].add(item['weather'][0]['description'])
                 daily_data[date]['wind_speed'].append(item['wind']['speed'])
                 daily_data[date]['pressure'].append(item['main']['pressure'])
-                
-                # Add rain probability (pop = probability of precipitation)
-                if 'pop' in item:
-                    daily_data[date]['rain_probability'].append(item['pop'])
-                else:
-                    daily_data[date]['rain_probability'].append(0)
-            
-            # Calculate daily max rain probability and format descriptions
+                # Track max pop and its description
+                if pop > daily_data[date]['max_pop']:
+                    daily_data[date]['max_pop'] = pop
+                    daily_data[date]['max_pop_desc'] = desc
             forecast = []
             for date, day_data in sorted(daily_data.items()):
-                day = {
+                forecast.append({
                     'date': date,
                     'temp_min': round(day_data['temp_min'], 1),
                     'temp_max': round(day_data['temp_max'], 1),
                     'humidity': round(sum(day_data['humidity']) / len(day_data['humidity'])),
-                    'description': ', '.join(sorted(day_data['description'])),
                     'wind_speed': round(sum(day_data['wind_speed']) / len(day_data['wind_speed']), 1),
                     'pressure': round(sum(day_data['pressure']) / len(day_data['pressure'])),
-                    'rain_probability': round(max(day_data['rain_probability']) * 100, 1) if day_data['rain_probability'] else 0.0
-                }
-                forecast.append(day)
-            
+                    'rain_probability': round(day_data['max_pop'] * 100, 1),
+                    'rain_description': day_data['max_pop_desc']
+                })
             return forecast[:days]
-            
         except Exception as e:
             logger.error(f"Error getting weather forecast: {e}")
             return None
     
-    def get_hourly_rain_forecast(self) -> Optional[List[Dict[str, Any]]]:
+    def get_hourly_rain_forecast(self, hours: int = 12) -> Optional[list]:
         """
-        Get hourly rain probability forecast for the current day
-        
+        Get hourly rain probability forecast from current time forward (default: next 12 blocks)
         Returns:
-            Optional[List[Dict[str, Any]]]: Hourly rain data or None if error
+            List of dicts: [{time, rain_probability, description}]
         """
         try:
             url = f"{self.base_url}/forecast"
@@ -162,30 +146,20 @@ class WeatherService:
                 'appid': self.api_key,
                 'units': 'imperial'
             }
-            
             response = requests.get(url, params=params, timeout=10)
             response.raise_for_status()
-            
             data = response.json()
-            
-            # Get current date
-            current_date = datetime.now().date()
-            
-            # Filter for current day and next 24 hours
+            now = datetime.now().timestamp()
+            # Only include blocks from now forward
             hourly_data = []
             for item in data['list']:
-                item_date = datetime.fromtimestamp(item['dt']).date()
-                if item_date == current_date:
+                if item['dt'] >= now:
                     hourly_data.append({
-                        'time': datetime.fromtimestamp(item['dt']).strftime('%I %p'),
+                        'time': datetime.fromtimestamp(item['dt']).strftime('%a %I %p'),
                         'rain_probability': round(item.get('pop', 0) * 100, 1),
-                        'wind_speed': round(item['wind']['speed'], 1),
-                        'temperature': round(item['main']['temp'], 1),
-                        'description': item['weather'][0]['description']
+                        'description': item['weather'][0]['description'].capitalize()
                     })
-            
-            return hourly_data
-            
+            return hourly_data[:hours]
         except Exception as e:
             logger.error(f"Error getting hourly rain forecast: {e}")
             return None
@@ -330,44 +304,26 @@ class WeatherService:
                 f"</div>"
             ]
             
-            # Add hourly rain forecast for current day
+            # Add hourly rain forecast for current time forward
             if hourly_rain:
-                summary_parts.append("<h4 class='text-md font-semibold text-blue-800 mb-3'>Today's Hourly Rain Forecast</h4>")
+                summary_parts.append("<h4 class='text-md font-semibold text-blue-800 mb-3'>Upcoming Hourly Rain Forecast</h4>")
                 summary_parts.append("<div class='grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 mb-4'>")
-                for hour in hourly_rain[:12]:  # Show next 12 hours
+                for hour in hourly_rain:
                     rain_color = "bg-red-100" if hour['rain_probability'] > 50 else "bg-yellow-100" if hour['rain_probability'] > 20 else "bg-green-100"
                     summary_parts.append(f"<div class='{rain_color} p-2 rounded text-center text-sm'>")
                     summary_parts.append(f"<div class='font-semibold'>{hour['time']}</div>")
-                    summary_parts.append(f"<div class='text-blue-600'>{hour['rain_probability']}%</div>")
-                    summary_parts.append(f"<div class='text-gray-600'>{hour['wind_speed']} mph</div>")
+                    summary_parts.append(f"<div class='text-blue-600'>{hour['rain_probability']}% ({hour['description']})</div>")
                     summary_parts.append("</div>")
                 summary_parts.append("</div>")
             
             if forecast:
-                summary_parts.append("<h4 class='text-md font-semibold text-blue-800 mb-3'>3-Day Forecast</h4>")
+                summary_parts.append("<h4 class='text-md font-semibold text-blue-800 mb-3'>3-Day Rain Forecast</h4>")
                 summary_parts.append("<div class='space-y-2'>")
                 for day in forecast:
-                    # Clean up the description to show the most common condition
-                    conditions = day['description'].split(', ')
-                    # Get the most frequent condition or the first one if all are unique
-                    if len(conditions) > 1:
-                        # Count occurrences and get the most common
-                        from collections import Counter
-                        condition_counts = Counter(conditions)
-                        primary_condition = condition_counts.most_common(1)[0][0]
-                        # If there are multiple conditions, show the primary one with a note
-                        if len(condition_counts) > 1:
-                            condition_display = f"{primary_condition.title()} (mixed conditions)"
-                        else:
-                            condition_display = primary_condition.title()
-                    else:
-                        condition_display = conditions[0].title()
-                    
-                    # Add rain probability and wind speed to daily forecast
                     rain_color = "border-red-300" if day['rain_probability'] > 50 else "border-yellow-300" if day['rain_probability'] > 20 else "border-blue-300"
                     summary_parts.append(f"<div class='bg-blue-50 p-3 rounded border-l-4 {rain_color}'>")
-                    summary_parts.append(f"<strong>{day['date'].strftime('%A, %B %d')}:</strong> {day['temp_min']}°F - {day['temp_max']}°F, {condition_display}")
-                    summary_parts.append(f"<br><span class='text-sm text-blue-600'>Rain: {day['rain_probability']}% | Wind: {day['wind_speed']} mph</span>")
+                    summary_parts.append(f"<strong>{day['date'].strftime('%A, %B %d')}:</strong> {day['rain_probability']}% ({day['rain_description']})")
+                    summary_parts.append(f"<br><span class='text-sm text-blue-600'>Temp: {day['temp_min']}°F - {day['temp_max']}°F | Wind: {day['wind_speed']} mph</span>")
                     summary_parts.append("</div>")
                 summary_parts.append("</div>")
             
