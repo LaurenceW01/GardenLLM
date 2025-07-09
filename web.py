@@ -16,7 +16,7 @@ import requests
 from config import openai_client
 from plant_operations import add_plant, get_plants, update_plant, delete_plant, search_plants
 from sheets_client import initialize_sheet
-from weather_service import get_weather_summary, get_plant_care_recommendations
+from enhanced_weather_service import get_weather_summary, get_plant_care_recommendations
 from field_config import get_all_field_names, get_field_alias, get_canonical_field_name
 from climate_config import get_climate_context, get_default_location
 from chat_response import get_chat_response_with_analyzer_optimized
@@ -154,12 +154,14 @@ def weather():
         plant_care_recommendations = get_plant_care_recommendations()
         climate_context = get_climate_context()
         default_location = get_default_location()
-        
+        from enhanced_weather_service import get_hourly_rain_forecast
+        hourly_rain = get_hourly_rain_forecast()
         return render_template('weather.html', 
                              weather_summary=weather_summary,
                              plant_care_recommendations=plant_care_recommendations,
                              climate_context=climate_context,
-                             default_location=default_location)
+                             default_location=default_location,
+                             hourly_rain=hourly_rain)
     except Exception as e:
         logger.error(f"Error loading weather page: {e}")
         flash(f"Error loading weather information: {str(e)}", 'error')
@@ -167,7 +169,8 @@ def weather():
                              weather_summary="",
                              plant_care_recommendations="",
                              climate_context="",
-                             default_location="")
+                             default_location="",
+                             hourly_rain=None)
 
 @app.route('/api/plants', methods=['GET', 'POST'])
 def api_plants():

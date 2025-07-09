@@ -1,6 +1,5 @@
 """
-Weather service for GardenLLM.
-Provides weather data and plant care recommendations based on weather conditions.
+LEGACY: This weather service is now replaced by enhanced_weather_service for all app weather queries.
 """
 
 import logging
