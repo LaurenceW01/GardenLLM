@@ -118,3 +118,7 @@ except Exception as e:
     logger.error(f"Failed to initialize clients: {e}")
     logger.error(traceback.format_exc())
     raise 
+
+# Baron Weather API Configuration
+BARON_API_KEY = "tcATLX0GE43S"
+BARON_API_SECRET = "1fWKEKScFNHPGxxUA851w7rDXfbMSPFTkEfgBvByNm" 

@@ -16,7 +16,7 @@ import requests
 from config import openai_client
 from plant_operations import add_plant, get_plants, update_plant, delete_plant, search_plants
 from sheets_client import initialize_sheet
-from enhanced_weather_service import get_weather_summary, get_plant_care_recommendations
+from enhanced_weather_service import get_current_weather, get_hourly_forecast
 from field_config import get_all_field_names, get_field_alias, get_canonical_field_name
 from climate_config import get_climate_context, get_default_location
 from chat_response import get_chat_response_with_analyzer_optimized
@@ -81,8 +81,13 @@ def process_image_upload(file):
 def index():
     """Main page with weather and plant list"""
     try:
-        # Get weather summary
-        weather_summary = get_weather_summary()
+        # Get weather data using new enhanced service
+        current_weather = get_current_weather()
+        
+        # Build weather summary for display
+        weather_summary = ""
+        if current_weather:
+            weather_summary = f"Current weather: {current_weather.get('temperature', 'Unknown')}°F, {current_weather.get('description', 'Unknown')}"
         
         # Get all plants
         plants = get_plants()
@@ -150,18 +155,63 @@ def add_plant_route():
 def weather():
     """Weather information page"""
     try:
-        weather_summary = get_weather_summary()
-        plant_care_recommendations = get_plant_care_recommendations()
+        # Get weather data using new enhanced service
+        current_weather = get_current_weather()
+        hourly_forecast = get_hourly_forecast(hours=24)
+        
+        # Build weather summary from current weather
+        weather_summary = ""
+        if current_weather:
+            weather_summary = f"""
+            <h3 class='text-lg font-semibold text-blue-900 mb-3'>Current Weather for Houston</h3>
+            <div class='grid grid-cols-1 md:grid-cols-2 gap-4 mb-4'>
+                <div class='bg-blue-100 p-3 rounded-lg'><strong>Temperature:</strong> {current_weather.get('temperature', 'Unknown')}°F</div>
+                <div class='bg-blue-100 p-3 rounded-lg'><strong>Conditions:</strong> {current_weather.get('description', 'Unknown').title()}</div>
+                <div class='bg-blue-100 p-3 rounded-lg'><strong>Humidity:</strong> {current_weather.get('humidity', 'Unknown')}%</div>
+                <div class='bg-blue-100 p-3 rounded-lg'><strong>Wind Speed:</strong> {current_weather.get('wind_speed', 'Unknown')} mph</div>
+                <div class='bg-blue-100 p-3 rounded-lg'><strong>Pressure:</strong> {current_weather.get('pressure', 'Unknown')} hPa</div>
+                <div class='bg-blue-100 p-3 rounded-lg'><strong>Data Source:</strong> Baron Weather API</div>
+            </div>
+            """
+        
+        # Generate plant care recommendations based on current weather
+        plant_care_recommendations = "Plant care recommendations based on current weather conditions."
+        if current_weather:
+            temp = current_weather.get('temperature', 75)
+            humidity = current_weather.get('humidity', 60)
+            description = current_weather.get('description', 'Partly cloudy').lower()
+            
+            recommendations = []
+            if temp < 50:
+                recommendations.append("Protect sensitive plants from cold temperatures")
+            elif temp > 90:
+                recommendations.append("Provide extra water and shade for plants")
+            
+            if humidity < 40:
+                recommendations.append("Consider misting plants or using a humidifier")
+            elif humidity > 80:
+                recommendations.append("Ensure good air circulation to prevent fungal issues")
+            
+            if 'rain' in description or 'storm' in description:
+                recommendations.append("Reduce watering frequency due to natural precipitation")
+            
+            if recommendations:
+                plant_care_recommendations = f"""
+                <h4 class="text-lg font-semibold text-green-800 mb-2">Current Recommendations:</h4>
+                <ul class="list-disc list-inside space-y-1 mb-4">
+                    {''.join(f'<li class="text-gray-700">{rec}</li>' for rec in recommendations)}
+                </ul>
+                """
+        
         climate_context = get_climate_context()
         default_location = get_default_location()
-        from enhanced_weather_service import get_hourly_rain_forecast
-        hourly_rain = get_hourly_rain_forecast()
+        
         return render_template('weather.html', 
                              weather_summary=weather_summary,
                              plant_care_recommendations=plant_care_recommendations,
                              climate_context=climate_context,
                              default_location=default_location,
-                             hourly_rain=hourly_rain)
+                             hourly_rain=hourly_forecast)
     except Exception as e:
         logger.error(f"Error loading weather page: {e}")
         flash(f"Error loading weather information: {str(e)}", 'error')
@@ -280,8 +330,24 @@ def api_plant(plant_id):
 def api_weather():
     """API endpoint for weather information"""
     try:
-        weather_summary = get_weather_summary()
-        plant_care_recommendations = get_plant_care_recommendations()
+        # Get weather data using new enhanced service
+        current_weather = get_current_weather()
+        hourly_forecast = get_hourly_forecast(hours=24)
+        
+        # Build weather summary
+        weather_summary = ""
+        if current_weather:
+            weather_summary = f"Current weather: {current_weather.get('temperature', 'Unknown')}°F, {current_weather.get('description', 'Unknown')}"
+        
+        # Generate plant care recommendations
+        plant_care_recommendations = "Plant care recommendations based on current weather conditions."
+        if current_weather:
+            temp = current_weather.get('temperature', 75)
+            if temp < 50:
+                plant_care_recommendations = "Protect sensitive plants from cold temperatures"
+            elif temp > 90:
+                plant_care_recommendations = "Provide extra water and shade for plants"
+        
         climate_context = get_climate_context()
         default_location = get_default_location()
         
@@ -290,7 +356,9 @@ def api_weather():
             'weather_summary': weather_summary,
             'plant_care_recommendations': plant_care_recommendations,
             'climate_context': climate_context,
-            'default_location': default_location
+            'default_location': default_location,
+            'current_weather': current_weather,
+            'hourly_forecast': hourly_forecast
         })
     except Exception as e:
         logger.error(f"Error getting weather via API: {e}")
