@@ -320,7 +320,6 @@ Keep the advice practical, specific, and easy to follow. Use bullet points and c
             
             current_weather = cached_data.get('current_weather')
             forecast = cached_data.get('daily_forecast', [])[:3]  # Next 3 days
-            hourly_rain = cached_data.get('hourly_forecast', [])[:12]  # Next 12 hours
             
             if not current_weather:
                 return "Unable to retrieve weather information at this time."
@@ -339,21 +338,9 @@ Keep the advice practical, specific, and easy to follow. Use bullet points and c
             summary_parts.append(f"<div class='bg-blue-100 p-3 rounded-lg'><strong>Data Source:</strong> {self.last_service_used or 'Unknown'}</div>")
             summary_parts.append(f"</div>")
             
-            # Hourly forecast
-            if hourly_rain:
-                summary_parts.append("<h4 class='text-md font-semibold text-blue-800 mb-3'>Upcoming Hourly Rain Forecast</h4>")
-                summary_parts.append("<div class='grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 mb-4'>")
-                for hour in hourly_rain:
-                    rain_color = "bg-red-100" if hour['rain_probability'] > 50 else "bg-yellow-100" if hour['rain_probability'] > 20 else "bg-green-100"
-                    summary_parts.append(f"<div class='{rain_color} p-2 rounded text-center text-sm'>")
-                    summary_parts.append(f"<div class='font-semibold'>{hour['time']}</div>")
-                    summary_parts.append(f"<div class='text-blue-600'>{hour['rain_probability']}% ({hour['description']})</div>")
-                    summary_parts.append("</div>")
-                summary_parts.append("</div>")
-            
-            # Daily forecast
+            # Daily forecast only (hourly is shown separately in template)
             if forecast:
-                summary_parts.append("<h4 class='text-md font-semibold text-blue-800 mb-3'>3-Day Rain Forecast</h4>")
+                summary_parts.append("<h4 class='text-md font-semibold text-blue-800 mb-3'>3-Day Forecast</h4>")
                 summary_parts.append("<div class='space-y-2'>")
                 for day in forecast:
                     rain_color = "border-red-300" if day['rain_probability'] > 50 else "border-yellow-300" if day['rain_probability'] > 20 else "border-blue-300"
