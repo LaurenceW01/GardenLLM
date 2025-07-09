@@ -152,16 +152,20 @@ class WeatherService:
             
             # Use UTC time for comparison since OpenWeather API returns UTC timestamps
             from datetime import timezone
+            import pytz
+            
             now_utc = datetime.now(timezone.utc).timestamp()
+            houston_tz = pytz.timezone('America/Chicago')
             
             # Only include blocks from now forward
             hourly_data = []
             for item in data['list']:
                 if item['dt'] >= now_utc:
-                    # Convert UTC timestamp to local time for display
-                    local_time = datetime.fromtimestamp(item['dt'])
+                    # Convert UTC timestamp to Houston time for display
+                    utc_time = datetime.fromtimestamp(item['dt'], tz=timezone.utc)
+                    houston_time = utc_time.astimezone(houston_tz)
                     hourly_data.append({
-                        'time': local_time.strftime('%a %I %p'),
+                        'time': houston_time.strftime('%a %I %p'),
                         'rain_probability': round(item.get('pop', 0) * 100, 1),
                         'description': item['weather'][0]['description'].capitalize(),
                         'wind_speed': round(item.get('wind', {}).get('speed', 0), 1),
