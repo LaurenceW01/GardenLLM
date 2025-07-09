@@ -78,7 +78,9 @@ class EnhancedWeatherService:
                 # Get all weather data in one go to minimize requests
                 current_weather = self.scraper.get_current_weather()
                 daily_forecast = self.scraper.get_daily_forecast(5)
-                hourly_forecast = self.scraper.get_hourly_forecast(12)
+                
+                # Get hourly forecast (24 hours to get all available)
+                hourly_forecast = self.scraper.get_hourly_forecast(hours=24)
                 
                 if current_weather:
                     self._weather_cache = {
@@ -89,6 +91,7 @@ class EnhancedWeatherService:
                     }
                     self._last_cache_update = time.time()
                     self.last_service_used = "scraper"
+                    logger.info(f"Got {len(hourly_forecast) if hourly_forecast else 0} hours of hourly forecast from scraper")
                     return True
             
             # Fallback to API if available
@@ -97,7 +100,9 @@ class EnhancedWeatherService:
                 
                 current_weather = self.fallback_service.get_current_weather()
                 daily_forecast = self.fallback_service.get_weather_forecast(5)
-                hourly_forecast = self.fallback_service.get_hourly_rain_forecast(12)
+                
+                # Get hourly forecast (24 hours to get all available)
+                hourly_forecast = self.fallback_service.get_hourly_rain_forecast(hours=24)
                 
                 if current_weather:
                     self._weather_cache = {
@@ -108,6 +113,7 @@ class EnhancedWeatherService:
                     }
                     self._last_cache_update = time.time()
                     self.last_service_used = "api"
+                    logger.info(f"Got {len(hourly_forecast) if hourly_forecast else 0} hours of hourly forecast from API")
                     return True
             
             return False

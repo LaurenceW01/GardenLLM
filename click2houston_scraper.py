@@ -7,7 +7,7 @@ import logging
 import requests
 import time
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from bs4 import BeautifulSoup
 import re
 import json
@@ -23,6 +23,9 @@ class Click2HoustonScraper:
         """Initialize the scraper with session and headers"""
         self.base_url = "https://www.click2houston.com/weather/"
         self.session = requests.Session()
+        
+        # Houston timezone (Central Time)
+        self.houston_tz = timezone(timedelta(hours=-6))  # CST (UTC-6)
         
         # Set headers to mimic a real browser
         self.session.headers.update({
@@ -215,6 +218,7 @@ class Click2HoustonScraper:
                             break
             
             # Default values if scraping fails
+            houston_now = self._get_houston_time()
             weather_data = {
                 'temperature': temperature or 75.0,  # Default to 75°F if not found
                 'feels_like': temperature or 75.0,
@@ -224,8 +228,8 @@ class Click2HoustonScraper:
                 'wind_speed': 5.0,  # Default wind speed
                 'pressure': 1013,  # Default pressure
                 'visibility': 10,  # Default visibility
-                'sunrise': datetime.now().replace(hour=6, minute=30, second=0, microsecond=0),
-                'sunset': datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)
+                'sunrise': houston_now.replace(hour=6, minute=30, second=0, microsecond=0),
+                'sunset': houston_now.replace(hour=8, minute=0, second=0, microsecond=0)
             }
             
             # Try to extract more specific data if available
@@ -260,12 +264,12 @@ class Click2HoustonScraper:
             logger.error(f"Error scraping current weather: {e}")
             return None
     
-    def get_hourly_forecast(self, hours: int = 12) -> Optional[List[Dict[str, Any]]]:
+    def get_hourly_forecast(self, hours: int = 24) -> Optional[List[Dict[str, Any]]]:
         """
         Get hourly forecast from Click2Houston
         
         Args:
-            hours (int): Number of hours to forecast (default: 12)
+            hours (int): Number of hours to forecast (default: 24 to get all available)
             
         Returns:
             Optional[List[Dict[str, Any]]]: Hourly forecast data or None if error
@@ -276,35 +280,101 @@ class Click2HoustonScraper:
             return cached_data
         
         try:
-            # Generate mock hourly data since specific hourly elements may not be easily scrapable
-            # This is a reasonable fallback that provides useful data
-            hourly_data = []
-            now = datetime.now()
+            soup = self._get_html_content()
+            if not soup:
+                return None
             
-            for i in range(hours):
-                # Calculate the actual hour time (current time + i hours)
-                hour_time = now + timedelta(hours=i)
-                
-                # Generate realistic weather patterns based on time of day
-                hour_of_day = hour_time.hour
-                
-                # Temperature varies by time of day (cooler at night, warmer during day)
-                if 6 <= hour_of_day <= 18:  # Daytime
-                    base_temp = 75 + (hour_of_day - 12) * 2  # Peak at noon
-                else:  # Nighttime
-                    base_temp = 70 - (hour_of_day - 18) * 1 if hour_of_day > 18 else 70 + hour_of_day * 1
-                
-                # Rain probability varies by time
-                rain_prob = 15 if hour_of_day in [14, 15, 16] else 5  # Afternoon showers
-                wind_speed = 3 + (hour_of_day % 4) * 2  # Variable wind
-                
-                hourly_data.append({
-                    'time': hour_time.strftime('%a %I %p').replace(' 0', ' '),  # Remove leading zero from hour
-                    'rain_probability': rain_prob,
-                    'description': 'Partly cloudy' if rain_prob > 10 else 'Clear',
-                    'wind_speed': wind_speed,
-                    'temperature': round(base_temp)
-                })
+            hourly_data = []
+            houston_now = self._get_houston_time()
+            
+            # Try to find hourly forecast elements on the page
+            # Look for common hourly forecast patterns
+            hourly_selectors = [
+                '.hourly-forecast',
+                '.hourly-weather',
+                '.hourly-data',
+                '[class*="hourly"]',
+                '[class*="forecast"]',
+                '.weather-hourly',
+                '.forecast-hourly'
+            ]
+            
+            hourly_elements = []
+            for selector in hourly_selectors:
+                elements = soup.select(selector)
+                if elements:
+                    hourly_elements.extend(elements)
+                    break
+            
+            # If we found hourly elements, try to parse them
+            if hourly_elements:
+                logger.info("Found hourly forecast elements, attempting to parse")
+                for i, element in enumerate(hourly_elements[:hours]):
+                    try:
+                        # Extract time
+                        time_elem = element.find(text=re.compile(r'\d{1,2}:\d{2}\s*(AM|PM|am|pm)'))
+                        if time_elem:
+                            time_str = time_elem.strip()
+                        else:
+                            # Calculate time based on current time + hours
+                            hour_time = houston_now + timedelta(hours=i)
+                            time_str = hour_time.strftime('%I %p').replace(' 0', ' ')
+                        
+                        # Extract temperature
+                        temp_elem = element.find(text=re.compile(r'\d+°'))
+                        temp_match = re.search(r'(\d+)°', str(temp_elem)) if temp_elem else None
+                        temperature = int(temp_match.group(1)) if temp_match else 75
+                        
+                        # Extract rain probability
+                        rain_elem = element.find(text=re.compile(r'\d+%'))
+                        rain_match = re.search(r'(\d+)%', str(rain_elem)) if rain_elem else None
+                        rain_prob = int(rain_match.group(1)) if rain_match else 10
+                        
+                        # Extract description
+                        desc_elem = element.find(text=re.compile(r'(sunny|cloudy|rainy|stormy|clear|partly)', re.IGNORECASE))
+                        description = desc_elem.strip().title() if desc_elem else 'Partly Cloudy'
+                        
+                        # Extract wind speed
+                        wind_elem = element.find(text=re.compile(r'\d+\s*mph', re.IGNORECASE))
+                        wind_match = re.search(r'(\d+)\s*mph', str(wind_elem), re.IGNORECASE) if wind_elem else None
+                        wind_speed = int(wind_match.group(1)) if wind_match else 5
+                        
+                        hourly_data.append({
+                            'time': time_str,
+                            'rain_probability': rain_prob,
+                            'description': description,
+                            'wind_speed': wind_speed,
+                            'temperature': temperature
+                        })
+                        
+                    except Exception as e:
+                        logger.warning(f"Error parsing hourly element {i}: {e}")
+                        continue
+            
+            # If we couldn't parse hourly elements, generate realistic data based on current time
+            if not hourly_data:
+                logger.info("Could not parse hourly elements, generating realistic data")
+                for i in range(hours):
+                    hour_time = houston_now + timedelta(hours=i)
+                    hour_of_day = hour_time.hour
+                    
+                    # Generate realistic weather patterns based on time of day
+                    if 6 <= hour_of_day <= 18:  # Daytime
+                        base_temp = 75 + (hour_of_day - 12) * 2  # Peak at noon
+                    else:  # Nighttime
+                        base_temp = 70 - (hour_of_day - 18) * 1 if hour_of_day > 18 else 70 + hour_of_day * 1
+                    
+                    # Rain probability varies by time
+                    rain_prob = 15 if hour_of_day in [14, 15, 16] else 5  # Afternoon showers
+                    wind_speed = 3 + (hour_of_day % 4) * 2  # Variable wind
+                    
+                    hourly_data.append({
+                        'time': hour_time.strftime('%a %I %p').replace(' 0', ' '),  # Remove leading zero from hour
+                        'rain_probability': rain_prob,
+                        'description': 'Partly cloudy' if rain_prob > 10 else 'Clear',
+                        'wind_speed': wind_speed,
+                        'temperature': round(base_temp)
+                    })
             
             self._set_cached_data(cache_key, hourly_data)
             return hourly_data
@@ -331,10 +401,10 @@ class Click2HoustonScraper:
         try:
             # Generate more realistic daily data for Houston weather patterns
             daily_data = []
-            now = datetime.now()
+            houston_now = self._get_houston_time()
             
             for i in range(days):
-                forecast_date = now.date() + timedelta(days=i)
+                forecast_date = houston_now.date() + timedelta(days=i)
                 
                 # Generate realistic Houston weather patterns
                 # Houston typically has hot, humid summers with afternoon thunderstorms
@@ -396,3 +466,13 @@ class Click2HoustonScraper:
         except Exception as e:
             logger.error(f"Error checking Click2Houston availability: {e}")
             return False 
+
+    def _get_houston_time(self) -> datetime:
+        """
+        Get current time in Houston timezone
+        
+        Returns:
+            datetime: Current time in Houston timezone
+        """
+        utc_now = datetime.now(timezone.utc)
+        return utc_now.astimezone(self.houston_tz) 
