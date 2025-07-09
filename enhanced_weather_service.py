@@ -217,37 +217,45 @@ class EnhancedWeatherService:
             
             # Build the prompt with weather and climate information
             prompt = f"""
-You are a gardening expert providing care recommendations for plants in Houston, Texas. 
-Use the following weather and climate information to provide specific, actionable advice.
+Based on the current weather conditions and {self.default_location} climate, provide clear, actionable plant care recommendations.
 
-Climate Context:
-{climate_context}
-
-Current Weather Conditions:
+Current Weather:
 - Temperature: {weather_data.get('temperature', 'Unknown')}°F
-- Feels Like: {weather_data.get('feels_like', 'Unknown')}°F
+- Feels like: {weather_data.get('feels_like', 'Unknown')}°F
 - Humidity: {weather_data.get('humidity', 'Unknown')}%
+- Conditions: {weather_data.get('description', 'Unknown')}
 - Wind Speed: {weather_data.get('wind_speed', 'Unknown')} mph
-- Weather Description: {weather_data.get('description', 'Unknown')}
-- Pressure: {weather_data.get('pressure', 'Unknown')} hPa
-- Visibility: {weather_data.get('visibility', 'Unknown')} km
 
-Data Source: {self.last_service_used or 'Unknown'}
+Please provide specific, actionable plant care advice in this format:
 
-Please provide:
-1. General plant care recommendations based on current conditions
-2. Specific advice for watering, fertilizing, and protection
-3. Any weather-related precautions gardeners should take
-4. Recommendations for indoor vs outdoor plants
+<h4 class="text-lg font-semibold text-green-800 mb-2">Watering Recommendations:</h4>
+<ul class="list-disc list-inside space-y-1 mb-4">
+[Specific watering advice based on current conditions]
+</ul>
 
-Keep the response concise but comprehensive, focusing on practical advice that Houston gardeners can implement immediately.
+<h4 class="text-lg font-semibold text-green-800 mb-2">Protection Measures:</h4>
+<ul class="list-disc list-inside space-y-1 mb-4">
+[Any protection needed for current weather]
+</ul>
+
+<h4 class="text-lg font-semibold text-green-800 mb-2">Maintenance Tasks:</h4>
+<ul class="list-disc list-inside space-y-1 mb-4">
+[General maintenance appropriate for these conditions]
+</ul>
+
+<h4 class="text-lg font-semibold text-green-800 mb-2">Special Considerations:</h4>
+<ul class="list-disc list-inside space-y-1 mb-4">
+[Any specific advice for {self.default_location} climate]
+</ul>
+
+Keep the advice practical, specific, and easy to follow. Use bullet points and clear language.
 """
             
             # Get AI response
             response = openai_client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "You are a knowledgeable gardening expert specializing in Houston, Texas climate and growing conditions."},
+                    {"role": "system", "content": "You are a knowledgeable gardening expert specializing in weather-aware plant care. Always format your responses with proper HTML tags including <h4>, <ul>, and <li> tags for structure."},
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=500,
@@ -255,7 +263,41 @@ Keep the response concise but comprehensive, focusing on practical advice that H
             )
             
             content = response.choices[0].message.content
-            return content.strip() if content else "Unable to generate plant care recommendations"
+            if not content:
+                return "Unable to generate plant care recommendations."
+            
+            # Post-process to ensure proper HTML formatting
+            import re
+            
+            # If the AI didn't use proper HTML, convert plain text to HTML
+            if not re.search(r'<h4>|<ul>|<li>', content):
+                # Split by sections and convert to HTML
+                sections = content.split('\n\n')
+                html_parts = []
+                
+                for section in sections:
+                    if section.strip():
+                        lines = section.strip().split('\n')
+                        if lines:
+                            # First line is the header
+                            header = lines[0].replace(':', '').strip()
+                            if header and not header.startswith('<'):
+                                html_parts.append(f'<h4 class="text-lg font-semibold text-green-800 mb-2">{header}</h4>')
+                                html_parts.append('<ul class="list-disc list-inside space-y-1 mb-4">')
+                                
+                                # Remaining lines are bullet points
+                                for line in lines[1:]:
+                                    line = line.strip()
+                                    if line and not line.startswith('<'):
+                                        # Remove common bullet point indicators
+                                        line = re.sub(r'^[-•*]\s*', '', line)
+                                        html_parts.append(f'<li class="text-gray-700">{line}</li>')
+                                
+                                html_parts.append('</ul>')
+                
+                content = '\n'.join(html_parts)
+            
+            return content
             
         except Exception as e:
             logger.error(f"Error getting plant care recommendations: {e}")
@@ -283,32 +325,45 @@ Keep the response concise but comprehensive, focusing on practical advice that H
             if not current_weather:
                 return "Unable to retrieve weather information at this time."
             
-            # Build summary
+            # Build summary with proper HTML formatting
             summary_parts = []
             
             # Current conditions
-            summary_parts.append(f"**Current Conditions:**")
-            summary_parts.append(f"Temperature: {current_weather.get('temperature', 'Unknown')}°F")
-            summary_parts.append(f"Feels Like: {current_weather.get('feels_like', 'Unknown')}°F")
-            summary_parts.append(f"Humidity: {current_weather.get('humidity', 'Unknown')}%")
-            summary_parts.append(f"Wind: {current_weather.get('wind_speed', 'Unknown')} mph")
-            summary_parts.append(f"Conditions: {current_weather.get('description', 'Unknown')}")
-            summary_parts.append(f"Data Source: {self.last_service_used or 'Unknown'}")
+            summary_parts.append(f"<h3 class='text-lg font-semibold text-blue-900 mb-3'>Current Weather for {self.default_location}</h3>")
+            summary_parts.append(f"<div class='grid grid-cols-1 md:grid-cols-2 gap-4 mb-4'>")
+            summary_parts.append(f"<div class='bg-blue-100 p-3 rounded-lg'><strong>Temperature:</strong> {current_weather.get('temperature', 'Unknown')}°F (feels like {current_weather.get('feels_like', 'Unknown')}°F)</div>")
+            summary_parts.append(f"<div class='bg-blue-100 p-3 rounded-lg'><strong>Conditions:</strong> {current_weather.get('description', 'Unknown').title()}</div>")
+            summary_parts.append(f"<div class='bg-blue-100 p-3 rounded-lg'><strong>Humidity:</strong> {current_weather.get('humidity', 'Unknown')}%</div>")
+            summary_parts.append(f"<div class='bg-blue-100 p-3 rounded-lg'><strong>Wind Speed:</strong> {current_weather.get('wind_speed', 'Unknown')} mph</div>")
+            summary_parts.append(f"<div class='bg-blue-100 p-3 rounded-lg'><strong>Pressure:</strong> {current_weather.get('pressure', 'Unknown')} hPa</div>")
+            summary_parts.append(f"<div class='bg-blue-100 p-3 rounded-lg'><strong>Data Source:</strong> {self.last_service_used or 'Unknown'}</div>")
+            summary_parts.append(f"</div>")
             
             # Hourly forecast
             if hourly_rain:
-                summary_parts.append(f"\n**Next 12 Hours:**")
-                for hour in hourly_rain[:6]:  # Show first 6 hours
-                    summary_parts.append(f"{hour['time']}: {hour['temperature']}°F, {hour['rain_probability']}% rain chance")
+                summary_parts.append("<h4 class='text-md font-semibold text-blue-800 mb-3'>Upcoming Hourly Rain Forecast</h4>")
+                summary_parts.append("<div class='grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 mb-4'>")
+                for hour in hourly_rain:
+                    rain_color = "bg-red-100" if hour['rain_probability'] > 50 else "bg-yellow-100" if hour['rain_probability'] > 20 else "bg-green-100"
+                    summary_parts.append(f"<div class='{rain_color} p-2 rounded text-center text-sm'>")
+                    summary_parts.append(f"<div class='font-semibold'>{hour['time']}</div>")
+                    summary_parts.append(f"<div class='text-blue-600'>{hour['rain_probability']}% ({hour['description']})</div>")
+                    summary_parts.append("</div>")
+                summary_parts.append("</div>")
             
             # Daily forecast
             if forecast:
-                summary_parts.append(f"\n**3-Day Forecast:**")
+                summary_parts.append("<h4 class='text-md font-semibold text-blue-800 mb-3'>3-Day Rain Forecast</h4>")
+                summary_parts.append("<div class='space-y-2'>")
                 for day in forecast:
-                    date_str = day['date'].strftime('%a, %b %d')
-                    summary_parts.append(f"{date_str}: High {day['temp_max']}°F, Low {day['temp_min']}°F, {day['rain_probability']}% rain chance")
+                    rain_color = "border-red-300" if day['rain_probability'] > 50 else "border-yellow-300" if day['rain_probability'] > 20 else "border-blue-300"
+                    summary_parts.append(f"<div class='bg-blue-50 p-3 rounded border-l-4 {rain_color}'>")
+                    summary_parts.append(f"<strong>{day['date'].strftime('%A, %B %d')}:</strong> {day['rain_probability']}% ({day['rain_description']})")
+                    summary_parts.append(f"<br><span class='text-sm text-blue-600'>Temp: {day['temp_min']}°F - {day['temp_max']}°F | Wind: {day['wind_speed']} mph</span>")
+                    summary_parts.append("</div>")
+                summary_parts.append("</div>")
             
-            return "\n".join(summary_parts)
+            return "".join(summary_parts)
             
         except Exception as e:
             logger.error(f"Error getting weather summary: {e}")

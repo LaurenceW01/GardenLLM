@@ -290,7 +290,7 @@ class Click2HoustonScraper:
                 wind_speed = 5 + (i % 3) * 2  # Variable wind
                 
                 hourly_data.append({
-                    'time': hour_time.strftime('%a %I %p'),
+                    'time': hour_time.strftime('%a %I %p').replace(' 0', ' '),  # Remove leading zero from hour
                     'rain_probability': rain_prob,
                     'description': 'Partly cloudy' if rain_prob > 15 else 'Clear',
                     'wind_speed': wind_speed,
