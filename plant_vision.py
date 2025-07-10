@@ -2,7 +2,7 @@ from openai import OpenAI  # Import the OpenAI library for API interaction
 import os  # Import the os module for environment variable access
 import logging  # Import logging for logging messages
 import base64  # Import base64 for encoding images
-from typing import Optional, Tuple, List, Dict  # Import typing for type annotations
+from typing import Optional, Tuple, List, Dict, Any  # Import typing for type annotations
 from datetime import datetime, timedelta  # Import datetime for date and time operations
 import imghdr  # Import imghdr for image type checking
 import traceback  # Import traceback for error tracing
@@ -18,8 +18,12 @@ import tiktoken  # Import tiktoken for token encoding
 logging.basicConfig(level=logging.INFO)  # Configure logging to display INFO level messages
 logger = logging.getLogger(__name__)  # Create a logger for this module
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # Create an OpenAI client using the API key from environment variables
+# Initialize OpenAI client - use the one from config.py if available
+try:
+    from config import openai_client
+    client = openai_client  # Use the client from config.py
+except ImportError:
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # Fallback to creating a new client
 
 # Constants for token management
 MAX_TOKENS = 4000  # Maximum tokens allowed for context in a conversation
@@ -200,7 +204,14 @@ def process_image(image_data: bytes) -> Tuple[bytes, str]:
 
 def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None, conversation_id: Optional[str] = None) -> str:
     """
-    Analyze a plant image using GPT-4 Turbo with vision capabilities
+    Analyze a plant image using GPT-4 Turbo with vision capabilities for comprehensive plant identification and health assessment
+    
+    This function implements Phase 1 of the Plant Image Analysis Enhancement Plan:
+    - Plant identification with common and scientific names
+    - Health assessment and condition analysis
+    - Treatment recommendations and care advice
+    - Database integration for existing plant checks
+    - Structured data extraction for plant information
     """
     try:
         # Process and validate the image
@@ -215,37 +226,88 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None, c
 
         # Get existing conversation or start new one
         if not conversation_manager.get_messages(conversation_id):  # Check if conversation is new
-            # Add system message with explicit instructions
+            # Add system message with comprehensive plant analysis instructions
             conversation_manager.add_message(conversation_id, {
                 "role": "system",
-                "content": """You are a plant expert who analyzes plant images and provides detailed care recommendations. 
-                IMPORTANT RULES:
-                1. You will analyze the plant in the provided image
-                2. Store all details about this specific plant in your analysis
-                3. For any follow-up questions, use ONLY the information from your analysis
-                4. NEVER ask to check databases or plant lists
-                5. NEVER ask for plant names - you already analyzed the plant
-                6. If unsure about something, refer back to what you observed in the image
-                7. Format your responses in markdown"""
+                "content": """You are an expert plant identification and health assessment specialist. Your role is to:
+
+1. **PLANT IDENTIFICATION**: Identify plants with both common and scientific names, providing confidence levels
+2. **HEALTH ASSESSMENT**: Analyze plant condition, identify visible issues, diseases, pests, or stress factors
+3. **CARE RECOMMENDATIONS**: Provide specific treatment plans and care advice for the identified issues
+4. **STRUCTURED ANALYSIS**: Extract comprehensive plant data including:
+   - Plant name (common and scientific)
+   - Current health status
+   - Visible issues or concerns
+   - Treatment recommendations
+   - Care requirements
+   - Growing tips
+
+IMPORTANT RULES:
+- Analyze the specific plant(s) in the provided image with extreme attention to detail
+- Look carefully at leaf shape, arrangement, color, texture, and any flowers or buds
+- Pay attention to the overall growth habit, stem structure, and plant architecture
+- If you see distinctive features (like specific leaf patterns, flower colors, growth habits), mention them specifically
+- Store all details about this specific plant in your analysis
+- For follow-up questions, use ONLY information from your analysis
+- NEVER ask to check databases or plant lists
+- NEVER ask for plant names - you already analyzed the plant
+- If unsure about something, refer back to what you observed in the image
+- Format responses in markdown with clear sections
+- Provide actionable care recommendations
+- Include confidence levels for identifications (high/medium/low)
+- If you're uncertain, mention similar plants that could be confused with this one"""
             })
 
             # Add context-setting message
             conversation_manager.add_message(conversation_id, {
                 "role": "system",
-                "content": "The following conversation will be about a specific plant shown in an image. All questions should be answered in relation to this specific plant only."
+                "content": "The following conversation will be about specific plant(s) shown in an image. All questions should be answered in relation to these specific plants only."
             })
 
-        # Prepare the user query with explicit context
+        # Prepare the comprehensive analysis query
         if user_message:  # Check if user message is provided
-            query = f"Please analyze this specific plant image. User's comment: {user_message}"  # Include user comment in query
+            query = f"""Please analyze this specific plant image comprehensively. User's comment: {user_message}
+
+Please provide:
+1. **Plant Identification**: Common name and scientific name with confidence level
+2. **Health Assessment**: Current condition and any visible issues
+3. **Treatment Plan**: Specific recommendations for any identified problems
+4. **Care Advice**: Growing tips and maintenance recommendations
+
+Remember: Your analysis and any follow-up questions will be specifically about this plant."""
         else:
-            query = """Please analyze this specific plant image and provide:
-            1. Plant identification (species name and common name)
-            2. Assessment of this plant's current condition
-            3. Specific care recommendations for this individual plant
-            4. Any visible issues or concerns with this particular plant
-            Remember: Your analysis and any follow-up questions will be specifically about this plant.
-            Please format the response in markdown."""  # Default query for analysis
+            query = """Please analyze this specific plant image and provide a comprehensive assessment:
+
+## Plant Identification
+- Common name and scientific name (be very specific about the exact species/variety)
+- Confidence level in identification (high/medium/low)
+- Key distinguishing characteristics you observe (leaf shape, color, texture, flowers, growth habit, etc.)
+- If you're uncertain, mention similar plants that could be confused with this one
+
+## Health Assessment
+- Current condition of the plant
+- Any visible issues, diseases, or pests
+- Signs of stress or environmental problems
+- Overall health rating (excellent/good/fair/poor)
+
+## Treatment Recommendations
+- Specific actions to address any issues
+- Preventive care measures
+- Timeline for treatment
+
+## Care Requirements
+- Watering needs
+- Light requirements
+- Soil preferences
+- Temperature tolerance
+- Seasonal care considerations
+
+## Growing Tips
+- Best practices for this specific plant
+- Common mistakes to avoid
+- Propagation methods if applicable
+
+IMPORTANT: Look very carefully at the leaf shape, arrangement, color, and any flowers or buds. Pay attention to the overall growth habit and structure. If you see any distinctive features, mention them specifically."""
 
         # Add user message with image
         conversation_manager.add_message(conversation_id, {
@@ -256,7 +318,7 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None, c
                     "type": "image_url",
                     "image_url": {
                         "url": f"data:image/{image_format};base64,{base64_image}",  # Add base64 image URL
-                        "detail": "high"  # Set image detail level
+                        "detail": "high"  # Set image detail level for detailed analysis
                     }
                 }
             ]
@@ -268,29 +330,32 @@ def analyze_plant_image(image_data: bytes, user_message: Optional[str] = None, c
         # Call GPT-4 Turbo API with conversation history
         response = client.chat.completions.create(
             model=MODEL_NAME,  # Specify model name
-            messages=messages,  # Provide conversation messages
-            max_tokens=1000,  # Set maximum tokens for response
+            messages=messages,  # type: ignore  # Provide conversation messages
+            max_tokens=1500,  # Increased tokens for comprehensive analysis
             temperature=0.7,  # Set response randomness
             seed=123,  # Added for consistency
             response_format={ "type": "text" }  # Specify response format
         )
 
-        # Extract the plant identification from the response
-        ai_response = response.choices[0].message.content  # Get content from response
+        # Extract the comprehensive plant analysis from the response
+        ai_response = response.choices[0].message.content or ""  # Get content from response with fallback
         
-        # Add assistant's response with context reinforcement
+        # Enhance analysis with database integration
+        enhanced_response = enhance_analysis_with_database_check(ai_response)  # Enhance with database info
+        
+        # Add assistant's response to conversation history
         conversation_manager.add_message(conversation_id, {
             "role": "assistant",
-            "content": ai_response  # Add AI response to conversation
+            "content": enhanced_response  # Add enhanced response to conversation
         })
         
-        # Add a context reminder message
+        # Add a context reminder message for follow-up questions
         conversation_manager.add_message(conversation_id, {
             "role": "system",
-            "content": "Remember: The following questions will be about the specific plant that was just analyzed in the image. Do not reference any other plants or garden databases."
+            "content": "Remember: The following questions will be about the specific plant(s) that were just analyzed in the image. Do not reference any other plants or garden databases."
         })
 
-        return ai_response  # Return AI response
+        return enhanced_response  # Return enhanced AI response with database integration
 
     except openai.AuthenticationError as e:
         logger.error(f"Authentication error with OpenAI: {e}")  # Log authentication error
@@ -340,3 +405,172 @@ def save_image(image_data: bytes, filename: str) -> str:
     except Exception as e:
         logger.error(f"Error saving image: {e}")  # Log error saving image
         raise  # Raise exception on error 
+
+def check_plant_in_database(plant_name: str) -> Dict[str, Any]:
+    """
+    Check if an identified plant exists in the user's garden database
+    
+    This function integrates with existing plant operations to check if a plant
+    identified through image analysis already exists in the user's garden.
+    
+    Args:
+        plant_name (str): The plant name to check in the database
+        
+    Returns:
+        Dict[str, Any]: Dictionary containing:
+            - exists (bool): Whether the plant exists in the database
+            - plant_data (Dict): Plant data if found, empty dict if not
+            - message (str): Human-readable message about the plant's status
+    """
+    try:
+        # Import here to avoid circular imports
+        from plant_operations import search_plants, get_plant_names_from_database
+        
+        # Normalize the plant name for better matching
+        normalized_name = plant_name.lower().strip()
+        
+        # Get all plant names from database for comparison
+        database_plants = get_plant_names_from_database()
+        
+        # Check for exact matches first
+        exact_matches = [name for name in database_plants if name.lower().strip() == normalized_name]
+        
+        if exact_matches:
+            # Plant exists - get full data
+            plant_data = search_plants(exact_matches[0])
+            if plant_data:
+                return {
+                    "exists": True,
+                    "plant_data": plant_data[0] if plant_data else {},
+                    "message": f"✅ {exact_matches[0]} is already in your garden!",
+                    "plant_name": exact_matches[0]
+                }
+        
+        # Check for partial matches
+        partial_matches = [name for name in database_plants if normalized_name in name.lower() or name.lower() in normalized_name]
+        
+        if partial_matches:
+            return {
+                "exists": False,
+                "plant_data": {},
+                "message": f"❓ Similar plants found in your garden: {', '.join(partial_matches[:3])}. The identified plant '{plant_name}' is not in your garden yet.",
+                "similar_plants": partial_matches[:3]
+            }
+        
+        # No matches found
+        return {
+            "exists": False,
+            "plant_data": {},
+            "message": f"🌱 '{plant_name}' is not in your garden yet. Would you like to add it?",
+            "plant_name": plant_name
+        }
+        
+    except Exception as e:
+        logger.error(f"Error checking plant in database: {e}")  # Log error
+        return {
+            "exists": False,
+            "plant_data": {},
+            "message": f"Unable to check if '{plant_name}' exists in your garden due to a database error.",
+            "error": str(e)
+        }
+
+def extract_plant_names_from_analysis(analysis_text: str) -> List[str]:
+    """
+    Extract plant names from AI analysis text for database checking
+    
+    This function parses the AI analysis response to extract plant names
+    that can be checked against the user's garden database.
+    
+    Args:
+        analysis_text (str): The AI analysis response text
+        
+    Returns:
+        List[str]: List of extracted plant names
+    """
+    try:
+        import re  # Import regex for pattern matching
+        
+        plant_names = []  # Initialize list to store plant names
+        
+        # Common patterns for plant names in analysis text
+        patterns = [
+            r'(?:identified as|this is|appears to be|looks like)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',  # "This is a Rose"
+            r'(?:common name[:\s]+)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',  # "Common name: Rose"
+            r'(?:scientific name[:\s]+)([A-Z][a-z]+\s+[a-z]+)',  # "Scientific name: Rosa sp."
+            r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(?:plant|specimen|variety)',  # "Rose plant"
+        ]
+        
+        for pattern in patterns:  # Iterate through patterns
+            matches = re.findall(pattern, analysis_text, re.IGNORECASE)  # Find matches
+            for match in matches:  # Iterate through matches
+                if match and len(match.strip()) > 2:  # Check if match is valid
+                    plant_names.append(match.strip())  # Add to list
+        
+        # Remove duplicates while preserving order
+        unique_names = []  # Initialize unique names list
+        for name in plant_names:  # Iterate through plant names
+            if name not in unique_names:  # Check if name is unique
+                unique_names.append(name)  # Add to unique list
+        
+        logger.info(f"Extracted plant names from analysis: {unique_names}")  # Log extracted names
+        return unique_names  # Return unique plant names
+        
+    except Exception as e:
+        logger.error(f"Error extracting plant names from analysis: {e}")  # Log error
+        return []  # Return empty list on error
+
+def enhance_analysis_with_database_check(analysis_text: str) -> str:
+    """
+    Enhance AI analysis with database integration information
+    
+    This function takes the AI analysis and adds information about whether
+    identified plants exist in the user's garden database.
+    
+    Args:
+        analysis_text (str): The original AI analysis text
+        
+    Returns:
+        str: Enhanced analysis with database information
+    """
+    try:
+        # Extract plant names from the analysis
+        plant_names = extract_plant_names_from_analysis(analysis_text)  # Extract plant names
+        
+        if not plant_names:  # Check if no plant names found
+            return analysis_text  # Return original analysis
+        
+        # Check each plant in the database
+        database_info = []  # Initialize database info list
+        
+        for plant_name in plant_names:  # Iterate through plant names
+            check_result = check_plant_in_database(plant_name)  # Check plant in database
+            database_info.append(check_result)  # Add result to list
+        
+        # Create enhanced analysis
+        enhanced_analysis = analysis_text  # Start with original analysis
+        
+        # Add database integration section
+        enhanced_analysis += "\n\n## Garden Database Integration\n\n"
+        
+        for info in database_info:  # Iterate through database info
+            enhanced_analysis += f"**{info.get('plant_name', 'Unknown Plant')}**: {info['message']}\n\n"
+        
+        # Add action suggestions
+        new_plants = [info for info in database_info if not info['exists']]  # Get new plants
+        existing_plants = [info for info in database_info if info['exists']]  # Get existing plants
+        
+        if new_plants:  # Check if there are new plants
+            enhanced_analysis += "**💡 Action Items:**\n"
+            enhanced_analysis += "- Consider adding newly identified plants to your garden database\n"
+            enhanced_analysis += "- Use the 'Add Plant' feature to track these plants\n\n"
+        
+        if existing_plants:  # Check if there are existing plants
+            enhanced_analysis += "**📋 Garden Management:**\n"
+            enhanced_analysis += "- Review care information for existing plants\n"
+            enhanced_analysis += "- Update plant records with new observations\n\n"
+        
+        return enhanced_analysis  # Return enhanced analysis
+        
+    except Exception as e:
+        logger.error(f"Error enhancing analysis with database check: {e}")  # Log error
+        return analysis_text  # Return original analysis on error 

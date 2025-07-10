@@ -5,6 +5,7 @@ Provides a Flask web application for interacting with the garden assistant.
 
 import os
 import logging
+import traceback
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
 from werkzeug.utils import secure_filename
@@ -409,7 +410,7 @@ def chat():
 
 @app.route('/analyze-plant', methods=['POST'])
 def analyze_plant():
-    """Image analysis endpoint for plant identification and care advice"""
+    """Enhanced image analysis endpoint for comprehensive plant identification and health assessment"""
     try:
         # Check if image file is present in request
         if 'file' not in request.files:
@@ -419,27 +420,52 @@ def analyze_plant():
         if file.filename == '':
             return jsonify({'success': False, 'error': 'No image file selected'}), 400
         
-        # Get optional user message
+        # Get optional user message and conversation ID
         user_message = request.form.get('message', '').strip()
         conversation_id = request.form.get('conversation_id')
+        
+        # Validate image file
+        if not file.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
+            return jsonify({'success': False, 'error': 'Invalid image format. Please upload a valid image file.'}), 400
         
         # Read image data
         image_data = file.read()
         
-        # Import the analyze_plant_image function from plant_vision
-        from plant_vision import analyze_plant_image
+        # Validate image data size (max 10MB)
+        if len(image_data) > 10 * 1024 * 1024:
+            return jsonify({'success': False, 'error': 'Image file too large. Please upload an image smaller than 10MB.'}), 400
         
-        # Analyze the plant image
+        # Import the enhanced analyze_plant_image function from plant_vision
+        from plant_vision import analyze_plant_image, validate_image
+        
+        # Validate image format
+        if not validate_image(image_data):
+            return jsonify({'success': False, 'error': 'Invalid or corrupted image file. Please try a different image.'}), 400
+        
+        # Analyze the plant image with enhanced capabilities
         response = analyze_plant_image(image_data, user_message, conversation_id)
         
-        return jsonify({
+        # Prepare response with metadata
+        response_data = {
             'success': True,
             'response': response,
-            'conversation_id': conversation_id
-        })
+            'conversation_id': conversation_id,
+            'analysis_type': 'comprehensive_plant_analysis',
+            'features': [
+                'plant_identification',
+                'health_assessment', 
+                'care_recommendations',
+                'database_integration'
+            ],
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        logger.info(f"Plant analysis completed successfully for conversation {conversation_id}")
+        return jsonify(response_data)
         
     except Exception as e:
         logger.error(f"Error in analyze-plant endpoint: {e}")
+        logger.error(f"Full error traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/fields')
