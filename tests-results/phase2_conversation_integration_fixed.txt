@@ -1,0 +1,677 @@
+INFO:googleapiclient.discovery_cache:file_cache is only supported with oauth2client<4.0.0
+INFO:config:Successfully connected to Google Sheets API
+INFO:config:Successfully initialized Google Sheets client
+INFO:httpx:HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:config:OpenAI connection successful. Test response: ChatCompletion(id='chatcmpl-Brpu3l92Ul07SVHEWc4OTsJPGtt2S', choices=[Choice(finish_reason='length', index=0, message=ChatCompletionMessage(content='Hello! How can I', role='assistant', function_call=None, tool_calls=None, refusal=None, annotations=[]), logprobs=None)], created=1752170599, model='gpt-3.5-turbo-0125', object='chat.completion', system_fingerprint=None, usage=CompletionUsage(completion_tokens=5, prompt_tokens=8, total_tokens=13, prompt_tokens_details={'cached_tokens': 0, 'audio_tokens': 0}, completion_tokens_details={'reasoning_tokens': 0, 'audio_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}), service_tier='default')
+INFO:googleapiclient.discovery_cache:file_cache is only supported with oauth2client<4.0.0
+INFO:config:Successfully connected to Google Sheets API
+INFO:chat_response:Query analyzer module loaded successfully
+test_ai_response_with_conversation_history (tests.test_phase2_conversation_integration.TestPhase2ConversationIntegration.test_ai_response_with_conversation_history)
+Test that AI responses include conversation history context ... INFO:conversation_manager:Creating new conversation test_conversation_123
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 1
+INFO:chat_response:Phase 2: Added user message to conversation test_conversation_123
+INFO:chat_response:Phase 5: Starting AI analysis (first AI call)
+INFO:query_analyzer:Analyzing query: I have a tomato plant
+INFO:plant_operations:Cache expired, fetching fresh plant list from database
+INFO:plant_operations:Updated plant list cache with 115 plants
+INFO:query_analyzer:Retrieved 115 plant names from database
+ERROR:query_analyzer:Failed to parse AI response as JSON: Expecting value: line 1 column 1 (char 0)
+ERROR:query_analyzer:Raw response: Test AI response
+WARNING:query_analyzer:Using fallback analysis due to AI analysis failure
+INFO:query_analyzer:Query analysis result: {'plant_references': [], 'query_type': 'GENERAL', 'confidence': 0.5, 'reasoning': 'Fallback: defaulting to general query', 'requires_ai_response': True, 'original_query': 'I have a tomato plant', 'plant_list_provided': 115}
+INFO:chat_response:Phase 5: AI analysis completed in 0.20s
+INFO:chat_response:Phase 5: Analysis result: {'plant_references': [], 'query_type': 'GENERAL', 'confidence': 0.5, 'reasoning': 'Fallback: defaulting to general query', 'requires_ai_response': True, 'original_query': 'I have a tomato plant', 'plant_list_provided': 115}
+INFO:chat_response:Phase 5: Processing AI-enhanced query type: GENERAL
+INFO:conversation_manager:Retrieved 1 messages for conversation test_conversation_123
+INFO:chat_response:Phase 2: Added 0 conversation history messages
+INFO:chat_response:Phase 5: AI response generated in 0.00s
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 2
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 3
+INFO:chat_response:Phase 2: Added user message to conversation test_conversation_123
+INFO:chat_response:Phase 5: Starting AI analysis (first AI call)
+INFO:query_analyzer:Analyzing query: How should I care for it?
+INFO:plant_operations:Returning cached plant list with 115 plants
+INFO:query_analyzer:Retrieved 115 plant names from database
+ERROR:query_analyzer:Failed to parse AI response as JSON: Expecting value: line 1 column 1 (char 0)
+ERROR:query_analyzer:Raw response: Test AI response
+WARNING:query_analyzer:Using fallback analysis due to AI analysis failure
+INFO:query_analyzer:Query analysis result: {'plant_references': [], 'query_type': 'GENERAL', 'confidence': 0.5, 'reasoning': 'Fallback: defaulting to general query', 'requires_ai_response': True, 'original_query': 'How should I care for it?', 'plant_list_provided': 115}
+INFO:chat_response:Phase 5: AI analysis completed in 0.00s
+INFO:chat_response:Phase 5: Analysis result: {'plant_references': [], 'query_type': 'GENERAL', 'confidence': 0.5, 'reasoning': 'Fallback: defaulting to general query', 'requires_ai_response': True, 'original_query': 'How should I care for it?', 'plant_list_provided': 115}
+INFO:chat_response:Phase 5: Processing AI-enhanced query type: GENERAL
+INFO:conversation_manager:Retrieved 3 messages for conversation test_conversation_123
+INFO:chat_response:Phase 2: Added 2 conversation history messages
+INFO:chat_response:Phase 5: AI response generated in 0.00s
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 4
+ok
+test_conversation_context_preserved (tests.test_phase2_conversation_integration.TestPhase2ConversationIntegration.test_conversation_context_preserved)
+Test that conversation context is preserved across multiple messages ... INFO:conversation_manager:Creating new conversation test_conversation_123
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 1
+INFO:chat_response:Phase 2: Added user message to conversation test_conversation_123
+INFO:chat_response:Phase 5: Starting AI analysis (first AI call)
+INFO:query_analyzer:Analyzing query: I have a tomato plant
+INFO:plant_operations:Returning cached plant list with 115 plants
+INFO:query_analyzer:Retrieved 115 plant names from database
+ERROR:query_analyzer:Failed to parse AI response as JSON: Expecting value: line 1 column 1 (char 0)
+ERROR:query_analyzer:Raw response: Test AI response
+WARNING:query_analyzer:Using fallback analysis due to AI analysis failure
+INFO:query_analyzer:Query analysis result: {'plant_references': [], 'query_type': 'GENERAL', 'confidence': 0.5, 'reasoning': 'Fallback: defaulting to general query', 'requires_ai_response': True, 'original_query': 'I have a tomato plant', 'plant_list_provided': 115}
+INFO:chat_response:Phase 5: AI analysis completed in 0.00s
+INFO:chat_response:Phase 5: Analysis result: {'plant_references': [], 'query_type': 'GENERAL', 'confidence': 0.5, 'reasoning': 'Fallback: defaulting to general query', 'requires_ai_response': True, 'original_query': 'I have a tomato plant', 'plant_list_provided': 115}
+INFO:chat_response:Phase 5: Processing AI-enhanced query type: GENERAL
+INFO:conversation_manager:Retrieved 1 messages for conversation test_conversation_123
+INFO:chat_response:Phase 2: Added 0 conversation history messages
+INFO:chat_response:Phase 5: AI response generated in 0.00s
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 2
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 3
+INFO:chat_response:Phase 2: Added user message to conversation test_conversation_123
+INFO:chat_response:Phase 5: Starting AI analysis (first AI call)
+INFO:query_analyzer:Analyzing query: How should I care for it?
+INFO:plant_operations:Returning cached plant list with 115 plants
+INFO:query_analyzer:Retrieved 115 plant names from database
+ERROR:query_analyzer:Failed to parse AI response as JSON: Expecting value: line 1 column 1 (char 0)
+ERROR:query_analyzer:Raw response: Test AI response
+WARNING:query_analyzer:Using fallback analysis due to AI analysis failure
+INFO:query_analyzer:Query analysis result: {'plant_references': [], 'query_type': 'GENERAL', 'confidence': 0.5, 'reasoning': 'Fallback: defaulting to general query', 'requires_ai_response': True, 'original_query': 'How should I care for it?', 'plant_list_provided': 115}
+INFO:chat_response:Phase 5: AI analysis completed in 0.00s
+INFO:chat_response:Phase 5: Analysis result: {'plant_references': [], 'query_type': 'GENERAL', 'confidence': 0.5, 'reasoning': 'Fallback: defaulting to general query', 'requires_ai_response': True, 'original_query': 'How should I care for it?', 'plant_list_provided': 115}
+INFO:chat_response:Phase 5: Processing AI-enhanced query type: GENERAL
+INFO:conversation_manager:Retrieved 3 messages for conversation test_conversation_123
+INFO:chat_response:Phase 2: Added 2 conversation history messages
+INFO:chat_response:Phase 5: AI response generated in 0.00s
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 4
+INFO:conversation_manager:Retrieved 4 messages for conversation test_conversation_123
+ok
+test_conversation_id_optional (tests.test_phase2_conversation_integration.TestPhase2ConversationIntegration.test_conversation_id_optional)
+Test that conversation_id is optional and doesn't break existing functionality ... INFO:chat_response:Phase 5: Starting AI analysis (first AI call)
+INFO:query_analyzer:Analyzing query: What plants do I have?
+INFO:plant_operations:Returning cached plant list with 115 plants
+INFO:query_analyzer:Retrieved 115 plant names from database
+ERROR:query_analyzer:Failed to parse AI response as JSON: Expecting value: line 1 column 1 (char 0)
+ERROR:query_analyzer:Raw response: Test AI response
+WARNING:query_analyzer:Using fallback analysis due to AI analysis failure
+INFO:query_analyzer:Query analysis result: {'plant_references': [], 'query_type': 'GENERAL', 'confidence': 0.5, 'reasoning': 'Fallback: defaulting to general query', 'requires_ai_response': True, 'original_query': 'What plants do I have?', 'plant_list_provided': 115}
+INFO:chat_response:Phase 5: AI analysis completed in 0.00s
+INFO:chat_response:Phase 5: Analysis result: {'plant_references': [], 'query_type': 'GENERAL', 'confidence': 0.5, 'reasoning': 'Fallback: defaulting to general query', 'requires_ai_response': True, 'original_query': 'What plants do I have?', 'plant_list_provided': 115}
+INFO:chat_response:Phase 5: Processing AI-enhanced query type: GENERAL
+INFO:chat_response:Phase 5: AI response generated in 0.00s
+INFO:chat_response:Phase 5: Starting AI analysis (first AI call)
+INFO:query_analyzer:Analyzing query: What plants do I have?
+INFO:plant_operations:Returning cached plant list with 115 plants
+INFO:query_analyzer:Retrieved 115 plant names from database
+ERROR:query_analyzer:Failed to parse AI response as JSON: Expecting value: line 1 column 1 (char 0)
+ERROR:query_analyzer:Raw response: Test AI response
+WARNING:query_analyzer:Using fallback analysis due to AI analysis failure
+INFO:query_analyzer:Query analysis result: {'plant_references': [], 'query_type': 'GENERAL', 'confidence': 0.5, 'reasoning': 'Fallback: defaulting to general query', 'requires_ai_response': True, 'original_query': 'What plants do I have?', 'plant_list_provided': 115}
+INFO:chat_response:Phase 5: AI analysis completed in 0.00s
+INFO:chat_response:Phase 5: Analysis result: {'plant_references': [], 'query_type': 'GENERAL', 'confidence': 0.5, 'reasoning': 'Fallback: defaulting to general query', 'requires_ai_response': True, 'original_query': 'What plants do I have?', 'plant_list_provided': 115}
+INFO:chat_response:Phase 5: Processing AI-enhanced query type: GENERAL
+INFO:chat_response:Phase 5: AI response generated in 0.00s
+ok
+test_conversation_id_parameter_accepted (tests.test_phase2_conversation_integration.TestPhase2ConversationIntegration.test_conversation_id_parameter_accepted)
+Test that conversation_id parameter is properly accepted ... INFO:conversation_manager:Creating new conversation test_conversation_123
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 1
+INFO:chat_response:Phase 2: Added user message to conversation test_conversation_123
+INFO:chat_response:Phase 5: Starting AI analysis (first AI call)
+INFO:query_analyzer:Analyzing query: What plants do I have?
+INFO:plant_operations:Returning cached plant list with 115 plants
+INFO:query_analyzer:Retrieved 115 plant names from database
+ERROR:query_analyzer:Failed to parse AI response as JSON: Expecting value: line 1 column 1 (char 0)
+ERROR:query_analyzer:Raw response: Test AI response
+WARNING:query_analyzer:Using fallback analysis due to AI analysis failure
+INFO:query_analyzer:Query analysis result: {'plant_references': [], 'query_type': 'GENERAL', 'confidence': 0.5, 'reasoning': 'Fallback: defaulting to general query', 'requires_ai_response': True, 'original_query': 'What plants do I have?', 'plant_list_provided': 115}
+INFO:chat_response:Phase 5: AI analysis completed in 0.00s
+INFO:chat_response:Phase 5: Analysis result: {'plant_references': [], 'query_type': 'GENERAL', 'confidence': 0.5, 'reasoning': 'Fallback: defaulting to general query', 'requires_ai_response': True, 'original_query': 'What plants do I have?', 'plant_list_provided': 115}
+INFO:chat_response:Phase 5: Processing AI-enhanced query type: GENERAL
+INFO:conversation_manager:Retrieved 1 messages for conversation test_conversation_123
+INFO:chat_response:Phase 2: Added 0 conversation history messages
+INFO:chat_response:Phase 5: AI response generated in 0.00s
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 2
+ok
+test_conversation_manager_integration (tests.test_phase2_conversation_integration.TestPhase2ConversationIntegration.test_conversation_manager_integration)
+Test that ConversationManager is properly integrated ... INFO:conversation_manager:Creating new conversation test_conversation_123
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 1
+INFO:conversation_manager:Retrieved 1 messages for conversation test_conversation_123
+ok
+test_conversation_messages_stored (tests.test_phase2_conversation_integration.TestPhase2ConversationIntegration.test_conversation_messages_stored)
+Test that conversation messages are properly stored ... INFO:conversation_manager:Creating new conversation test_conversation_123
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 1
+INFO:chat_response:Phase 2: Added user message to conversation test_conversation_123
+INFO:chat_response:Phase 5: Starting AI analysis (first AI call)
+INFO:query_analyzer:Analyzing query: What plants do I have?
+INFO:plant_operations:Returning cached plant list with 115 plants
+INFO:query_analyzer:Retrieved 115 plant names from database
+ERROR:query_analyzer:Failed to parse AI response as JSON: Expecting value: line 1 column 1 (char 0)
+ERROR:query_analyzer:Raw response: Test AI response
+WARNING:query_analyzer:Using fallback analysis due to AI analysis failure
+INFO:query_analyzer:Query analysis result: {'plant_references': [], 'query_type': 'GENERAL', 'confidence': 0.5, 'reasoning': 'Fallback: defaulting to general query', 'requires_ai_response': True, 'original_query': 'What plants do I have?', 'plant_list_provided': 115}
+INFO:chat_response:Phase 5: AI analysis completed in 0.00s
+INFO:chat_response:Phase 5: Analysis result: {'plant_references': [], 'query_type': 'GENERAL', 'confidence': 0.5, 'reasoning': 'Fallback: defaulting to general query', 'requires_ai_response': True, 'original_query': 'What plants do I have?', 'plant_list_provided': 115}
+INFO:chat_response:Phase 5: Processing AI-enhanced query type: GENERAL
+INFO:conversation_manager:Retrieved 1 messages for conversation test_conversation_123
+INFO:chat_response:Phase 2: Added 0 conversation history messages
+INFO:chat_response:Phase 5: AI response generated in 0.00s
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 2
+INFO:conversation_manager:Retrieved 2 messages for conversation test_conversation_123
+ok
+test_conversation_timeout_handling (tests.test_phase2_conversation_integration.TestPhase2ConversationIntegration.test_conversation_timeout_handling)
+Test that conversation timeout is properly handled ... INFO:conversation_manager:Creating new conversation test_conversation_123
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 1
+INFO:conversation_manager:Retrieved 1 messages for conversation test_conversation_123
+INFO:conversation_manager:Conversation test_conversation_123 has timed out or doesn't exist
+ok
+test_error_handling_with_conversation (tests.test_phase2_conversation_integration.TestPhase2ConversationIntegration.test_error_handling_with_conversation)
+Test that errors are handled gracefully with conversation history ... INFO:conversation_manager:Creating new conversation test_conversation_123
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 1
+INFO:chat_response:Phase 2: Added user message to conversation test_conversation_123
+INFO:chat_response:Phase 5: Starting AI analysis (first AI call)
+INFO:query_analyzer:Analyzing query: Test message
+INFO:plant_operations:Returning cached plant list with 115 plants
+INFO:query_analyzer:Retrieved 115 plant names from database
+ERROR:query_analyzer:Error analyzing query: API Error
+WARNING:query_analyzer:Using fallback analysis due to AI analysis failure
+INFO:chat_response:Phase 5: AI analysis completed in 0.00s
+INFO:chat_response:Phase 5: Analysis result: {'plant_references': [], 'query_type': 'GENERAL', 'confidence': 0.5, 'reasoning': 'Fallback: defaulting to general query', 'requires_ai_response': True, 'original_query': 'Test message', 'plant_list_provided': 0}
+INFO:chat_response:Phase 5: Processing AI-enhanced query type: GENERAL
+INFO:conversation_manager:Retrieved 1 messages for conversation test_conversation_123
+INFO:chat_response:Phase 2: Added 0 conversation history messages
+ERROR:chat_response:Error generating AI response: API Error
+ERROR:chat_response:Phase 5: Error in AI-enhanced processing: API Error
+INFO:chat_response:Phase 5: Attempting fallback AI response
+ERROR:chat_response:Error in fallback AI response: API Error
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 2
+ok
+test_generate_ai_response_with_conversation_context (tests.test_phase2_conversation_integration.TestPhase2ConversationIntegration.test_generate_ai_response_with_conversation_context)
+Test that generate_ai_response_with_context includes conversation history ... INFO:conversation_manager:Creating new conversation test_conversation_123
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 1
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 2
+INFO:conversation_manager:Retrieved 2 messages for conversation test_conversation_123
+INFO:chat_response:Phase 2: Added 1 conversation history messages
+ok
+test_handle_ai_enhanced_query_with_conversation (tests.test_phase2_conversation_integration.TestPhase2ConversationIntegration.test_handle_ai_enhanced_query_with_conversation)
+Test that handle_ai_enhanced_query_optimized supports conversation history ... 
+=== DEBUG: Sheet Headers ===
+Headers: ['ID', 'Plant Name', 'Description', 'Location', 'Light Requirements', 'Frost Tolerance', 'Watering Needs', 'Soil Preferences', 'Pruning Instructions', 'Mulching Needs', 'Fertilizing Schedule', 'Winterizing Instructions', 'Spacing Requirements', 'Care Notes', 'Photo URL', 'Raw Photo URL', 'Last Updated']
+
+=== DEBUG: Photo URLs for Tropical Hibiscus ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNJsw2fTSCGyxtFRoQ92HJxevfK043loxfRXFO9voLmBGttkSP7hHEfYZVGOTsFlsHKSgNZh-M2VJcmip5bN5VexAMmTxgWTTWWVRa2pVu2dOT6IgecwRz-Xn075c8mq57eJJbzVk3r0A3Uamg368VS5w=w683-h910-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Rose ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNZ_1EiF2B6klZa9N7JJ_bqgFr1HUlJ2kLBc2rEcphiXZz4IlpiT6n6KxkxAGo2wNPVubz0VO-KVOK_DNSWJrHcE1WPv04cBHpMFktuSz1_zMQfD_9FH8ooSk-4hD83pidl-S-UbjTX9Jb2HT4WfT5t6Q=w1213-h910-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Azalea ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMXfO3fncyG4BX34oax5Fj_lq0V6Ugk3lDpip8sP3tY6F4SJzu808ZRT4uEAzU237W-cxW3lsNzqDfqGBHP9WfZrHjeUHtFv853UrPrLoy_N9QJWMqExex6VqUQKsGdURnV5tv1XmV_qmrH9MVxaPqbTg=w856-h642-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Blueberry ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOtpJeXRhHnFOiX56fD1jl9Jnm4l5hUyq1FDz7n5gzitxrD9RSirlB6rJapnagGed2cntEu6euskIKEe3msua5Sfq9m7u4hDhwmuHAiNfYYXT8Pyr1KBJ-y12e-arupqSp8F37UgxC_pWtzdYIo6Chvuw=w554-h554-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Hardy Hibiscus ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNW77yCPqBksltPbjLLQVB8VggEwiKab8-XsjUHNSGprH8DiGhJAIRshbNlE8ThL2NQF47VPfQ50BURFydNUK83VWX8CR4IrYB6EeEBgHrqjWQHGk4sMjh49n_N1_2BY362nI0FkK4vYNsAVMScrBnSMw=w428-h642-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Hydrangea ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNKNUdmmpgahX7WVcpOPdCam-DK0jinNFCZHQxblp5HwfYi9SchVwDBhLqlt4KCyRC59J6Nv0FqyPRh93GyVwpnfHojnbmt1S-CGiKugk7a3XNyxntH-ULnN9PKyDvlx1ynKXxNsl7vFWgJMJsfS3krqA=w100-h74-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Ginger ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczM0VrCKmCkt9-nArlrrToGSgtyB08yvpWa0Xb-L9Sg5XY0OUU313IfbLPK0kpzgO2gGwn4xmPt0S_3sDhIdvqFiVH1GyM4bTyeh1kfJ29jDD8iPCosLJWCiOYEMt9cFlRXfLdaV36UFVZtYkQhXgh4UBA=w642-h642-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Philodendron ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNA91qwhPAdkfoMANFONGOcL2xPwImpKpOXg016oCDrwAYS2bCGRL23Um6gUkTjlrGP0LpWTzidNPeuQzpEkFushNNmN27k310l5iWRGfteLxBiHm81oujBv7zmLyk7yS9K3dpXGNFDKIxKcB2MiNZZCg=w642-h642-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Bougainvillea ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMxgcc1lo0RZOSGKZDWqJTLXiUcgRxuKY3M55okkVDo8wIjpP4LYOAVomiWWNpZC_DFlPhDUmVbFeu9tqoAemqh_BfZ6WRm44nRY1FXARyS12QwoYzzq3kuFd0ET8typmR7Qg_gNIhlqCzuFprko5HrJA=w1215-h911-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Red Sister ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMpCe9sSCrVEqal9UcNCIHMmlp45kx-GL3ouBVcd7wLMYFdjfLsuYlMo32tpC28Qsc1m0-d5gsRdgAQMDATe-jL63wo6hGHRxFEW1FkvoyLM95pcgV-0uBdRw3HqyPfp_s7AZ_ufndTGpDq5Vvlu_oXSg=w474-h642-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Camellia Japonica ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMjkPE_HA3L7S6TYpxHyOwZ_NPNuN8CeQ4yi05zKgDYqiBeiotgyxUcFUyGYlpjtLNQNYe_4sFPYBwHV8fUKxV_-al7vjTzg_iSQ_48oeZVkKKW5lOl5bJoQo2qAjydWMx1kPS43t0QsMSA6SeAI99pag=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Leyland Cypress ===
+Photo URL (formula): 
+Raw Photo URL: https://photos.fife.usercontent.google.com/pw/AP1GczNtZX549KDDJixZ32JPpAdI7HIPsOZCRsT44-XfCILjoWd7Fh2DrzuTaA=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Lobelia ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczPCx-Vs3LEFHoZqwBPKyXjWugzuyM-hOvK-BXrKi5Q0XMCzZtlmNHSgVsswHtuvom1G6zC5c0tMOLRo39MNUUsYF5FVvMsTfDG00LOFksfym8Ku79IfNPuPzeWiH8TfHynPly0dtYgOprdwYBr8K3TkWw=w1091-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Blanket Flower ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNIJqEG1ZDBdDhXXxPK9tzwsFZ0Jv6NDUiIaqGuddNJMpsSNJnbWRkp2fFsILaTuidEDiUhUISPcB0Xv-f2_rmF6t06boX7TxqxJACqKcozuCN1USeO7KSRjTVZmfJtlWNE_EgdwIj534Ioogn0ApKEaA=w627-h836-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for African Daisy ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczN8G_PdeV-wJuCxNKzCRPNUnbGzTqlfHKbDg77_78asKzFi9liCwOCQd9C6DKZt0JLHT4KYtCDyi6LbJJGS3nWssdtdORRt-vnbaCehC1bQ87yyGtA2nu4QZlfn0sttaVj-DGKlWDqH-NqKP3jPZKop0Q=w1001-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Canna Lily ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOTL99BN5gEhunmPSePCUe8rrrqhk8bivTdNvjOsuO3JwhoAeS4wHVbYtgSCqV8p0_kIzZ-vunlQ5YuacQ1s2JGWn-NRvkfpsn5EfpDCq4YkfDZuyS0fnIF5BaFkX0dy2hvL66gnFKyEZxlUJ6EPkpi3Q=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Phlox ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczN2sHw8wXPpH9nHfyFdEtpXb-mBIaHT9oV85p0Mcvot1PPr6ZRGILrC_9aaJTTR6csHU-f71ARI9b0h7wiEQDPQfO4OuCbFZYokOa_pWrqYoW2avGVuV4npldiJc_29flo-6O9--W_ahkTPEpyJZATuJQ=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Oleander ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNscbjYQ80OUkW04jgEh6H09VhDJBTx9rRtYU8jki2uw-1_i3FPtOxZ_PxVybgJyi8S2kvlmaQQmmxZGxD9dVQtNPlrPZ56Th6ocJSAhqGO4QPgTNjBuglQo4C16Ah-KlLziJS3svZmF6kky-q8fHBA-w=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Aster ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczPiKKFGVkOmB9H0ENTvJUX7fJ5Rg-Sq8mePxcQPBwVsACYNzJeInx0aT7scSxKHD7weJHX5N0seQOFN9LFxW94lw8W20HG6z51RTWZpRNAf6_9QL0-ntipJaBOdeauyC9KJJOQX7x5waTiVYbiaGK3Lug=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Pentas ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOYV2G08FXzQlesfXKHB6_FlcLOjXcSH4Z8VOPGC5NLnDhiDTe2NJnkNhmwhSMPHZEk0WT9bouxTZJXToVGhyrKQR0y6vejifOZfyALnLW-69goBeFIfySWPsUsSWW6MLDsOe5_DFPzZ5GrmYGEHipFgg=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Coneflower ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczO80ZQFG6Jz0k6Act3Ji4viwncX5NkNb3fdBWGkcrvKKPusWCO7e8j49uUPiM6ys1ri8-NBRdcpxzURRX_l9GYvKppkkViFP3gNuGBquKq4FjMdYsp2D8wE6IGRLLfPWUUd-kryDSTACFYijCPMt1fyBg=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Petunia ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMuZKfxggZ_G4uRwDba49cQLTyIig1-V9mAqdBuBccSkguo08UuzhF5O3IQScae0rsPQUyS4Wds0O_A_pX-1gxFXn-dFZlIWBs3-7Zn2zjbqtVDwPK0-iTlWlxOk9mdlcCqH9dtZdgGsCutrxW4ea8d9w=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Foxtail Fern ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczONQDeQDjclyo0iIaAm4MRmqf3won9Pu0MAf2TqykhuP1hMNzq1PIyuZSKyYfCc2L5fshUdsZGXiOymE50d4BoXYVVjisU0PfIOt_YOiANJyvUOC4ChNLL4bOQoxINEXfU7yCwi4SlR21l9_r_Ns0Rv-g=w620-h827-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Bromeliad ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMm3Jn8dmXE83reb-0QBAG9ON_lDQ9QFyBH9rT7aSc9Iz00ZPWefJM6nwMB5NqeagstJDXjKNFVkESg8shmM6ceQ9f_j6jRHKCGTN8ulN59YwFO9UswLZeYKaTsjIaCQ-te4y9ZQrskyvtwhwTKe6JMHw=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Verbena ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNgZ30zmyk9Jyo5R9j2r1SERs3KCs1ySVHcZgaoP6_dspJgOEfYGsc3pj6zbLfaroBJqmBsxjyrgh6xv8zrS44okR3aYJ18quMSscXcQ36Mc4iJifnbDaM847paiATyh2ZCdSEXQo99Ny2qtNw-e3kmOQ=w1100-h733-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Barberry ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczO8OoGpQKtkJ0mZEUudYwpm5FtC2ArUNwwby8lrW7XZAAqFlIlVoWrBkqCAw6b9Pk8jaAG4I9bDjJ1iMN6ZvDBKMJnnEz0E86MhQWYp8a_Cte2WZp2P7GXcrvM8NzuJzNG8tgT-d3RGa3tjyH3s3lB89g=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Lantana ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczM5JIWS2Mru0mhEjygGQjUjTE7q4LXwsbasrojkj1-3zaBo_X20bVK0J8WH2tKvrVo9Fts7m13piM_J0EUMdJAnG6yK3CGfod3otYiTSncWldqlT8Hrvfwx7xJrBsUEQ5i-0fneyfPZijQMdzY6X0-GEw=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Daylily ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOIG7gRgaSmqP-Q41m9Cvmaws6lQgta0f8lSoMGc63AHy-JsdF5lDKiAjtjj0ykgHkgxEKnqjUJvSyphG8BGkkdQtdm6BQIvGWcQZshC4H0RpQuQF-q6WGJyufdrU4za0xsdbfYAUae76JRdfVzXC-JRQ=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Impatiens ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMVWTr_AmyopNxES2W0tqBwQIvd5sD_Kz_6tH2c_8_uNApcsNyqfGnjDA8eUXdzDQoYgB3-gkm-EQYKR_lPmjfiyeqEl992LRnzQk-5jj4zVyIHITTnxoakaOUsL0I7H_f1MOH8PiD0DDIQSPs-9m_7RA=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Blue Daze ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMHfTBmEzhKSdijFf48PVnKhNpKfPdM-a2Kl2VJP6xxsF-L07bOhJhonmQPmwvJfynmadmBAbe7cqhxlJCabXwqcCJvjrID-iNE9rlfPBE2fLHV4beB9GmLLSxR29_Zi2M7LcVV5hjGJAZnAE9-fTNpAA=w1091-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Trailing Vinca ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMG0r3oXzi44bTr8vw40-lc77Ers2N1Moe6Mmi4oDXJsZuxr3pm-4AQWJuftGhb7qQ4g0dWxc6G2J3eWEBMCSWMzrH7ZgJnIxVgP0jn3_V-D5AFzLb3_CmmP1isivxmsPmUuYL9p8vj6LfrpJbv5070DQ=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Moss Rose ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOMnYsMCYAYrT05Cxfa0xiGgq3ir0d3KAlEa27xNfKhSOrf58DOeyttSYB45eEgqkkiYs-2sjiaT6HPzrZGP0GdvvB3L-KC6_Or6XrfEn_shR_xrvIOATNhjKoblsztcNME0TSeGIW0Yo6mUtXdbw7hLg=w1007-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Gerbera Daisy ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNqAwpkNKzU0uBoXZtNMWmeKoKsyB4hTwgpJKg7a0GwkrwEzWTPZoKROkPEOeLrIjEfwTqGWkz85dTtc2IXNH8UuiLJNJXhnKy_XgSdpjNbZEvPARUNu6rovb2rMff7xVXcaPMAH0SknG7AAZwvTHk9UQ=w1254-h836-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Pride of Barbados ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczPbS7YWdvqkTxjU_JnUTgv_70QlylaKrylu23tCYcWlhIPf2lQHPfvdOR3wWOk9o9WYmvVgNCOrOF0Xxi-xcc58a098A1y1ptr5iP4HSf_nGb9FsobWA5M_r1TSx4mzDqbeKOFBomaTaB_BmwcPlbhO7A=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Mandevilla ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNbQbf9U12Lym6xwbOTGnJSaktJJS76EaUSsTw71UsSfoYOzoBOIsH1VzJZlaGGv3RjQAELnUM56rquhXEzKNQz6GZtcn5qB2DBwsYKQzE6-TX4S6f1bSI-fTJfnNei0GPcmWaUtWxLAFDPsxELyOkbVQ=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Plumbago ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczO4CYHSuP2jU5E2kDxKYqkQ01Q8oWLSD3CWcLgZUTaX2KKfI5Dp1xL0XmDDxu0sUdH6OeHk1mwrp919FR5GLKSkpoEhuMWFx2U5c000iiPhePn7nyHjowCmH4JFBR8BJeYcQYkEZdTaKA3G3oF8m05-CQ=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Caladium ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMgIyvN6W7XJT-r_aKmHWckLCm55k_9tYu843pxBvScMsVUMfnI3QBHPMN1HVtXL0_wiNqRCtoMMuUhngOWzPMFcgIMZMAIyrUle6lb57gwa3LWEPiyCg7XrUZ1Ml3fRpclXKsiNdt7VTcbkSWhla2y4w=w836-h836-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Purple Sweet Potato Vine ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNLkcs9VZwZ8HbQ7s85n06jHySKbBBMucSG4Cnw9X7vAGWKN_8m8fCmwYEkRv5aGD-NAcg2iOv6QyMP3_gxcvnjB7xj_5MsyPAuLdo7HLS4abBJa-D_4MLgwibwgxvRZY7cJTY0YTcPLgGFl4RiW5jznw=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Mums ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMA5gWSilso56QfxFz4yFW5uTwUEFv2YrXm5k9_AorUyRsp4kjOc5cwYsPbYOJE5dcAGiBnuVX7mYnfTMCHl1IGCD6-OQ0fW_hPV4VgG3RCy30kaYVY6PXwDVF9Wnmt7cwA17CYcK_r7blGvkM1FDUz6Q=w1091-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Black-eyed Susan ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczP4nNxWIX1a3LiSFil9sdXASbfg1B4E3oFTd3f2bS8egj5pKxP_O-ju2eciPKQ1m1sVCOY8wLF78Ld0p_C7sz-KLpGvWVmDfayyXyWLwI21C0GSERfqG-QYeeirdTNo9tRuZy76E1QJdTBMrJZecuQbCA=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for SunPatiens ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczPEJzB17mCzDp6f89LX7vF3qI5GYxCvd0J9KfpwSB1yNukADf1CScbscF6_Wo-rstt5HslFIM28ffUbLzkv0gRg_oiIFvVAafQ4mntI1zYvYn5E9MiB8hnEqOP8L5AGxpUsvJpq7pjs0NU_LG_7XoidMw=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Snowball Viburnum ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczP02NeU6hb4wFkIykPpFX-9ojvdZnzSaW7vH-tfqCLhnstFg4GL3XG7JE4xet83ahKtxzxLEQO6iGMubAuolIA8wXTxYgnpQbvaHTUYVJ53b1oKKJMsp6LA8Pdj1GBKWgembd39pv3tbzvCvgEAsyNpCg=w274-h182-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Orange Bells ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOdPY4NFECl_E6miPp6A8---zATnZlKwM8DASxSnswCzcvEYbQl6BKofKmCdD-4MACOMEsDKn_2YW-7h6cMOFqs4H89j02H2x5JAFzNDw4G62irkkRmr6wXfddagrNNT1g9Dj0wkQdalNFFTmPEEsJuGA=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Firecracker ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczObyz4P8hJnXRNJK2MVwT-vPQaSIrkuglAkCZ2LEoFE0AnnhnuDfgu4mADkbHNqh5RElPEtf8nndfYWhPpHYMQ49ZlZBrWyJAwYn6OHul3oaWfrCK6lq-zo_xHnBxn4h_D8BFOHIvrC0vi4-rdlMluBOg=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Fan Palm ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOqB_ofRKIt68PgAmgOHdXVVBriD3IlGqL7r5WXSt1QHut9QO2HU5BIXORhxK5MdMktzcbodgPh9EkwNuyJTAPnvwJ_wr9WhxjNpWVkA9Ru9iZmJoBsSnzXTB31zqJaXwEDO1r-yQndsnz-w9MU9Ow3-w=w1469-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Asiatic Lily ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczPS54stikVijwaI8rnxCTiZ4Mq-ZzRNdS1gucyCeQVt_jt8H-DiuwCNHrwe0z9lirXhOIRCHvMPE90BFTPFBRuJVazhXvWSMup5_-WrMYD08xK2rwlH2t4iQFMh5e7d2a5CYFTIWZi7FoHjL0ZS-9LwUg=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Red Shrimp ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczPx3AqS2VrMnpsqerML5mpNXleOX_YkF4tgNh6HlxozIMk_r5UjI4cVMXnk2MM3bmr2Ur5AFtW2h_afidpFS1ERJ4Wzm4Jlu31SenFNCGvJihFdAH3_7bIwUbP7foI1MfTHTVbhGuJyRftEKNDpvWtGVQ=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Walking Iris ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczM_nRW565Hb1glu2FBLwry02u1Gdl370Tg1y6vIr0fRO3VGnmMvPkZ97pg9rGPsfcYL6FBWYvZ9JBJ23hrzb0SGHSctug1HmOiA5-I0gnUBll9cXEM-kIEYbU5kgBZXBNDVeYwJGIal4QhIrCd8VAu6oA=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Pygmy Date Palm ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczPLaVoLT3ylQnK3IpoRP7-e3Tkbomj2QntrleL2q8idcI6q4oWn7riGBwMKNOnj3YDZaN8IQR3okE-TghI2SJb47MGrq5VC3BQUry_PJVUFAZIJbJ9fZKx86cErP3lNbDZpeWqZTqJHowda2v0pkUSVjg=w1091-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Fiddle Leaf Fig ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczN0x0lXxb2_03fDW2ryU5Hxgp_PfcWDRSQCblkscsgJkLcnT3_B314l8dC-645U6RAzHA8PPfr8VAa2NzF8MkXZy50kH99Yt6RszJfCBFY8FnvLvvCp7dm6zktWMCvn4pPQZwN8WOJPLq1Z4UTnRNrsWQ=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for False Aralia ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczPTCEU2lBS1IbQWtDl04QL_PTBcpyE78-2pi5XOPaerWd8EIHFjs3oFvQVCKkOT4Sx3596nxYiD_S-lIhU64edMd6c8yRoJyuEnN91_R137dmR2QOlWdsUWzirfgKTcizlYfiVD-TYrP2lox5uk7AXFkw=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Bird of Paradise ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOsIKzjVuMAHPo9a6Fl0vC5TBaojn1Gd9IGX0i2GcFBEIQebLu17UWQ_ZkIPowwiZ14E8OZxfn4h-E8kYkaytGiGnEeqGxPKCgI5VlDDBQucaAMEGTbYXjAvpdaweaQWlrK4SMjBQrRty3GXjjbIP0qUA=w836-h836-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Dumb Cane ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOF16EIfOJgZ_0PhR424VEEostA3fpKbdkQxgPEqXAtYws2p-EgNhcpzWxOW5koxRepXAB104s3n-tOTURzdKYKil0lQAK6xLWBCAcWvITkwS0o52d2rKrwNv4kq4S5lWEj8CpYPR7xBnskPA5yeCP3vg=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Corn Plant ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczPaBysqWfI6dAUOSfG3-ze8-OJkujE4WNAxH_SaDn5qSmDTX2m04PItkBtA4xYR0WY8oQkT93kgUOkAeSB12vvYhgAJxPhTEjQ5Xq_DVTs7ecAZuFsKQOhVjOHpib7upfaf8NPHbYdG3lK8IkXQVpcRbA=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Morning Glory ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczPrNqV4f0_PHrLQ5x_39e5s71ftPVH2dgP5VNWeI8zrXq68Ju1PEhYAwX0bDZvbln4FyBR12MccBh456LWZnTbS9rhV0sAWXcrfrSEYZf0po0h-ByDaMEhXzdEkydcE7979_kxf8MHygE9z8LX-s4ivug=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Gazania ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMBI8OlmklhGiZkmsxXa2epP1wY2gVyt2ipcjVq2eGUoodHEfMrZQacka3DYcjz1-J8Tp5hkKsrnS1cMAJilQveYDZobtuvO80wmNUQMsLuq-wRaoJTaMrxc9fd60-iMnkJElrqoOigkjSCScUH7-iGXQ=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Geranium ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOwwXKYMzWXwy0fHnRzf2gFL1URhNqEwQDU2yUYcNNfIEq7RnIx75eFYgX3ZB_9MI4_IEM3ID_fJ3cWAREBxC1KhkyGzp5fzzwJTlDN3Kst_oVcHUxkLO9WByk780Ac3njQIuCWuP2nruDQ7F6JeQWZOA=w1091-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Calibrachoa ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMP1hRBT3f3mIjlFm8Gvwf2pLzLCLCFtlwGDPQsic7LJ3tj5ctxK9C18HP7hW3lWzv0w3gm-0zPTMd8QtJkmDP6N3b1SK6jZOKNPCKahsWtYjzu0dGlSzDmEAhHPKGVRfM-NXOY_qAG_p0qKdtaAc_6TA=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Heliotrope ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOor4y35iyqXTKWyl7-R9YkVimBpIRZr5MTtVYdv3hDiNtnE_CaECDxrgC4ecwxqbUMkocDtdzUTVHQlMUsermbUAEdSqNqceoXC01uwyrTJZt-LO7OwcgZ3hYxEJMxWcy6Fywf8ws_Me9yVoeTdi5QKA=w614-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Honeysuckle ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNP8_iy3eh-XJa5WUeSfNwWOXDJyuY5UVGhTLtMrNdVbGe4Jp98JqncjH7vYEg98pkW9DrfVqflGG6NFZOEQEl6-I4LnJRNqZYr80GUqDF9MU14T6m-l-xnfakFOhwHaAWj56bKzEOpGnAjhvmjlhzbDw=w818-h818-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Ixora ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMMOleEbFC4xSGScoVtmn_JmEwRGCy9cvqoFelCMyH2heLIXMrIIu5ACuCAQKQVuFzvVcQXEf4c_706fgomoPmLJTDezXzIzSB_LAmrnvagXJxpAmjuiiuUcPe-flxRj5tq6Y7YaO-E-lct4o0_-Kz6bQ=w700-h700-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Veronica ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMcDLczsMxfFudCbNqyNBsgT_aUtSo-b5Lfkm4EFfB04zUljTnNF-zib2gtSfqz3Go81NBFjPCVKHPs3AhEblqCzi3z225mnyTNFX1YAUHFhx_53lDUkRRBYVPqZ64zRfbT_wIddVmF_Zfbn5e_Wv-T1w=w453-h771-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Nemesia ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOX6PU6Va48AUlK4ud8gFGJ8fNPO5016BWiJn05lKJ_u42cwzOLtL4--qEESwg6qVoZJtVxMRRPS4WgJ-kW0EBxlX7aiqdXcAQ3ukfJcNut6iwN_P6PjMy7Z9AxCUjmpbrEWtdJ9Stg0wv5apILF8Mptw=w612-h471-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Pink Jasmine ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczP4DV5z-QKxb81JCzU-fIB-bcPo-ciQEvFa9f-_RWwtWe5gfiF2A2CZ7Cq01S8wWbNoY9-GMxXwjKxxGr9xMfGtUECjC0T22EEWdu7Xa3Fecj_8eEGgLoPQgGubFq097OyLjeSASRVDv-u5vLx37cwZIg=w612-h408-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Kalanchoe ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOgPXDK9sxna58256El17qNtVz8E8zhht_a0NnqJz4hTQLZX6Io_szyE3U0wyi0s5yC8QnvpVgqFFIlcvzJbAF8wNk8k835JE9IYb5XnXinBYj7bdHd_Rfv3BK_UoLcmgFwFTazhxJ3dAqOZoJaR06z4Q=w540-h360-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Speedwell (Dracaena) ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOM-gxcDxkvk7pfoKW7RRURIbmCZurspE8WJMKB2Xf4Pws_UX5x5a49DsfoE9yqh1dpvjYMaBnSIpnk43YVT3nRfPtH-Yl-G_CD1CJtQQNbLC0ijLe4ix5u3a95Qu8G05dUX0hFWBSNgxK34Joz5r8wFg=w911-h911-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Erysimum ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczPHuxOCa-wyb6tJ0SxepUW2qZqjRzNw2ub1nDSwosJeSoFBkd1WUDj5U_FYaNbZclutazFPLyfBgb2kyqX5bE6EhC3kROvXG_hp9_cVwBUJKf6oGhEemCTn5SXkIBftwxYl998f6ZvEVhHaMjfFJ_1DDQ=w2048-h1365-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Coleus ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczM3TBR65CxlzK5-pgAbWPm9COBSJFkzY5VA1kBooau_-ODsWVDkAPVkpsB_QVzFAOzwRJLFDGBQZncP5j5uT31_K_E-AT8WQMOJzoE-LI9q-bQfCjpdR6Nh4bY5gvkQfgt7gzkoweDFzgvddg8MvXE6CA=w544-h544-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Osteospermum ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOL7QpW0XCwYCzhhTditBBVV2AeG3_LLospcpVtKbhutSqp_xA84_vRbCujVfBxYhHbZkreIQ6nNRlCgIDN3vh43SVLHDsxMpPA4ImdtbtINqAp4Wx6cPh72eWQS5TLGM-kThm7ja17-0-zniVfPCQY9w=w952-h827-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Lavender ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNH5rTSQxmSqST7MzoO97-3gKz6fbCF-CQpqclQqDtP-B77vTqouBt9ONKFqeiMg8SdAr8jRLzcTg93A8HnKHXdqSyztT6knONv2A6Oh3Yo_WdbQ532aw7hkdhQOLfn3pO8isp0z9v5WFuC1RiyXrETyQ=w827-h827-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Live Oak ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNm3PO8vNyVNJwnJcqQ4InI9nyk0vqOs_jIqULpefUPR-tHnvUUw1kikr9YNEYwHjz80ba9X-_Gazjgcu45eFcr0wxUqvrsseeSb9E13P7Xe7g7fMdkYPHBoah1m3lN20l8_fYST_LmwoTfjYRV4C7_1Q=w1000-h560-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Bottle Brush Tree ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOBCCeCOQJ3DDiy_9c2DLlNZ6QoLbkGjJVPEsTtuQr-SojA8npJS0eDyaXgbyuaLBjITwAXgEYnExF_bT03JJFfIf3nF1utD5muyLv-GuTr0l2CI--in09PKwW2tLuZM1ARSX-iqK_oPtCj53yxVsVExw=w827-h827-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Pittosporum ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczP_Qc0JSTl79iKye1DkoNdKdI4d1PN1Ts6sACwM37O_RxKv8wZDGsv6Q9njG2OKZ1GURoFB7QefYVhKUT8gIMO1X8xkbxYrFohQWFAZExvyQADOPe66SFbNhbUsjkKOX2j6_I6q4c2EkEpZ98K63pk6RA=w1000-h750-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Chinese Evergreen ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczO4wNkRe9zIAthmG_9jFaQkrbJ9OyQETNAAIlR9hiid6C2gzYONNCcNPGuk7L--DEPjDbwZyIOX2Wvj9EZhGAu_a-ZEzfcRcmzFIY7RPlv6-zJKRVGogOFhkk0-IbcjERCM8_nnKjoof1wnr-4qN6wYSQ=w812-h836-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Texas Sage ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNgsMrhIvM6xmsnvuHlFBc4H1422U_Wag0rkAHDNSO4QpU40j9JqI4qUM-UEhsJnYuW2G9Udg4L9zgebD5s81_UUufsH9X-mZkJNg59mGgdZBAAXfIuSR1Edqjx-8Ro_wbgZ_FFTmG43HdHk5_PVshtiA=w600-h600-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Japanese Yew ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMnhSi_YPFOYRoO5Jg4NuwDImOb2kqWAzujXeLNU9-2nzmqKIInQqaFXfYA1tkQPaaP1uHvV_q0eSeGRHLfyBosOQZk2q5GG9uG2pQyVY7HFwfwrkGqwHXCU7_gvlEZ8RaGTiiXuvSQihv1b01l6wGf4w=w534-h800-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Ivy ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNVynXw1TCgRe4VX2SeMqPTmoOFg7DENeQFzAhpyO9_sRoXehAwgrOl1LLssQ4QkrutwleRu0y4FqHQSO19pFGsfmZFsg02z6slTt79vgd6fHv6fz74tthj5i-YxnQmUNvUnhucdlGpWoFdRMT6n1KxYw=w732-h836-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Morning light Maiden Grass ===
+Photo URL (formula): 
+INFO:conversation_manager:Conversation test_conversation_123 has timed out or doesn't exist
+INFO:chat_response:Phase 5: AI response generated in 0.13s
+ok
+test_token_management_with_conversation (tests.test_phase2_conversation_integration.TestPhase2ConversationIntegration.test_token_management_with_conversation)
+Test that token management works with conversation history ... INFO:conversation_manager:Creating new conversation test_conversation_123
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 1
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 2
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 3
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 4
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 5
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 6
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 7
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 8
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 9
+INFO:conversation_manager:Added message to conversation test_conversation_123. Total messages: 10
+INFO:conversation_manager:Retrieved 10 messages for conversation test_conversation_123
+ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.765s
+
+OK
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczM31ilgaU7H3d9ora3HNqaRBih-dTfB3XhOXMoKTzOBpbzV8ZdCJxvAslOK0HWLAVvtp02awNs5FgrUgPosu7M5VWh1Dme0yWYA_zDckjFyYUozWMxmbn74WO6L0muOxe5OsxIriy-f6LUUp2NvR-FnPw=w701-h701-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Marigold ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczPcsOb8wY9CDXSSC1N9ISVTND2-h0ojzXCc2W05wfpyhwZHWak-HmnmhpylUf0IySqsamJON4yLF69s6PW8Ok1m7AdA2HX3m6t5vZ7ibCRMTZtSqVL_WbgW3DzkUkxaU8yvebCXtcsYai3UI6Ye7lb8Gw=w836-h836-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for snapdragon ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMXBnk8mssZYTE7HVGI-MU0slgeWhZ94eCLXEhyjybpasAIYClAxyEYaTjKZwWCPrVq2q4TatX-SooendgSQgNTNVOITZlo07xfSnSyzzCupzKiZGsdtrqin_uHgTxeMzmCX6oksSUnr_xZCniOfXnRag=w692-h836-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for lime tree ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMPbCETdZL0YcXAeGfFCiwj_I8gEYr5uenWS2lC19mx5XFHbPVqSEzCWhl4pfxXhns3dbtYi8gHkpv7ELSNHWyOHynBi9G5FeEsqTrLesKiNzoKfYD9NtlxC6sfwrsc6e8MSoFu1MKbW9sPrqMLpPdJ1g=w800-h800-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for lemon tree ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMO46cZK5BtSgfC1vCmEADVteZg7fR0oIxvrM5sOL3t_j-_a4rt44Umvj6g8Wj7LL-_Dv_lCEmtSW_eM_P-_YOYUreT7dJwiVC89nzOyqa9ASNSHeVXR9jf2UCMdUo1JqDnwL5c4n9dspTs5lq_rwxgLw=w836-h836-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for trailing Lobilia ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMOzdZGy0EmXF2S29ZgFkQm2tqLy0cC-lEtYVnU78TZTm0DM0_Gs9Gm5Nc5MvNs1Rx5M8FdYDWfvu8FC6dta5G4sIMu9fG2qLP_3fKxOwR89JTlhrdJHtH524hHL1eOZChNgf3C5MOdRu79ObqRi-8z2g=w800-h800-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for onion ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNLxNth-EhszsE-rNxBBkrbIOmNQQPshiSox0930Jy9L0iL6G8jMhQSuha0ovabzMo9yDIdYcgHV71IT5Iscm1X2WAWgT0IrHD8rSM6zinl-YqRsEG4QPj2OGShx_ICwIpHtijQdZHL3vGDv_zPh2G47w=w612-h408-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Dianthus ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOOAiIDIdEGsyvVKJ5SrM98MVMo4UPfUUkvv_4iq3qDZndXVFl2f6k3hwm8TB7Zu6Ca2E6mllG9mnFro1Q5tg7n0-Mrn5kMkyMp8ZQVLFebTHbTRsJ2AskhIdE9_jCE6yfNDcFZa3fnI8XVFEYXRpx79A=w627-h836-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Mandarin orange ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczPWjrV1qOOZBtRjkSacJ1YZjfUaRp82vQ36YZ_h8wQugDkoPsLh1-SHPUDcavgzQtDmjzotduGTNy05c8DlWZjWNE0YkPFNu9ZVTNXUAwndWP7D1YKi--r9ScXJE7UeRFi_2R1GLSjaJVHJ7OED9V2K9w=w331-h400-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for blackberry ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNIiyd4NfUddLACx9Db6kDTq5R_xD-x9ThEgzbqpOZVbln2pytrdDmDSjzEOnFoqwrWWd-HB3S3p_QAlBsZbeVQvsUwHYjjwWbLewZIcXMXfBKgtlVXuFWQhGzZ4j-gBtdfUv7U9Q0jCh0lPkHeYTpcUg=w1000-h667-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for elephant ear taro ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMHfbD39HEqIZA3p5MqXUdTJIyo_H5jWu7Tur0hs2R-TnOUuZZbAkPy63XdzfTNZVFZgfd8viqh8eGaRPymlcqtPuYKwrHaltnPPmjtrRwukteSqAl7DXcx5gYE1L-6-53MYs5xZFonX5wbAS_9vnJFiQ=w300-h315-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Primrose jasmine ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOLKVAdooEbJioQMa6YcDnOSgC4TSBR7gvvlmdU6L1bfuTPyBoA0My3XRubRhQOL9xZqozPpHxdZIg699Zed_CsPJKLeC0JK1O2L-LQ1tlD9h9TZTUmbAx7gcjwfLz5we8kw_jQjV4MCPem38JxzNCN5g=w768-h576-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Rododendron ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNZYsRA7QdTFAzbO5cAbtDpDlunIyCSYvjodJ6cQL02rbsKP5ScQW2-t4KTNkxX9z6UfMFPiXpS3DyGEdB-ZOXY8voUTHGVp3EKoUUa2siMPF2BxplbfhP2zguQQuyeQ0Nay_wxDb1YSNLHmMVzRBw4Mw=w1255-h836-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for monkey grass ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMLfqoO6_WwVYQpwI8HMVE1EdLbzbuVlagYUEB4cMfCMbqec-9jIU4OS9V8vWqiR4v7op-TxuilyvWZ4nVehx8b2111yXzvLq33q9JFTYkwtHV7gcRf1m5oK8dzr1f3ueG7e7cTLprsBpvFyaQNcmYjPA=w500-h500-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for fig tree ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczPGzoshyTGNEIQcrYYIpXziF0A4rCL5T6uKmidDmKqyvB6YLVXn2odrvgRkufRAnZ20HuOKfHK-uTXlAvEBC1DeYswSslHq32kNl96C74PWBBgRi7W_alcTDrr3V19RH_ZBSihBjUXTm8Eox_uhiINi0g=w719-h600-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for dwarf heavenly bamboo ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczN1uECKdJyXSzCe3VvRWvvUkWlfflSfkyrYK1FDyk9b3Q7LwFjoYtwfb5uBKCQfjumZCMqbN9fqyG5jYPeDMPQUTdVnbq4EM29dlVWeO63RXuG2Y_na8ccio7EK2e64E_YJ8wjwR6lMiy6GygMynTnvLQ=w836-h836-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for prayer plant ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOoZddu9db8YImXPbXPiEtNULpiiV2P372Uq3MOzaUoqXLiSE1_dHPaUZncIt_7CtuuBZz1mp3iuvFo8qnzBs6-etBfHOylr3bYfUDccDFdKDTyu1-lj3hNCZjystTX50tG0cu7lFPCCwVesGmYMZAigA=w800-h533-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for dwarf umbrella tree ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczODTXixB118tnlEO41ageuU3owJPqOL5C6UiNi0UgW_zFVc2LSWvC5hqqv-vMPrHrU_94DcXw8LIi8gr_i6yV6aUn-DFKdoVVDv3BLhIji6HycNfNU5fXN5nVhQO6f53BcoIm-w3ta2nUsCJ01Qf00X1w=w1254-h836-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Japanese privet ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNW7fvD6ntpbhrjZTJfVtavXLSor-I2Eg3t-PmevASiwSIdesE7LWPEe2GZU7LvNfigrQW_PR_LYkbDLFSPkdeQgLk4XNbiqLr9zqkt6oCP0cHC6YGrLFrQBRSq9msYGsTXtgtgHJhOurEusLUTuP5mAQ=w600-h450-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for purple Shamrock ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOO4XHZIbfcIzMvPwlku81M9hNfvFKhS85DZ3UzdhvHBHiTTYhJisfPXbLtEMME13mDVc0VHvO68GvzOKItO7hl__h6I9Hi9yqp9NgMRvoyk2KzWhwF7g1P2mDfaoKYtaV_9dwD745THzXkPFiB_A1kcA=w800-h594-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for sweet Alissum ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOcBc_p1X7G2vgcAdWN7fU1xDj5brvL2BH8bGH6Qn8uW45WKI7eSuYfTGXzldCHOxP19P8KQQ690YQifilStqt_Wsglwb3i54Mjl6mK4hpDrbFcdbw01qQvGpYEV3_sGTXODVam_k295aMhnw4vGqfK5g=w800-h800-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Jenny’s stonecrop ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczM4K22SU8v6f3Hd4BjUdN7J8rjW2iPKnJaHmR5-zCKaF73UEBU2QzWNyMlDLjZ_7ciF9jRZew8RCrcNTT4nXfuLXHKuqHt1aBFbtzZy2iUX2RIiwpI2XY_7FMzy6-3RkV4O0rZIiNUwnwMqJ46kK-HSIw=w800-h600-s-no-gm?authuser=0
+
+
+=== DEBUG: Photo URLs for Sky pencil ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczPChL4RMcRpLYaDcGhGlkkc1vXWiXuQruOdydrnXKj6WeybQNUw29_HjOrw4B_TgBltXi32lrBAS6pVG6RMccaBLwsng2ltR52_bdCds4oWBtlQLLNbDc-f4u_pmA4BbT8KQz2hyourFt7-a1ynZcTJkQ=w836-h836-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for leopard plant ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMrlBmcTYIYplHEpy4spo_MpAhnOpqSV73kZeIF__l7lpDA0AeZZLs0k3bAO03cPf6ev6DPEljYL48pl47WF0KHubJBcsKTAVaSSVyKKuasCRd1GUioqzq4Q3wJFKPPgTNnHANvkPAppFPpPdECAR_iSg=w1239-h836-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for carnation ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNS105vto9_qQgDh92o1e2RAkVB8hg9MqpQvXCaXpBKgtQh05SbX-erSANlW51sXOa1JBuy-Q2yYgZ_jQbXLNvpC8gStxy4w0Xks-jwqgQNCWc24iQCrJUoqNJYhLituoKGFjWlB7J2ix-4HAP3tMdn4g=w1486-h836-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Primrose ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOYOg_GnmT4GLQ91wbl_VxEHt_KylFrpXBtY1FPrhJydTfDq_Y2GuzV6ftjtkUWvPyp-4z4U-nId_Eq5Ym1UW6uXXq5xsU27fs61bXlpXTF-iC9PwXE0ijdOoaFUazHMEvxck8dvUfAvFhbp3gsZ0P88Q=w1349-h903-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Red Banana Tree ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOSa3O5hEsRHN-MeD5ns5a-LjTgkEGo2gCN_850uBAgzOOJ2EGjtnoTAMOnieWxmMQtjwwMiA_r_S9z1AOlw9I-RouiQU7C6Dlnu_GTMBufLzKIqoX40tRVavpLJ2wcn_9VnJDPzcUxmKO7szqUyCIiMQ=w910-h910-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Italian Cypress ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczPJjsgDYDSvYAKCmvYdGS8AFDROKZj7_xkO4ViRi5mW2g2jm21icqtGLA1w6wrqqsczAn9N1I7GFOI4FZ3dOp52TLo9jPXG9gxDg53hB7NB9FSRsibgDsv8H2YEkhRSsPJ-DAlAezw7G4uazqruJ4HonA=w839-h839-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for douglas fir ===
+Photo URL (formula): 
+Raw Photo URL: https://photos.fife.usercontent.google.com/pw/AP1GczPZqHxlXPJ0C768sV1DRw-FDiNLfjnDTZLOLerB9m-0QfO6nqIhoVbX0g=w600-h770-s-no-gm?authuser=0?authuser=0
+
+=== DEBUG: Photo URLs for panama rose ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMCeu_n7UAh-vlj-LYZn-kWbjAyYN13enR3paGJRPJWIItr-KEpc22kiqDBRL09v8qhH6kV7eXGp3IPWEdcjWZrxuzZskVF5KgWWz49E6ZQ96Yogr7GQIpYSIE_F6Cf1UlCTnYOoMAXe0OEfB_IiaMcyw=w522-h835-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for tibouchina ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMjJyrPwNcbdGr_2qpf3PuHjGhjPm5fQUWu-gAo9PMNUYjYQJan1oLxJ1jiDDPg3bQ5fOMDuFn7C7Fn7XV2kmWpiHYflZP8RYzY4uAyQ6vDpWunEJUa8700kIrB_QZL3eZ6gC2c2_TWF_HzLHtRQnhdrg=w1100-h782-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for peggy martin rose ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczPFSCnEwq4PF73yL6a3OL0XfkNJkz47H7L0eYU_iCo1i4S2sUNu7O21nLxSrIUvQAqPvzG2pjtJJaLesrTtxaVgTPslIBF6IwA5_ll31AREIPQMLsaS0jF6Hgq3oux1DHtkvSjD-44wfVW90ns7yDInKg=w557-h835-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Nandina Blush Pink ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczNlvGwGgdwmKZSDT_HMrMmfu6QywYXluOfFDP1PqUuCElHBPsYGni532dG4TkQqZBu1kCJBKacBYv_3j_QhHyg8zY0_ht8cqG-ml6n1mmtxhWaHdYP67ZwAroIbYKt4zWVhtGoV6CeKt4mIrIbHixmK6w=w280-h280-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Regal shield alocasia ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMBJFOqQNczyVIwcZ1CkAfrK5pTemD4IA1jf9wZUC9Stc_ORwx8NzKSbdhw8PCzqXko4IgQbofH5sLLhjupbe9_81cd3A6OxcxwiSCBPw2UJ_n1WY_d4susPGpQNCoCWeGLPg-qCpyAJ7vTbHPgc5R1XA=w599-h798-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Tomlinson natal plum ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczMvhMXI0rQspM-gfz5h-WES8mW9v1f6BkzFI3dVJDy7_w94vjMl0JivtB0G8S93BWEuikB1PZdOuPj807J9-BQEEQJNRvYChyh_o4Z9cQDUtxMQ9NuPkpZzdFWeqra-Op9gaSAMckj43xfg12bmsQUIyA=w798-h798-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Clerodendrum ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOwE-DPzCik0yiP9eXJznspUgCV3N87AD-IKqqwKY2D8f4Mqx7cYsD5PO20gQTdLnYCZZC2GDe2QHQMkkPoPczUtRhKV4qeNjKRIztkKqIo2OXTni5H4xYS454O1XZOPebyVRuYmK8kO7BFSDVkwopDRw=w612-h409-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for Crepe Myrtle ===
+Photo URL (formula): 
+Raw Photo URL: https://lh3.googleusercontent.com/pw/AP1GczOZ7wVrD9Y568PMYDO9Bsl99X5s1uOmciE3KRQp_9IVQp6ycDYtcC6oC-mmL4Ut03_sXDMpUxi_HdWq2lZ4dtzDK-CvIs4CVrlUSW2oSrpPhNW7OgkGCCPsDR9j3s4RrVqdkISW7oDIOo87n1y63iG5-Q=w800-h500-s-no-gm?authuser=0
+
+=== DEBUG: Photo URLs for wild fern ===
+Photo URL (formula): 
+Raw Photo URL: 

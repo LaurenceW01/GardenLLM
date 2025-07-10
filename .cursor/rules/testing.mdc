@@ -1,0 +1,9 @@
+---
+description: Always test with unit and functional tests at the end of an implementation phase
+alwaysApply: false
+---
+When implementing app changes we do so as part of a plan which will be in an associated .md file.
+The implementation plan will be in broken into phases.
+At the end of writing the code to implement a phase, a set of tests will be written and run to prove the new code works.
+The test scripts will be kept in the tests folder.
+The test output will also be written to a log file of the same name as the test program which will be kept in the tests-results folder.

@@ -395,8 +395,8 @@ def chat():
         if not message:
             return jsonify({'success': False, 'error': 'Message is required'}), 400
         
-        # Use the optimized chat response function
-        response = get_chat_response_with_analyzer_optimized(message)
+        # Use the optimized chat response function with conversation history
+        response = get_chat_response_with_analyzer_optimized(message, conversation_id)
         
         return jsonify({
             'success': True,

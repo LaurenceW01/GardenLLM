@@ -7,8 +7,19 @@ from config import openai_client
 from field_config import get_canonical_field_name, is_valid_field, get_all_field_names
 from climate_config import get_climate_context, get_default_location
 import json
+from conversation_manager import ConversationManager
 
 logger = logging.getLogger(__name__)
+
+# Initialize the conversation manager for chat responses (lazy initialization)
+_conversation_manager = None
+
+def get_conversation_manager():
+    """Get the conversation manager instance (lazy initialization)"""
+    global _conversation_manager
+    if _conversation_manager is None:
+        _conversation_manager = ConversationManager()
+    return _conversation_manager
 
 # Phase 1: Import query analyzer (new functionality)
 try:
@@ -218,10 +229,14 @@ def parse_update_command(message: str) -> Optional[Dict]:
         logger.error(f"Error parsing update command: {e}")
         return None
 
-def get_chat_response(message: str) -> str:
-    """Generate a chat response using the unified processing pipeline (Phase 5)"""
+def get_chat_response(message: str, conversation_id: Optional[str] = None) -> str:
+    """Generate a chat response using the unified processing pipeline (Phase 5) with conversation history support"""
     # Phase 5: Use the unified pipeline with performance monitoring and error handling
-    return process_query_with_pipeline(message)
+    # Phase 2: Add conversation history support
+    if conversation_id:
+        return get_chat_response_with_analyzer_optimized(message, conversation_id)
+    else:
+        return process_query_with_pipeline(message)
 
 def handle_ai_enhanced_query(query_type: str, plant_references: List[str], original_message: str) -> str:
     """
@@ -1048,12 +1063,13 @@ def process_query_with_pipeline(message: str) -> str:
             logger.error(f"Phase 5: Legacy method also failed: {legacy_error}")
             return "I apologize, but I'm experiencing technical difficulties. Please try again in a moment."
 
-def get_chat_response_with_analyzer_optimized(message: str) -> str:
+def get_chat_response_with_analyzer_optimized(message: str, conversation_id: Optional[str] = None) -> str:
     """
-    Optimized version of chat response with analyzer, including performance monitoring.
+    Optimized version of chat response with analyzer, including performance monitoring and conversation history.
     
     Args:
         message (str): User's query message
+        conversation_id (str, optional): Conversation ID for maintaining context
     
     Returns:
         str: Response to user query
@@ -1061,6 +1077,12 @@ def get_chat_response_with_analyzer_optimized(message: str) -> str:
     analysis_start = performance_monitor.start_timer()
     
     try:
+        # Add user message to conversation history if conversation_id provided
+        if conversation_id:
+            user_message = {"role": "user", "content": message}
+            get_conversation_manager().add_message(conversation_id, user_message)
+            logger.info(f"Phase 2: Added user message to conversation {conversation_id}")
+        
         # Check for location-based plant queries first (AI-driven approach)
         msg_lower = message.lower()
         location_patterns = [
@@ -1073,7 +1095,12 @@ def get_chat_response_with_analyzer_optimized(message: str) -> str:
         
         if is_location_plants_query:
             logger.info(f"Phase 5: Detected location-based plant query: {message}")
-            return handle_location_plants_query_with_ai(message)
+            response = handle_location_plants_query_with_ai(message)
+            # Add response to conversation history
+            if conversation_id:
+                ai_message = {"role": "assistant", "content": response}
+                get_conversation_manager().add_message(conversation_id, ai_message)
+            return response
         
         # Step 1: AI Analysis (First AI call)
         logger.info("Phase 5: Starting AI analysis (first AI call)")
@@ -1097,25 +1124,36 @@ def get_chat_response_with_analyzer_optimized(message: str) -> str:
             # Database-only processing
             performance_monitor.record_metric('database_only_queries')
             logger.info(f"Phase 5: Processing database-only query type: {query_type}")
-            return handle_database_only_query(query_type, plant_references, message)
+            response = handle_database_only_query(query_type, plant_references, message)
+            # Add response to conversation history
+            if conversation_id:
+                ai_message = {"role": "assistant", "content": response}
+                get_conversation_manager().add_message(conversation_id, ai_message)
+            return response
         else:
             # AI-enhanced processing (Second AI call)
             performance_monitor.record_metric('ai_enhanced_queries')
             logger.info(f"Phase 5: Processing AI-enhanced query type: {query_type}")
-            return handle_ai_enhanced_query_optimized(query_type, plant_references, message)
+            response = handle_ai_enhanced_query_optimized(query_type, plant_references, message, conversation_id)
+            # Add response to conversation history
+            if conversation_id:
+                ai_message = {"role": "assistant", "content": response}
+                get_conversation_manager().add_message(conversation_id, ai_message)
+            return response
             
     except Exception as e:
         logger.error(f"Phase 5: Error in optimized analyzer: {e}")
         raise
 
-def handle_ai_enhanced_query_optimized(query_type: str, plant_references: List[str], message: str) -> str:
+def handle_ai_enhanced_query_optimized(query_type: str, plant_references: List[str], message: str, conversation_id: Optional[str] = None) -> str:
     """
-    Optimized AI-enhanced query processing with performance monitoring.
+    Optimized AI-enhanced query processing with performance monitoring and conversation history.
     
     Args:
         query_type (str): Type of query (CARE, DIAGNOSIS, ADVICE, GENERAL)
         plant_references (List[str]): Plant names referenced in query
         message (str): Original user message
+        conversation_id (str, optional): Conversation ID for maintaining context
     
     Returns:
         str: AI-generated response with database context
@@ -1126,8 +1164,8 @@ def handle_ai_enhanced_query_optimized(query_type: str, plant_references: List[s
         # Build enhanced context with plant data
         context = build_ai_context_with_plants(query_type, plant_references, message)
         
-        # Generate AI response with context
-        ai_response = generate_ai_response_with_context(query_type, context, message)
+        # Generate AI response with context and conversation history
+        ai_response = generate_ai_response_with_context(query_type, context, message, conversation_id)
         
         response_time = time.time() - response_start
         
@@ -1202,14 +1240,15 @@ def build_ai_context_with_plants(query_type: str, plant_references: List[str], m
         logger.error(f"Error building AI context: {e}")
         return "Location: Houston, Texas (Zone 9a)"
 
-def generate_ai_response_with_context(query_type: str, context: str, message: str) -> str:
+def generate_ai_response_with_context(query_type: str, context: str, message: str, conversation_id: Optional[str] = None) -> str:
     """
-    Generate AI response with enhanced context.
+    Generate AI response with enhanced context and conversation history.
     
     Args:
         query_type (str): Type of query
         context (str): Enhanced context with plant data
         message (str): Original user message
+        conversation_id (str, optional): Conversation ID for maintaining context
     
     Returns:
         str: AI-generated response
@@ -1229,20 +1268,35 @@ def generate_ai_response_with_context(query_type: str, context: str, message: st
             system_prompt = """You are a helpful gardening assistant. Provide informative, accurate 
             gardening advice tailored to Houston's climate and the user's garden."""
         
-        # Create user prompt with context
+        # Build messages array with conversation history if available
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Add conversation history if conversation_id provided
+        if conversation_id:
+            conversation_messages = get_conversation_manager().get_messages(conversation_id)
+            if conversation_messages:
+                # Add conversation history (excluding the current user message)
+                for msg in conversation_messages[:-1]:  # Exclude the last message (current user message)
+                    # Ensure message has the correct structure
+                    if isinstance(msg, dict) and 'role' in msg and 'content' in msg:
+                        messages.append({
+                            "role": msg["role"],
+                            "content": str(msg["content"])
+                        })
+                logger.info(f"Phase 2: Added {len(conversation_messages)-1} conversation history messages")
+        
+        # Add current user message with context
         user_prompt = f"""Context: {context}
 
 User Question: {message}
 
 Please provide a helpful, accurate response based on the context and user's question."""
+        messages.append({"role": "user", "content": user_prompt})
         
         # Make AI call
         response = openai_client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
+            messages=messages,
             temperature=0.7,
             max_tokens=500
         )

@@ -13,6 +13,7 @@ except ImportError:
 import io  # Import io for handling byte streams
 import openai  # Import openai for OpenAI API interaction
 import tiktoken  # Import tiktoken for token encoding
+from conversation_manager import ConversationManager  # Import the centralized ConversationManager
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)  # Configure logging to display INFO level messages
@@ -30,101 +31,8 @@ MAX_TOKENS = 4000  # Maximum tokens allowed for context in a conversation
 TOKEN_BUFFER = 1000  # Buffer tokens reserved for new responses
 MODEL_NAME = "gpt-4-turbo"  # Specify the model name for OpenAI API
 
-class ConversationManager:
-    def __init__(self):
-        self.conversations: Dict[str, Dict] = {}  # Initialize a dictionary to store conversations with metadata
-        self.encoding = tiktoken.encoding_for_model(MODEL_NAME)  # Get the encoding for the specified model
-        self.conversation_timeout = timedelta(minutes=30)  # Set conversation timeout to 30 minutes
-
-    def _count_tokens(self, text: str) -> int:
-        """Count the number of tokens in a text string"""
-        return len(self.encoding.encode(text))  # Encode the text and return the number of tokens
-
-    def _count_message_tokens(self, message: Dict) -> int:
-        """Count tokens in a message including role and content"""
-        total = 0  # Initialize total token count
-        # Count tokens in the role
-        total += self._count_tokens(message.get("role", ""))  # Add tokens from the role field
-        
-        # Count tokens in the content
-        content = message.get("content", "")  # Get the content from the message
-        if isinstance(content, list):  # Check if content is a list
-            for item in content:  # Iterate over each item in the content list
-                if isinstance(item, dict):  # Check if item is a dictionary
-                    if item.get("type") == "text":  # Check if item type is text
-                        total += self._count_tokens(item.get("text", ""))  # Add tokens from the text field
-                    # Image URLs have a fixed token cost
-                    elif item.get("type") == "image_url":  # Check if item type is image_url
-                        total += 100  # Approximate token cost for image
-                else:
-                    total += self._count_tokens(str(item))  # Add tokens from the item converted to string
-        else:
-            total += self._count_tokens(str(content))  # Add tokens from the content converted to string
-        
-        return total  # Return the total token count
-
-    def _is_conversation_active(self, conversation_id: str) -> bool:
-        """Check if a conversation is still active"""
-        if conversation_id not in self.conversations:  # Check if conversation ID exists
-            return False  # Return False if not found
-        
-        last_activity = self.conversations[conversation_id].get('last_activity')  # Get the last activity time
-        if not last_activity:  # Check if last activity is None
-            return False  # Return False if no last activity
-            
-        return datetime.now() - last_activity < self.conversation_timeout  # Return True if within timeout
-
-    def add_message(self, conversation_id: str, message: Dict) -> None:
-        """Add a message to the conversation while managing token limit"""
-        # Initialize conversation if it doesn't exist
-        if conversation_id not in self.conversations:  # Check if conversation ID exists
-            logger.info(f"Creating new conversation {conversation_id}")  # Log creation of new conversation
-            self.conversations[conversation_id] = {
-                'messages': [],  # Initialize messages list
-                'last_activity': datetime.now()  # Set last activity to current time
-            }
-        
-        # Update last activity
-        self.conversations[conversation_id]['last_activity'] = datetime.now()  # Update last activity time
-        
-        # Add new message
-        self.conversations[conversation_id]['messages'].append(message)  # Append message to messages list
-        logger.info(f"Added message to conversation {conversation_id}. Total messages: {len(self.conversations[conversation_id]['messages'])}")  # Log message addition
-        
-        # Check total tokens and trim if necessary
-        while self._get_total_tokens(conversation_id) > (MAX_TOKENS - TOKEN_BUFFER):  # Check if tokens exceed limit
-            # Remove oldest message after system message
-            if len(self.conversations[conversation_id]['messages']) > 2:  # Ensure more than two messages exist
-                logger.info(f"Trimming conversation {conversation_id} due to token limit")  # Log trimming action
-                del self.conversations[conversation_id]['messages'][1]  # Delete the second message
-            else:
-                break  # Break if only two messages exist
-
-    def _get_total_tokens(self, conversation_id: str) -> int:
-        """Get total tokens in a conversation"""
-        if conversation_id not in self.conversations:  # Check if conversation ID exists
-            return 0  # Return 0 if not found
-        
-        return sum(self._count_message_tokens(msg) for msg in self.conversations[conversation_id]['messages'])  # Sum tokens for all messages
-
-    def get_messages(self, conversation_id: str) -> List[Dict]:
-        """Get all messages for a conversation if it's still active"""
-        if not self._is_conversation_active(conversation_id):  # Check if conversation is active
-            logger.info(f"Conversation {conversation_id} has timed out or doesn't exist")  # Log timeout or non-existence
-            self.clear_conversation(conversation_id)  # Clear conversation if inactive
-            return []  # Return empty list
-        
-        messages = self.conversations.get(conversation_id, {}).get('messages', [])  # Get messages from conversation
-        logger.info(f"Retrieved {len(messages)} messages for conversation {conversation_id}")  # Log message retrieval
-        return messages  # Return messages list
-
-    def clear_conversation(self, conversation_id: str) -> None:
-        """Clear a conversation history"""
-        if conversation_id in self.conversations:  # Check if conversation ID exists
-            del self.conversations[conversation_id]  # Delete the conversation
-
 # Initialize conversation manager
-conversation_manager = ConversationManager()  # Create an instance of ConversationManager
+conversation_manager = ConversationManager()  # Create an instance of the centralized ConversationManager
 
 def convert_heic_to_jpeg(image_data: bytes) -> Optional[bytes]:
     """

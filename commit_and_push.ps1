@@ -49,7 +49,7 @@ Write-Host "Adding all changes to git..."
 git add -A
 
 # Commit with a descriptive message
-$commitMessage = "Release v1.00.05: Phase 1 Plant Image Analysis Enhancement - Comprehensive plant identification and health assessment using ChatGPT Vision. Features enhanced prompting for accurate plant identification, health assessment with treatment recommendations, database integration for existing plant checks, and structured markdown output. Successfully tested with Clerodendrum identification. Includes improved conversation management and error handling."
+$commitMessage = "Release v1.00.06: Phase 2 Conversation History Integration - Complete integration of conversation history into chat response system. Features conversation ID support throughout processing pipeline, context preservation across user interactions, AI response enhancement with conversation history, backward compatibility, and robust error handling. Includes lazy initialization pattern for ConversationManager, comprehensive test suite (11/11 passing), and web interface updates. Successfully tested conversation storage, context preservation, token management, and timeout handling."
 Write-Host "Committing with message: $commitMessage"
 git commit -m "$commitMessage"
 
