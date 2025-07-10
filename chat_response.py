@@ -1254,26 +1254,23 @@ def generate_ai_response_with_context(query_type: str, context: str, message: st
         str: AI-generated response
     """
     try:
-        # Create specialized prompt based on query type
-        if query_type == QueryType.CARE:
-            system_prompt = """You are a knowledgeable gardening assistant specializing in plant care. 
-            Provide specific, actionable care advice based on the user's plants and Houston climate."""
-        elif query_type == QueryType.DIAGNOSIS:
-            system_prompt = """You are a plant health expert. Help diagnose plant problems and provide 
-            solutions based on symptoms and Houston growing conditions."""
-        elif query_type == QueryType.ADVICE:
-            system_prompt = """You are a gardening expert. Provide practical advice and best practices 
-            for gardening in Houston's climate."""
-        else:  # GENERAL
-            system_prompt = """You are a helpful gardening assistant. Provide informative, accurate 
-            gardening advice tailored to Houston's climate and the user's garden."""
+        # Get conversation manager for Phase 4 enhancements
+        conversation_manager = get_conversation_manager()
+        
+        # Get conversation context for enhanced system prompt
+        conversation_context = None
+        if conversation_id:
+            conversation_context = conversation_manager.get_conversation_context(conversation_id)
+        
+        # Use Phase 4 mode-specific system prompt
+        system_prompt = conversation_manager.get_mode_specific_system_prompt('database', conversation_context or {})
         
         # Build messages array with conversation history if available
         messages = [{"role": "system", "content": system_prompt}]
         
         # Add conversation history if conversation_id provided
         if conversation_id:
-            conversation_messages = get_conversation_manager().get_messages(conversation_id)
+            conversation_messages = conversation_manager.get_messages(conversation_id)
             if conversation_messages:
                 # Add conversation history (excluding the current user message)
                 for msg in conversation_messages[:-1]:  # Exclude the last message (current user message)
@@ -1283,7 +1280,7 @@ def generate_ai_response_with_context(query_type: str, context: str, message: st
                             "role": msg["role"],
                             "content": str(msg["content"])
                         })
-                logger.info(f"Phase 2: Added {len(conversation_messages)-1} conversation history messages")
+                logger.info(f"Phase 4: Added {len(conversation_messages)-1} conversation history messages")
         
         # Add current user message with context
         user_prompt = f"""Context: {context}

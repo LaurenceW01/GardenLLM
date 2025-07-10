@@ -224,4 +224,354 @@ class ConversationManager:
             'total_tokens': total_tokens,
             'average_messages_per_conversation': total_messages / total_conversations if total_conversations > 0 else 0,
             'average_tokens_per_conversation': total_tokens / total_conversations if total_conversations > 0 else 0
-        } 
+        }
+
+    def get_mode_specific_system_prompt(self, mode: str, conversation_context: Dict = {}) -> str:
+        """Generate mode-specific system prompts with conversation context."""
+        base_prompts = {
+            "image_analysis": """You are an expert plant identification specialist with deep knowledge of horticulture, plant health, and gardening practices. You can identify plants from images and provide detailed care information.
+
+Your expertise includes:
+- Plant identification from photos
+- Health assessment and disease diagnosis
+- Care recommendations for Houston, TX climate
+- Soil, water, light, and temperature requirements
+- Pruning, fertilizing, and maintenance advice
+
+Previous conversation context: {context}
+
+Always provide accurate, helpful information and ask for clarification if needed.""",
+            
+            "database": """You are a knowledgeable gardening assistant with access to the user's garden database. You can help with plant care, garden management, and provide personalized advice based on their specific plants and garden setup.
+
+Your capabilities include:
+- Accessing and querying the user's garden database
+- Providing care information for specific plants
+- Garden planning and plant recommendations
+- Seasonal care advice for Houston, TX climate
+- Troubleshooting plant issues
+
+Previous conversation context: {context}
+
+Always reference the user's actual garden data when possible and provide practical, actionable advice.""",
+            
+            "general": """You are a helpful gardening assistant that can work in multiple modes. You can help with plant identification, garden database queries, and general gardening advice.
+
+Previous conversation context: {context}
+
+Please provide helpful, accurate information and ask for clarification if needed."""
+        }
+        
+        # Get the appropriate base prompt for the mode
+        base_prompt = base_prompts.get(mode, base_prompts["general"])
+        
+        # Extract context information if provided
+        context_info = ""
+        if conversation_context and conversation_context.get('exists'):
+            messages = conversation_context.get('messages', [])
+            if messages:
+                # Create a summary of recent conversation context
+                recent_messages = messages[-3:]  # Last 3 messages for context
+                context_parts = []
+                for msg in recent_messages:
+                    role = msg.get('role', 'unknown')
+                    content = msg.get('content', '')
+                    if role == 'user' and content:
+                        context_parts.append(f"User: {content[:100]}...")
+                    elif role == 'assistant' and content:
+                        context_parts.append(f"Assistant: {content[:100]}...")
+                
+                if context_parts:
+                    context_info = " ".join(context_parts)
+        
+        # Format the prompt with context
+        return base_prompt.format(context=context_info if context_info else "No previous context")
+
+    def get_conversation_context_summary(self, conversation_id: str, max_length: int = 200) -> str:
+        """Generate a concise summary of conversation context for cross-mode transitions."""
+        context = self.get_conversation_context(conversation_id)
+        if not context['exists']:
+            return "No conversation context available"
+        
+        messages = context['messages']
+        if not messages:
+            return "No messages in conversation"
+        
+        # Extract key information from recent messages
+        summary_parts = []
+        
+        # Get the current mode
+        mode = context['metadata'].get('mode', 'unknown')
+        summary_parts.append(f"Mode: {mode}")
+        
+        # Get recent user messages for context
+        user_messages = [msg for msg in messages[-5:] if msg.get('role') == 'user']
+        if user_messages:
+            recent_topics = []
+            for msg in user_messages:
+                content = msg.get('content', '')
+                if content:
+                    # Extract key topics (improved approach)
+                    content_lower = content.lower()
+                    plant_keywords = ['tomato', 'pepper', 'herb', 'flower', 'tree', 'shrub', 'plant', 'garden', 'care', 'water', 'sun', 'soil', 'prune', 'fertilize']
+                    found_keywords = [word for word in plant_keywords if word in content_lower]
+                    if found_keywords:
+                        recent_topics.extend(found_keywords[:2])  # Limit to 2 keywords per message
+            
+            if recent_topics:
+                unique_topics = list(set(recent_topics))[:3]  # Limit to 3 unique topics
+                summary_parts.append(f"Recent topics: {', '.join(unique_topics)}")
+        
+        # Get message count
+        summary_parts.append(f"Messages: {len(messages)}")
+        
+        summary = " | ".join(summary_parts)
+        
+        # Truncate if too long
+        if len(summary) > max_length:
+            summary = summary[:max_length-3] + "..."
+        
+        return summary
+
+    def get_conversation_preview(self, conversation_id: str) -> Dict:
+        """Generate a detailed preview of conversation content for history display."""
+        context = self.get_conversation_context(conversation_id)
+        if not context['exists']:
+            return {
+                'title': 'No conversation',
+                'summary': 'Conversation not found',
+                'plants_mentioned': [],
+                'key_topics': [],
+                'actions': [],
+                'last_activity': None,
+                'message_count': 0
+            }
+        
+        messages = context['messages']
+        if not messages:
+            return {
+                'title': 'Empty conversation',
+                'summary': 'No messages in conversation',
+                'plants_mentioned': [],
+                'key_topics': [],
+                'actions': [],
+                'last_activity': context.get('last_activity'),
+                'message_count': 0,
+                'mode': context['metadata'].get('mode', 'unknown')
+            }
+        
+        # Extract plants mentioned
+        plants_mentioned = []
+        plant_keywords = ['tomato', 'pepper', 'herb', 'flower', 'tree', 'shrub', 'rose', 'lily', 'daisy', 'mint', 'basil', 'oregano', 'sage', 'thyme', 'rosemary', 'lavender', 'succulent', 'cactus', 'fern', 'palm', 'oak', 'maple', 'birch', 'willow', 'cherry', 'apple', 'peach', 'plum', 'lemon', 'lime', 'orange', 'grape', 'strawberry', 'blueberry', 'raspberry', 'blackberry', 'cucumber', 'carrot', 'lettuce', 'spinach', 'kale', 'broccoli', 'cauliflower', 'onion', 'garlic', 'potato', 'sweet potato', 'corn', 'bean', 'pea', 'zucchini', 'squash', 'pumpkin', 'melon', 'watermelon']
+        
+        # Extract key topics and actions
+        key_topics = []
+        actions = []
+        last_user_message = ""
+        last_ai_response = ""
+        
+        for msg in messages:
+            content = msg.get('content', '')
+            role = msg.get('role', '')
+            
+            if content:
+                content_lower = content.lower()
+                
+                # Extract plants mentioned
+                for plant in plant_keywords:
+                    if plant in content_lower and plant not in plants_mentioned:
+                        plants_mentioned.append(plant)
+                
+                # Extract key topics (improved detection)
+                topic_keywords = ['care', 'water', 'sun', 'soil', 'prune', 'fertilize', 'fertilizing', 'plant', 'grow', 'harvest', 'disease', 'pest', 'location', 'photo', 'picture', 'identify', 'diagnose', 'advice', 'tip', 'season', 'weather', 'climate', 'temperature', 'humidity', 'light', 'shade', 'full sun', 'partial shade', 'drought', 'flood', 'maintenance', 'repot', 'transplant', 'seed', 'seedling', 'mature', 'bloom', 'flower', 'fruit', 'vegetable', 'herb', 'annual', 'perennial']
+                
+                for topic in topic_keywords:
+                    if topic in content_lower and topic not in key_topics:
+                        key_topics.append(topic)
+                
+                # Extract actions
+                if 'add plant' in content_lower:
+                    actions.append('Plant added')
+                elif 'update' in content_lower:
+                    actions.append('Plant updated')
+                elif 'identify' in content_lower or 'what is this' in content_lower:
+                    actions.append('Plant identification')
+                elif 'care' in content_lower or 'how to' in content_lower:
+                    actions.append('Care advice')
+                elif 'location' in content_lower or 'where' in content_lower:
+                    actions.append('Location query')
+                elif 'photo' in content_lower or 'picture' in content_lower:
+                    actions.append('Photo request')
+                
+                # Store last messages for summary
+                if role == 'user':
+                    last_user_message = content[:100] + "..." if len(content) > 100 else content
+                elif role == 'assistant':
+                    last_ai_response = content[:100] + "..." if len(content) > 100 else content
+        
+        # Generate title and summary
+        title = "Garden conversation"
+        if plants_mentioned:
+            title = f"About {', '.join(plants_mentioned[:2])}"
+            if len(plants_mentioned) > 2:
+                title += f" and {len(plants_mentioned) - 2} more"
+        
+        summary = ""
+        if last_user_message:
+            summary = f"Q: {last_user_message}"
+        if last_ai_response:
+            summary += f" | A: {last_ai_response}"
+        
+        if not summary:
+            summary = f"Conversation about {', '.join(key_topics[:3]) if key_topics else 'gardening'}"
+        
+        return {
+            'title': title,
+            'summary': summary,
+            'plants_mentioned': plants_mentioned[:5],  # Limit to 5 plants
+            'key_topics': key_topics[:5],  # Limit to 5 topics
+            'actions': list(set(actions))[:3],  # Limit to 3 unique actions
+            'last_activity': context.get('last_activity'),
+            'message_count': len(messages),
+            'mode': context['metadata'].get('mode', 'unknown')
+        }
+
+    def get_conversation_history_summary(self, conversation_id: str) -> Dict:
+        """Generate a user-friendly summary for conversation history display."""
+        preview = self.get_conversation_preview(conversation_id)
+        
+        # Create a more user-friendly summary
+        summary_parts = []
+        
+        if preview['plants_mentioned']:
+            summary_parts.append(f"Plants: {', '.join(preview['plants_mentioned'])}")
+        
+        if preview['key_topics']:
+            summary_parts.append(f"Topics: {', '.join(preview['key_topics'])}")
+        
+        if preview['actions']:
+            summary_parts.append(f"Actions: {', '.join(preview['actions'])}")
+        
+        summary = " | ".join(summary_parts) if summary_parts else preview['summary']
+        
+        return {
+            'title': preview['title'],
+            'summary': summary,
+            'plants_mentioned': preview['plants_mentioned'],
+            'key_topics': preview['key_topics'],
+            'actions': preview['actions'],
+            'last_activity': preview['last_activity'],
+            'message_count': preview['message_count'],
+            'mode': preview.get('mode', 'unknown'),
+            'conversation_id': conversation_id
+        }
+
+    def add_conversation_metadata(self, conversation_id: str, metadata: Dict) -> bool:
+        """Add or update conversation metadata."""
+        if conversation_id not in self.conversations:
+            logger.warning(f"Cannot add metadata to non-existent conversation {conversation_id}")
+            return False
+        
+        if 'metadata' not in self.conversations[conversation_id]:
+            self.conversations[conversation_id]['metadata'] = {}
+        
+        # Update metadata
+        self.conversations[conversation_id]['metadata'].update(metadata)
+        self.conversations[conversation_id]['last_activity'] = datetime.now()
+        
+        logger.info(f"Updated metadata for conversation {conversation_id}")
+        return True
+
+    def create_conversation_with_metadata(self, conversation_id: str, initial_metadata: Dict = {}) -> bool:
+        """Create a new conversation with initial metadata."""
+        if conversation_id in self.conversations:
+            logger.warning(f"Conversation {conversation_id} already exists")
+            return False
+        
+        self.conversations[conversation_id] = {
+            'messages': [],
+            'last_activity': datetime.now(),
+            'metadata': initial_metadata or {
+                'created_at': datetime.now(),
+                'mode': 'general',
+                'total_messages': 0
+            }
+        }
+        
+        logger.info(f"Created conversation {conversation_id} with metadata")
+        return True
+
+    def get_cross_mode_context(self, conversation_id: str) -> Dict:
+        """Get context information suitable for cross-mode transitions."""
+        context = self.get_conversation_context(conversation_id)
+        if not context['exists']:
+            return {
+                'available': False,
+                'mode': 'unknown',
+                'summary': 'No conversation context available',
+                'recent_topics': [],
+                'user_preferences': {}
+            }
+        
+        # Extract recent topics and user preferences
+        messages = context['messages']
+        recent_topics = []
+        user_preferences = {}
+        
+        # Analyze recent messages for topics and preferences
+        for msg in messages[-10:]:  # Last 10 messages
+            if msg.get('role') == 'user':
+                content = msg.get('content', '').lower()
+                
+                # Extract plant-related topics
+                plant_keywords = ['tomato', 'pepper', 'herb', 'flower', 'tree', 'shrub', 'vegetable']
+                for keyword in plant_keywords:
+                    if keyword in content:
+                        recent_topics.append(keyword)
+                
+                # Extract preferences (simple pattern matching)
+                if 'prefer' in content or 'like' in content or 'want' in content:
+                    # Simple preference extraction
+                    if 'sun' in content and ('full' in content or 'partial' in content):
+                        user_preferences['light'] = 'full sun' if 'full' in content else 'partial shade'
+                    if 'water' in content and ('frequent' in content or 'drought' in content):
+                        user_preferences['water'] = 'frequent' if 'frequent' in content else 'drought tolerant'
+        
+        return {
+            'available': True,
+            'mode': context['metadata'].get('mode', 'unknown'),
+            'summary': self.get_conversation_context_summary(conversation_id),
+            'recent_topics': list(set(recent_topics))[:5],  # Unique topics, limit to 5
+            'user_preferences': user_preferences,
+            'message_count': len(messages),
+            'total_tokens': context['total_tokens']
+        }
+
+    def create_mode_transition_context(self, conversation_id: str, new_mode: str) -> Dict:
+        """Create context for seamless mode transitions."""
+        cross_context = self.get_cross_mode_context(conversation_id)
+        
+        # Generate mode-specific system prompt
+        system_prompt = self.get_mode_specific_system_prompt(new_mode, cross_context)
+        
+        # Create transition context
+        transition_context = {
+            'conversation_id': conversation_id,
+            'previous_mode': cross_context.get('mode', 'unknown'),
+            'new_mode': new_mode,
+            'system_prompt': system_prompt,
+            'context_summary': cross_context.get('summary', ''),
+            'recent_topics': cross_context.get('recent_topics', []),
+            'user_preferences': cross_context.get('user_preferences', {}),
+            'transition_timestamp': datetime.now().isoformat()
+        }
+        
+        # Update conversation metadata with mode transition
+        self.add_conversation_metadata(conversation_id, {
+            'mode': new_mode,
+            'last_mode_transition': datetime.now(),
+            'mode_transition_count': cross_context.get('mode_transition_count', 0) + 1
+        })
+        
+        logger.info(f"Created mode transition context for conversation {conversation_id}: {cross_context.get('mode', 'unknown')} -> {new_mode}")
+        return transition_context 

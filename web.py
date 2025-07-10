@@ -21,6 +21,7 @@ from enhanced_weather_service import get_current_weather, get_hourly_forecast
 from field_config import get_all_field_names, get_field_alias, get_canonical_field_name
 from climate_config import get_climate_context, get_default_location
 from chat_response import get_chat_response_with_analyzer_optimized
+from conversation_manager import ConversationManager
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -491,6 +492,55 @@ def api_fields():
     except Exception as e:
         logger.error(f"Error getting field configuration via API: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/conversation-history')
+def api_conversation_history():
+    """Get conversation history summaries for display"""
+    try:
+        conversation_manager = ConversationManager()
+        
+        # Get all active conversations
+        conversations = conversation_manager.get_all_conversations()
+        
+        # Generate summaries for each conversation
+        history_summaries = []
+        for conversation_id in conversations.keys():
+            summary = conversation_manager.get_conversation_history_summary(conversation_id)
+            history_summaries.append(summary)
+        
+        # Sort by last activity (most recent first)
+        history_summaries.sort(key=lambda x: x.get('last_activity', datetime.min), reverse=True)
+        
+        return jsonify({
+            'success': True,
+            'conversations': history_summaries
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting conversation history: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/conversation/<conversation_id>/summary')
+def api_conversation_summary(conversation_id):
+    """Get detailed summary for a specific conversation"""
+    try:
+        conversation_manager = ConversationManager()
+        summary = conversation_manager.get_conversation_history_summary(conversation_id)
+        
+        return jsonify({
+            'success': True,
+            'summary': summary
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting conversation summary: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.errorhandler(404)
 def not_found(error):
