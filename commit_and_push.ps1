@@ -49,7 +49,7 @@ Write-Host "Adding all changes to git..."
 git add -A
 
 # Commit with a descriptive message
-$commitMessage = "Release v1.00.06: Phase 2 Conversation History Integration - Complete integration of conversation history into chat response system. Features conversation ID support throughout processing pipeline, context preservation across user interactions, AI response enhancement with conversation history, backward compatibility, and robust error handling. Includes lazy initialization pattern for ConversationManager, comprehensive test suite (11/11 passing), and web interface updates. Successfully tested conversation storage, context preservation, token management, and timeout handling."
+$commitMessage = "Release v1.00.07: Phase 3 Frontend Conversation History Enhancement - Complete frontend enhancements for seamless conversation flow across modes. Features conversation ID preservation during mode switches, enhanced UI with conversation history sidebar and localStorage integration, mode indicators in chat messages, conversation context display, and comprehensive event tracking. Includes robust error handling, performance optimization, and cross-mode conversation continuity. Backend enhancements include unified conversation management, enhanced context preservation, and improved integration with chat response and plant vision systems. Comprehensive test suite: 28/28 tests passing (16 backend + 12 frontend). Successfully tested conversation flow, UI state management, API integration, and cross-mode functionality."
 Write-Host "Committing with message: $commitMessage"
 git commit -m "$commitMessage"
 

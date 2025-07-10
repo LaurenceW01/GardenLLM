@@ -81,9 +81,13 @@
             useDatabase: true,
             hasMessages: false,
             messages: [],
+            showConversationHistory: false,
+            conversationHistory: [],
+            currentMode: 'database',
             
             init() {
                 this.updateMessageStatus();
+                this.loadConversationHistory();
             },
             
             clearImage() {
@@ -92,17 +96,87 @@
                 document.getElementById('image-input').value = '';
             },
             
+            // Phase 3: Enhanced mode switching with conversation preservation
             toggleMode() {
+                const previousMode = this.useDatabase;
                 this.useDatabase = !this.useDatabase;
+                this.currentMode = this.useDatabase ? 'database' : 'image';
+                
+                // Phase 3: Preserve conversation ID across mode switches
+                if (this.conversationId) {
+                    // Keep the conversation ID but update the mode context
+                    console.log(`Phase 3: Preserving conversation ${this.conversationId} across mode switch from ${previousMode ? 'database' : 'image'} to ${this.useDatabase ? 'database' : 'image'}`);
+                } else {
+                    // Generate new conversation ID if none exists
+                    this.conversationId = this.generateConversationId();
+                    console.log(`Phase 3: Generated new conversation ID: ${this.conversationId}`);
+                }
+                
+                // Clear image when switching to database mode
                 if (this.useDatabase) {
                     this.clearImage();
-                    if (this.conversationId && !this.conversationId.startsWith('db_')) {
-                        this.conversationId = null;
+                }
+                
+                // Update conversation history with mode change
+                this.addConversationEvent('mode_switch', {
+                    from: previousMode ? 'database' : 'image',
+                    to: this.useDatabase ? 'database' : 'image'
+                });
+            },
+            
+            // Phase 3: Generate conversation ID with mode prefix
+            generateConversationId() {
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                const mode = this.useDatabase ? 'db' : 'img';
+                return `${mode}_${timestamp}`;
+            },
+            
+            // Phase 3: Add conversation events for tracking
+            addConversationEvent(type, data) {
+                const event = {
+                    type: type,
+                    timestamp: new Date().toISOString(),
+                    mode: this.currentMode,
+                    conversationId: this.conversationId,
+                    data: data
+                };
+                
+                this.conversationHistory.push(event);
+                this.saveConversationHistory();
+            },
+            
+            // Phase 3: Save conversation history to localStorage
+            saveConversationHistory() {
+                try {
+                    localStorage.setItem('gardenllm_conversation_history', JSON.stringify(this.conversationHistory));
+                } catch (error) {
+                    console.warn('Could not save conversation history:', error);
+                }
+            },
+            
+            // Phase 3: Load conversation history from localStorage
+            loadConversationHistory() {
+                try {
+                    const saved = localStorage.getItem('gardenllm_conversation_history');
+                    if (saved) {
+                        this.conversationHistory = JSON.parse(saved);
                     }
-                } else {
-                    if (this.conversationId && this.conversationId.startsWith('db_')) {
-                        this.conversationId = null;
-                    }
+                } catch (error) {
+                    console.warn('Could not load conversation history:', error);
+                    this.conversationHistory = [];
+                }
+            },
+            
+            // Phase 3: Toggle conversation history sidebar
+            toggleConversationHistory() {
+                this.showConversationHistory = !this.showConversationHistory;
+            },
+            
+            // Phase 3: Clear conversation history
+            clearConversationHistory() {
+                if (confirm('Are you sure you want to clear all conversation history?')) {
+                    this.conversationHistory = [];
+                    localStorage.removeItem('gardenllm_conversation_history');
                 }
             },
             
@@ -114,6 +188,12 @@
                     reader.onload = e => this.imagePreview = e.target.result;
                     reader.readAsDataURL(file);
                     this.useDatabase = false;
+                    this.currentMode = 'image';
+                    
+                    // Phase 3: Generate conversation ID if needed
+                    if (!this.conversationId) {
+                        this.conversationId = this.generateConversationId();
+                    }
                 }
             },
             
@@ -122,6 +202,11 @@
                 
                 this.loading = true;
                 const chatHistory = document.querySelector('#chat-history .space-y-4');
+                
+                // Phase 3: Generate conversation ID if needed
+                if (!this.conversationId) {
+                    this.conversationId = this.generateConversationId();
+                }
                 
                 // Add loading indicator
                 const loadingDiv = document.createElement('div');
@@ -146,11 +231,22 @@
                         userDiv.className = 'flex justify-end';
                         userDiv.innerHTML = `
                             <div class='bg-green-600 text-white rounded-lg p-3 max-w-3/4'>
+                                <div class='flex items-center gap-2 mb-2'>
+                                    <span class='text-xs bg-green-700 px-2 py-1 rounded'>Image Analysis</span>
+                                    <span class='text-xs opacity-75'>${this.conversationId}</span>
+                                </div>
                                 <img src='${this.imagePreview}' class='max-w-full h-auto rounded mb-2'>
                                 ${this.message ? `<p>${this.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>` : ''}
                             </div>
                         `;
                         chatHistory.appendChild(userDiv);
+                        
+                        // Phase 3: Add conversation event
+                        this.addConversationEvent('user_message', {
+                            type: 'image_analysis',
+                            hasImage: true,
+                            hasText: !!this.message.trim()
+                        });
                         
                         const formData = new FormData();
                         formData.append('file', this.imageFile);
@@ -181,10 +277,20 @@
                         const markdownContent = marked.parse(processedResponse);
                         botDiv.innerHTML = `
                             <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
+                                <div class='flex items-center gap-2 mb-2'>
+                                    <span class='text-xs bg-blue-600 text-white px-2 py-1 rounded'>AI Response</span>
+                                    <span class='text-xs text-gray-500'>Image Analysis</span>
+                                </div>
                                 ${markdownContent}
                             </div>
                         `;
                         chatHistory.appendChild(botDiv);
+                        
+                        // Phase 3: Add conversation event
+                        this.addConversationEvent('ai_response', {
+                            type: 'image_analysis',
+                            responseLength: data.response.length
+                        });
                         
                         this.updateMessageStatus();
                         
@@ -199,10 +305,20 @@
                         userDiv.className = 'flex justify-end';
                         userDiv.innerHTML = `
                             <div class='bg-green-600 text-white rounded-lg p-3 max-w-3/4'>
+                                <div class='flex items-center gap-2 mb-2'>
+                                    <span class='text-xs bg-green-700 px-2 py-1 rounded'>Garden Database</span>
+                                    <span class='text-xs opacity-75'>${this.conversationId}</span>
+                                </div>
                                 ${this.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
                             </div>
                         `;
                         chatHistory.appendChild(userDiv);
+                        
+                        // Phase 3: Add conversation event
+                        this.addConversationEvent('user_message', {
+                            type: 'garden_database',
+                            message: this.message
+                        });
                         
                         // Check if this is an add plant command
                         if (this.message.toLowerCase().startsWith('add plant ')) {
@@ -241,10 +357,20 @@
                                         const markdownContent = marked.parse(processedResponse);
                                         botDiv.innerHTML = `
                                             <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
+                                                <div class='flex items-center gap-2 mb-2'>
+                                                    <span class='text-xs bg-blue-600 text-white px-2 py-1 rounded'>AI Response</span>
+                                                    <span class='text-xs text-gray-500'>Plant Addition</span>
+                                                </div>
                                                 ${markdownContent}
                                             </div>
                                         `;
                                         chatHistory.appendChild(botDiv);
+                                        
+                                        // Phase 3: Add conversation event
+                                        this.addConversationEvent('plant_added', {
+                                            plantName: plantName,
+                                            locations: locations
+                                        });
                                         
                                         this.message = '';
                                         this.updateMessageStatus();
@@ -331,10 +457,20 @@
                         const markdownContent = marked.parse(processedResponse);
                         botDiv.innerHTML = `
                             <div class='bg-gray-200 rounded-lg p-3 max-w-3/4 prose prose-sm'>
+                                <div class='flex items-center gap-2 mb-2'>
+                                    <span class='text-xs bg-blue-600 text-white px-2 py-1 rounded'>AI Response</span>
+                                    <span class='text-xs text-gray-500'>Garden Database</span>
+                                </div>
                                 ${markdownContent}
                             </div>
                         `;
                         chatHistory.appendChild(botDiv);
+                        
+                        // Phase 3: Add conversation event
+                        this.addConversationEvent('ai_response', {
+                            type: 'garden_database',
+                            responseLength: data.response.length
+                        });
                     }
                     
                     this.message = '';
@@ -379,17 +515,20 @@
                             .user-message { background-color: #16a34a; color: white; margin-left: 20%; }
                             .assistant-message { background-color: #f3f4f6; color: black; margin-right: 20%; }
                             .timestamp { font-size: 0.8em; color: #666; margin-bottom: 5px; }
+                            .mode-badge { font-size: 0.7em; background-color: #374151; color: white; padding: 2px 6px; border-radius: 4px; margin-right: 8px; }
                             img { max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0; }
                             .metadata { color: #666; margin-bottom: 20px; }
+                            .conversation-info { background-color: #f8f9fa; padding: 10px; border-radius: 8px; margin-bottom: 20px; }
                         </style>
                     </head>
                     <body>
                         <div class="header">
                             <h1>GardenLLM Conversation</h1>
-                            <div class="metadata">
-                                <p>Date: ${new Date().toLocaleString()}</p>
-                                <p>Mode: ${this.useDatabase ? 'Garden Database' : 'Image Analysis'}</p>
-                                <p>Conversation ID: ${this.conversationId || 'Not assigned'}</p>
+                            <div class="conversation-info">
+                                <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+                                <p><strong>Current Mode:</strong> ${this.useDatabase ? 'Garden Database' : 'Image Analysis'}</p>
+                                <p><strong>Conversation ID:</strong> ${this.conversationId || 'Not assigned'}</p>
+                                <p><strong>Total Messages:</strong> ${chatHistory.children.length}</p>
                             </div>
                         </div>
                         <div class="chat-content">
@@ -401,9 +540,16 @@
                     const content = messageDiv.querySelector('div > div').cloneNode(true);
                     const timestamp = new Date().toLocaleString();
                     
+                    // Extract mode badge if present
+                    const modeBadge = content.querySelector('.text-xs.bg-green-700, .text-xs.bg-blue-600');
+                    const modeText = modeBadge ? modeBadge.textContent : (this.useDatabase ? 'Garden Database' : 'Image Analysis');
+                    
                     htmlContent += `
                         <div class="message ${isUser ? 'user-message' : 'assistant-message'}">
-                            <div class="timestamp">${isUser ? 'User' : 'Assistant'} - ${timestamp}</div>
+                            <div class="timestamp">
+                                <span class="mode-badge">${modeText}</span>
+                                ${isUser ? 'User' : 'Assistant'} - ${timestamp}
+                            </div>
                     `;
                     
                     // Handle images
@@ -436,7 +582,7 @@
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = `conversation_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.html`;
+                link.download = `conversation_${this.conversationId || new Date().toISOString().slice(0,19).replace(/:/g, '-')}.html`;
                 
                 document.body.appendChild(link);
                 link.click();
@@ -453,83 +599,165 @@
 </script>
 
 <div 
-    class="max-w-4xl mx-auto" 
+    class="max-w-6xl mx-auto" 
     x-data="chatInterface"
     @save-chat.window="saveConversation()"
 >
-    <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
-        <!-- Mode Toggle Switch -->
-        <div class="flex items-center justify-end mb-4">
-            <div class="flex items-center gap-2">
-                <span class="text-sm text-gray-600" x-text="useDatabase ? 'Garden Database Mode' : 'Image Analysis Mode'"></span>
+    <!-- Phase 3: Enhanced layout with conversation history sidebar -->
+    <div class="flex gap-6">
+        <!-- Main Chat Interface -->
+        <div class="flex-1">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+                <!-- Enhanced Header with Conversation Info -->
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-4">
+                        <h2 class="text-xl font-semibold text-gray-800">Garden Assistant</h2>
+                        <div x-show="conversationId" class="text-sm text-gray-600">
+                            <span class="font-medium">Conversation:</span> 
+                            <span x-text="conversationId" class="font-mono bg-gray-100 px-2 py-1 rounded"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-2">
+                        <!-- Phase 3: Conversation History Toggle -->
+                        <button 
+                            @click="toggleConversationHistory()" 
+                            class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm transition-colors"
+                            title="Toggle Conversation History"
+                        >
+                            📋 History
+                        </button>
+                        
+                        <!-- Mode Toggle Switch -->
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm text-gray-600" x-text="useDatabase ? 'Garden Database' : 'Image Analysis'"></span>
+                            <button 
+                                @click="toggleMode()" 
+                                type="button"
+                                :class="{'bg-green-600': useDatabase, 'bg-blue-600': !useDatabase}"
+                                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
+                                role="switch"
+                                :aria-checked="useDatabase"
+                            >
+                                <span 
+                                    :class="useDatabase ? 'translate-x-5' : 'translate-x-0'"
+                                    class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                                ></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Chat Interface -->
+                <div class="bg-gray-50 rounded-lg p-4 mb-4 h-96 overflow-y-auto" id="chat-history">
+                    <div class="space-y-4">
+                        <!-- Messages will be inserted here -->
+                    </div>
+                </div>
+                
+                <!-- Input Form -->
+                <form @submit.prevent="submitMessage" class="space-y-4">
+                    <!-- Image Preview -->
+                    <div x-show="imagePreview" class="relative inline-block">
+                        <img x-bind:src="imagePreview" class="max-h-32 rounded">
+                        <button @click="clearImage" type="button" 
+                            class="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center">
+                            ×
+                        </button>
+                    </div>
+                    
+                    <div class="flex flex-col md:flex-row gap-2">
+                        <!-- Image Upload -->
+                        <label x-show="!useDatabase" class="flex-none cursor-pointer bg-gray-100 hover:bg-gray-200 rounded-lg px-4 py-2 transition-colors">
+                            <input 
+                                type="file" 
+                                id="image-input"
+                                @change="handleImageSelect"
+                                accept="image/*"
+                                class="hidden"
+                                :disabled="loading"
+                            >
+                            📷 Add Image
+                        </label>
+                        
+                        <!-- Text Input -->
+                        <input 
+                            type="text" 
+                            x-model="message" 
+                            class="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                            :placeholder="useDatabase ? 'Ask about plants in your garden...' : 'Ask about the plant in the image...'"
+                            :disabled="loading"
+                        >
+                        
+                        <!-- Submit Button -->
+                        <button 
+                            type="submit" 
+                            class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                            :disabled="loading"
+                        >
+                            <span x-show="!loading">Send</span>
+                            <span x-show="loading">Processing...</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Phase 3: Conversation History Sidebar -->
+        <div 
+            x-show="showConversationHistory" 
+            x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0 transform translate-x-full"
+            x-transition:enter-end="opacity-100 transform translate-x-0"
+            x-transition:leave="transition ease-in duration-300"
+            x-transition:leave-start="opacity-100 transform translate-x-0"
+            x-transition:leave-end="opacity-0 transform translate-x-full"
+            class="w-80 bg-white rounded-lg shadow-lg p-4 h-fit"
+        >
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">Conversation History</h3>
                 <button 
-                    @click="toggleMode()" 
-                    type="button"
-                    :class="{'bg-green-600': useDatabase, 'bg-blue-600': !useDatabase}"
-                    class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
-                    role="switch"
-                    :aria-checked="useDatabase"
+                    @click="clearConversationHistory()" 
+                    class="text-red-600 hover:text-red-800 text-sm"
+                    title="Clear History"
                 >
-                    <span 
-                        :class="useDatabase ? 'translate-x-5' : 'translate-x-0'"
-                        class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                    ></span>
-                </button>
-            </div>
-        </div>
-        
-        <!-- Chat Interface -->
-        <div class="bg-gray-50 rounded-lg p-4 mb-4 h-96 overflow-y-auto" id="chat-history">
-            <div class="space-y-4">
-                <!-- Messages will be inserted here -->
-            </div>
-        </div>
-        
-        <!-- Input Form -->
-        <form @submit.prevent="submitMessage" class="space-y-4">
-            <!-- Image Preview -->
-            <div x-show="imagePreview" class="relative inline-block">
-                <img x-bind:src="imagePreview" class="max-h-32 rounded">
-                <button @click="clearImage" type="button" 
-                    class="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center">
-                    ×
+                    🗑️ Clear
                 </button>
             </div>
             
-            <div class="flex flex-col md:flex-row gap-2">
-                <!-- Image Upload -->
-                <label x-show="!useDatabase" class="flex-none cursor-pointer bg-gray-100 hover:bg-gray-200 rounded-lg px-4 py-2 transition-colors">
-                    <input 
-                        type="file" 
-                        id="image-input"
-                        @change="handleImageSelect"
-                        accept="image/*"
-                        class="hidden"
-                        :disabled="loading"
-                    >
-                    📷 Add Image
-                </label>
+            <div class="space-y-2 max-h-96 overflow-y-auto">
+                <template x-for="(event, index) in conversationHistory.slice().reverse()" :key="index">
+                    <div class="bg-gray-50 rounded-lg p-3 text-sm">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="font-medium" x-text="event.type.replace('_', ' ').toUpperCase()"></span>
+                            <span class="text-xs text-gray-500" x-text="new Date(event.timestamp).toLocaleTimeString()"></span>
+                        </div>
+                        <div class="text-xs text-gray-600 mb-1">
+                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded" x-text="event.mode"></span>
+                            <span class="ml-2" x-text="event.conversationId"></span>
+                        </div>
+                        <div x-show="event.data" class="text-xs text-gray-500">
+                            <template x-if="event.type === 'user_message'">
+                                <span x-text="event.data.message ? event.data.message.substring(0, 50) + '...' : 'Image analysis'"></span>
+                            </template>
+                            <template x-if="event.type === 'ai_response'">
+                                <span x-text="`Response: ${event.data.responseLength} characters`"></span>
+                            </template>
+                            <template x-if="event.type === 'mode_switch'">
+                                <span x-text="`${event.data.from} → ${event.data.to}`"></span>
+                            </template>
+                            <template x-if="event.type === 'plant_added'">
+                                <span x-text="`Added: ${event.data.plantName}`"></span>
+                            </template>
+                        </div>
+                    </div>
+                </template>
                 
-                <!-- Text Input -->
-                <input 
-                    type="text" 
-                    x-model="message" 
-                    class="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    :placeholder="useDatabase ? 'Ask about plants in your garden...' : 'Ask about the plant in the image...'"
-                    :disabled="loading"
-                >
-                
-                <!-- Submit Button -->
-                <button 
-                    type="submit" 
-                    class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                    :disabled="loading"
-                >
-                    <span x-show="!loading">Send</span>
-                    <span x-show="loading">Processing...</span>
-                </button>
+                <div x-show="conversationHistory.length === 0" class="text-center text-gray-500 py-4">
+                    No conversation history yet
+                </div>
             </div>
-        </form>
+        </div>
     </div>
 </div>
 
@@ -702,6 +930,33 @@ button:not(:disabled):hover {
         margin: 0.5rem 0;
         padding: 0.25rem;
     }
+}
+
+/* Phase 3: Conversation history sidebar styles */
+.conversation-history-item {
+    transition: all 0.2s ease-in-out;
+}
+
+.conversation-history-item:hover {
+    background-color: #f3f4f6;
+}
+
+/* Mode badge styles */
+.mode-badge {
+    font-size: 0.7em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.mode-badge.database {
+    background-color: #059669;
+    color: white;
+}
+
+.mode-badge.image {
+    background-color: #2563eb;
+    color: white;
 }
 </style>
 {% endblock %} 
