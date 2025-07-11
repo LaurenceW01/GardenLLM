@@ -271,21 +271,114 @@ def api_plants():
             # Convert locations array to comma-separated string
             location_string = ', '.join(locations)
             
-            # Add plant using centralized field configuration
-            photo_url_str = photo_url if photo_url else ""
-            result = add_plant(plant_name, "", location_string, photo_url_str)
-            
-            if result.get('success'):
-                # Generate simple care guide
-                care_guide = f"Care guide for {plant_name}:\n\n{plant_name} has been added to your garden in {location_string}. Please research specific care requirements for this plant based on your local climate and growing conditions."
+            # Use CLI-style add plant functionality with AI care generation
+            try:
+                # Create detailed plant care guide prompt for OpenAI
+                prompt = (
+                    f"Create a detailed plant care guide for {plant_name} in Houston, TX. "
+                    "Include care requirements, growing conditions, and maintenance tips. "
+                    "Focus on practical advice for the specified locations: " + 
+                    location_string + "\n\n" +
+                    "IMPORTANT: Use EXACTLY the section format shown below with double asterisks and colons:\n" +
+                    "**Description:**\n" +
+                    "**Light:**\n" +
+                    "**Soil:**\n" +
+                    "**Watering:**\n" +
+                    "**Temperature:**\n" +
+                    "**Pruning:**\n" +
+                    "**Mulching:**\n" +
+                    "**Fertilizing:**\n" +
+                    "**Winter Care:**\n" +
+                    "**Spacing:**"
+                )
                 
-                return jsonify({
-                    'success': True,
-                    'message': result.get('message', f'Added {plant_name} to garden'),
-                    'care_guide': care_guide
-                })
-            else:
-                return jsonify({'success': False, 'error': result.get('error', 'Unknown error')}), 400
+                # Get plant care information from OpenAI directly using GPT-4 Turbo
+                from config import openai_client
+                response = openai_client.chat.completions.create(
+                    model="gpt-4-turbo-preview",
+                    messages=[
+                        {"role": "system", "content": "You are a gardening expert assistant. Provide detailed, practical plant care guides with specific instructions. CRITICAL: Use the EXACT section format provided with double asterisks (**Section:**) - do not use markdown headers (###)."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.7,
+                    max_tokens=1000
+                )
+                response = response.choices[0].message.content or ""
+                
+                # Parse the care guide response to extract structured data for database storage
+                from ai_and_sheets_core import parse_care_guide
+                care_details = parse_care_guide(response)
+                
+                # Debug: Log the parsed care details
+                logger.info(f"AI Response: {response[:500]}...")
+                logger.info(f"Parsed care details: {care_details}")
+                
+                # Create comprehensive plant data dictionary with all required fields for database
+                from field_config import get_canonical_field_name
+                
+                # Get canonical field names
+                plant_name_field = get_canonical_field_name('Plant Name') or 'Plant Name'
+                location_field = get_canonical_field_name('Location') or 'Location'
+                description_field = get_canonical_field_name('Description') or 'Description'
+                light_field = get_canonical_field_name('Light Requirements') or 'Light Requirements'
+                soil_field = get_canonical_field_name('Soil Preferences') or 'Soil Preferences'
+                watering_field = get_canonical_field_name('Watering Needs') or 'Watering Needs'
+                frost_field = get_canonical_field_name('Frost Tolerance') or 'Frost Tolerance'
+                pruning_field = get_canonical_field_name('Pruning Instructions') or 'Pruning Instructions'
+                mulching_field = get_canonical_field_name('Mulching Needs') or 'Mulching Needs'
+                fertilizing_field = get_canonical_field_name('Fertilizing Schedule') or 'Fertilizing Schedule'
+                winterizing_field = get_canonical_field_name('Winterizing Instructions') or 'Winterizing Instructions'
+                spacing_field = get_canonical_field_name('Spacing Requirements') or 'Spacing Requirements'
+                care_notes_field = get_canonical_field_name('Care Notes') or 'Care Notes'
+                photo_url_field = get_canonical_field_name('Photo URL') or 'Photo URL'
+                
+                plant_data = {
+                    plant_name_field: plant_name,
+                    location_field: location_string,
+                    description_field: care_details.get(description_field, ''),
+                    light_field: care_details.get(light_field, ''),
+                    soil_field: care_details.get(soil_field, ''),
+                    watering_field: care_details.get(watering_field, ''),
+                    frost_field: care_details.get(frost_field, ''),
+                    pruning_field: care_details.get(pruning_field, ''),
+                    mulching_field: care_details.get(mulching_field, ''),
+                    fertilizing_field: care_details.get(fertilizing_field, ''),
+                    winterizing_field: care_details.get(winterizing_field, ''),
+                    spacing_field: care_details.get(spacing_field, ''),
+                    care_notes_field: response,
+                    photo_url_field: photo_url if photo_url else ""
+                }
+                
+                # Debug: Log the field names being used
+                logger.info(f"Field names being used: {list(plant_data.keys())}")
+                
+                # Add the plant to the Google Sheets database using the legacy update function
+                from plant_operations import update_plant_legacy
+                if update_plant_legacy(plant_data):
+                    return jsonify({
+                        'success': True,
+                        'message': f"Added {plant_name} to garden with comprehensive care information",
+                        'care_guide': response
+                    })
+                else:
+                    return jsonify({'success': False, 'error': f"Error adding plant '{plant_name}' to database"}), 400
+                    
+            except Exception as e:
+                logger.error(f"Error generating care information for {plant_name}: {e}")
+                # Fallback to simple add plant if care generation fails
+                photo_url_str = photo_url if photo_url else ""
+                result = add_plant(plant_name, "", location_string, photo_url_str)
+                
+                if result.get('success'):
+                    care_guide = f"Care guide for {plant_name}:\n\n{plant_name} has been added to your garden in {location_string}. Please research specific care requirements for this plant based on your local climate and growing conditions."
+                    
+                    return jsonify({
+                        'success': True,
+                        'message': result.get('message', f'Added {plant_name} to garden (care generation failed)'),
+                        'care_guide': care_guide
+                    })
+                else:
+                    return jsonify({'success': False, 'error': result.get('error', 'Unknown error')}), 400
                 
         except Exception as e:
             logger.error(f"Error adding plant via API: {e}")

@@ -298,89 +298,48 @@ def get_photo_url_from_album(photo_url):
         logger.error(f"Error formatting photo URL: {e}")
         return photo_url
 
-def parse_care_guide(response: str) -> Dict[str, str]:
+def parse_care_guide(response: str) -> dict:
     """Parse the care guide response from OpenAI into a structured dictionary.
-    Handles **Section:**, ### Section:, and #### Section: headers, and maps short names to full field names.
+    Handles **Section:** headers and maps short names to full field names.
     """
-    # Use field_config to get canonical field names for mapping
-    from field_config import get_canonical_field_name
-    
+    from field_config import get_canonical_field_name, get_all_field_names
+
     # Mapping from possible section names to spreadsheet field names
     section_map = {
         'Description': get_canonical_field_name('Description'),
         'Light': get_canonical_field_name('Light Requirements'),
-        'Light Requirements': get_canonical_field_name('Light Requirements'),
         'Soil': get_canonical_field_name('Soil Preferences'),
-        'Soil Preferences': get_canonical_field_name('Soil Preferences'),
         'Watering': get_canonical_field_name('Watering Needs'),
-        'Watering Needs': get_canonical_field_name('Watering Needs'),
-        'Temperature': get_canonical_field_name('Frost Tolerance'),  # Map Temperature to Frost Tolerance field
-        'Frost Tolerance': get_canonical_field_name('Frost Tolerance'),
+        'Temperature': get_canonical_field_name('Frost Tolerance'),
         'Pruning': get_canonical_field_name('Pruning Instructions'),
-        'Pruning Instructions': get_canonical_field_name('Pruning Instructions'),
         'Mulching': get_canonical_field_name('Mulching Needs'),
-        'Mulching Needs': get_canonical_field_name('Mulching Needs'),
         'Fertilizing': get_canonical_field_name('Fertilizing Schedule'),
-        'Fertilizing Schedule': get_canonical_field_name('Fertilizing Schedule'),
-        'Winter Care': get_canonical_field_name('Winterizing Instructions'),  # Map Winter Care to Winterizing Instructions
-        'Winterizing Instructions': get_canonical_field_name('Winterizing Instructions'),
+        'Winter Care': get_canonical_field_name('Winterizing Instructions'),
         'Spacing': get_canonical_field_name('Spacing Requirements'),
-        'Spacing Requirements': get_canonical_field_name('Spacing Requirements'),
     }
-    
-    # Initialize care details with all possible fields from field_config
-    from field_config import get_all_field_names
+
     care_fields = get_all_field_names()
     care_details = {field: '' for field in care_fields}
-    
-    # Remove system-managed fields from care details
-    system_fields = [get_canonical_field_name('ID'), get_canonical_field_name('Last Updated')]
-    for field in system_fields:
-        if field in care_details:
-            del care_details[field]
-    
-    # Parse the response
+
     lines = response.split('\n')
     current_section = None
     current_content = []
-    
+
+    def save_section(section, content):
+        if section and content:
+            section_name = section.strip('*').strip().rstrip(':')
+            field_name = section_map.get(section_name)
+            if field_name:
+                care_details[field_name] = '\n'.join(content).strip()
+
     for line in lines:
         line = line.strip()
-        
-        # Check for section headers
         if line.startswith('**') and line.endswith('**'):
-            # Save previous section
-            if current_section and current_content:
-                section_name = current_section.strip('*').strip()
-                field_name = section_map.get(section_name, section_name)
-                if field_name:
-                    care_details[field_name] = '\n'.join(current_content).strip()
-            
-            # Start new section
+            save_section(current_section, current_content)
             current_section = line
             current_content = []
-            
-        elif line.startswith('### ') or line.startswith('#### '):
-            # Save previous section
-            if current_section and current_content:
-                section_name = current_section.strip('*').strip()
-                field_name = section_map.get(section_name, section_name)
-                if field_name:
-                    care_details[field_name] = '\n'.join(current_content).strip()
-            
-            # Start new section
-            current_section = line.lstrip('#').strip()
-            current_content = []
-            
         elif current_section and line:
-            # Add content to current section
             current_content.append(line)
-    
-    # Save the last section
-    if current_section and current_content:
-        section_name = current_section.strip('*').strip()
-        field_name = section_map.get(section_name, section_name)
-        if field_name:
-            care_details[field_name] = '\n'.join(current_content).strip()
-    
+    save_section(current_section, current_content)
+
     return care_details

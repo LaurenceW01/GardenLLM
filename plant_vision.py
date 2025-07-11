@@ -31,8 +31,13 @@ MAX_TOKENS = 4000  # Maximum tokens allowed for context in a conversation
 TOKEN_BUFFER = 1000  # Buffer tokens reserved for new responses
 MODEL_NAME = "gpt-4-turbo"  # Specify the model name for OpenAI API
 
-# Initialize conversation manager
-conversation_manager = ConversationManager()  # Create an instance of the centralized ConversationManager
+# Use the global conversation manager from chat_response
+def get_conversation_manager():
+    """Get the global conversation manager instance"""
+    from chat_response import get_conversation_manager as get_global_manager
+    return get_global_manager()
+
+conversation_manager = get_conversation_manager()  # Get the global conversation manager instance
 
 def convert_heic_to_jpeg(image_data: bytes) -> Optional[bytes]:
     """
@@ -187,10 +192,11 @@ Remember: Your analysis and any follow-up questions will be specifically about t
             query = """Please analyze this specific plant image and provide a comprehensive assessment:
 
 ## Plant Identification
-- Common name and scientific name (be very specific about the exact species/variety)
-- Confidence level in identification (high/medium/low)
-- Key distinguishing characteristics you observe (leaf shape, color, texture, flowers, growth habit, etc.)
-- If you're uncertain, mention similar plants that could be confused with this one
+- **Common name**: [Provide the common name of the plant]
+- **Scientific name**: [Provide the scientific name if known]
+- **Confidence level**: [high/medium/low]
+- **Key distinguishing characteristics**: [Describe leaf shape, color, texture, flowers, growth habit, etc.]
+- **Similar plants**: [If uncertain, mention similar plants that could be confused with this one]
 
 ## Health Assessment
 - Current condition of the plant
@@ -215,7 +221,11 @@ Remember: Your analysis and any follow-up questions will be specifically about t
 - Common mistakes to avoid
 - Propagation methods if applicable
 
-IMPORTANT: Look very carefully at the leaf shape, arrangement, color, and any flowers or buds. Pay attention to the overall growth habit and structure. If you see any distinctive features, mention them specifically."""
+IMPORTANT: 
+- Look very carefully at the leaf shape, arrangement, color, and any flowers or buds
+- Pay attention to the overall growth habit and structure
+- If you see any distinctive features, mention them specifically
+- In the Plant Identification section, clearly state the plant name using the format "Common name: [Plant Name]" and "Scientific name: [Scientific Name]" if known"""
 
         # Add user message with image
         conversation_manager.add_message(conversation_id, {
@@ -400,32 +410,62 @@ def extract_plant_names_from_analysis(analysis_text: str) -> List[str]:
         
         plant_names = []  # Initialize list to store plant names
         
-        # Common patterns for plant names in analysis text
+        # Very restrictive patterns - only look for clear plant identification
         patterns = [
-            r'(?:identified as|this is|appears to be|looks like)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',  # "This is a Rose"
-            r'(?:common name[:\s]+)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',  # "Common name: Rose"
-            r'(?:scientific name[:\s]+)([A-Z][a-z]+\s+[a-z]+)',  # "Scientific name: Rosa sp."
-            r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(?:plant|specimen|variety)',  # "Rose plant"
+            # Look for "Common name:" specifically
+            r'common name[:\s]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+            # Look for "Scientific name:" specifically  
+            r'scientific name[:\s]+([A-Z][a-z]+\s+[a-z]+)',
+            # Look for "This is a [Plant Name]" pattern
+            r'this is a\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+            # Look for "Identified as [Plant Name]" pattern
+            r'identified as\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
         ]
         
-        for pattern in patterns:  # Iterate through patterns
-            matches = re.findall(pattern, analysis_text, re.IGNORECASE)  # Find matches
-            for match in matches:  # Iterate through matches
-                if match and len(match.strip()) > 2:  # Check if match is valid
-                    plant_names.append(match.strip())  # Add to list
+        # First, try to find the Plant Identification section
+        identification_section = re.search(r'##\s*Plant\s*Identification.*?(?=##|$)', analysis_text, re.IGNORECASE | re.DOTALL)
+        
+        if identification_section:
+            # Extract from the identification section only
+            section_text = identification_section.group(0)
+            logger.info(f"Found Plant Identification section: {section_text[:200]}...")
+            
+            for pattern in patterns:
+                matches = re.findall(pattern, section_text, re.IGNORECASE)
+                for match in matches:
+                    if match and len(match.strip()) > 2 and len(match.strip()) < 30:  # Shorter max length
+                        # Filter out common non-plant words and phrases
+                        non_plant_words = ['the', 'this', 'that', 'these', 'those', 'plant', 'specimen', 'variety', 'species', 'genus', 'family', 'one', 'large', 'flower', 'is', 'actually']
+                        if match.strip().lower() not in non_plant_words:
+                            # Additional check: make sure it doesn't contain common sentence fragments
+                            if not any(fragment in match.lower() for fragment in ['one large', 'flower is', 'is actually', 'this specific', 'best practices']):
+                                plant_names.append(match.strip())
+        else:
+            logger.info("No Plant Identification section found, skipping database integration")
+            return []
         
         # Remove duplicates while preserving order
-        unique_names = []  # Initialize unique names list
-        for name in plant_names:  # Iterate through plant names
-            if name not in unique_names:  # Check if name is unique
-                unique_names.append(name)  # Add to unique list
+        unique_names = []
+        for name in plant_names:
+            if name not in unique_names:
+                unique_names.append(name)
         
-        logger.info(f"Extracted plant names from analysis: {unique_names}")  # Log extracted names
-        return unique_names  # Return unique plant names
+        # Additional filtering: only keep names that look like actual plant names
+        filtered_names = []
+        for name in unique_names:
+            # Check if it contains at least one word that could be a plant name
+            words = name.split()
+            if any(len(word) >= 3 for word in words):  # At least one word with 3+ characters
+                # Final check: make sure it's not a sentence fragment
+                if not name.lower().startswith(('one ', 'this ', 'that ', 'the ', 'best ', 'common ')):
+                    filtered_names.append(name)
+        
+        logger.info(f"Extracted plant names from analysis: {filtered_names}")
+        return filtered_names
         
     except Exception as e:
-        logger.error(f"Error extracting plant names from analysis: {e}")  # Log error
-        return []  # Return empty list on error
+        logger.error(f"Error extracting plant names from analysis: {e}")
+        return []
 
 def enhance_analysis_with_database_check(analysis_text: str) -> str:
     """
@@ -445,37 +485,65 @@ def enhance_analysis_with_database_check(analysis_text: str) -> str:
         plant_names = extract_plant_names_from_analysis(analysis_text)  # Extract plant names
         
         if not plant_names:  # Check if no plant names found
-            return analysis_text  # Return original analysis
+            return analysis_text  # Return original analysis without database integration
+        
+        # Filter out any names that are too short or look like fragments
+        valid_plant_names = []
+        for name in plant_names:
+            # Only include names that look like actual plant names
+            if len(name.strip()) >= 3 and len(name.strip()) <= 30:
+                # Check if it contains at least one word that could be a plant name
+                words = name.split()
+                if any(len(word) >= 3 for word in words):
+                    valid_plant_names.append(name.strip())
+        
+        if not valid_plant_names:  # Check if no valid plant names found
+            return analysis_text  # Return original analysis without database integration
         
         # Check each plant in the database
         database_info = []  # Initialize database info list
         
-        for plant_name in plant_names:  # Iterate through plant names
+        for plant_name in valid_plant_names:  # Iterate through valid plant names
             check_result = check_plant_in_database(plant_name)  # Check plant in database
             database_info.append(check_result)  # Add result to list
         
         # Create enhanced analysis
         enhanced_analysis = analysis_text  # Start with original analysis
         
-        # Add database integration section
-        enhanced_analysis += "\n\n## Garden Database Integration\n\n"
-        
-        for info in database_info:  # Iterate through database info
-            enhanced_analysis += f"**{info.get('plant_name', 'Unknown Plant')}**: {info['message']}\n\n"
-        
-        # Add action suggestions
-        new_plants = [info for info in database_info if not info['exists']]  # Get new plants
-        existing_plants = [info for info in database_info if info['exists']]  # Get existing plants
-        
-        if new_plants:  # Check if there are new plants
-            enhanced_analysis += "**💡 Action Items:**\n"
-            enhanced_analysis += "- Consider adding newly identified plants to your garden database\n"
-            enhanced_analysis += "- Use the 'Add Plant' feature to track these plants\n\n"
-        
-        if existing_plants:  # Check if there are existing plants
-            enhanced_analysis += "**📋 Garden Management:**\n"
-            enhanced_analysis += "- Review care information for existing plants\n"
-            enhanced_analysis += "- Update plant records with new observations\n\n"
+        # Add database integration section only if we have valid results
+        if database_info:
+            # Additional safety check: only proceed if we have reasonable plant names
+            valid_plant_names = []
+            for info in database_info:
+                plant_name = info.get('plant_name', '')
+                # Only include names that look like actual plant names
+                if (len(plant_name) >= 3 and len(plant_name) <= 30 and 
+                    not plant_name.lower().startswith(('one ', 'this ', 'that ', 'the ', 'best ', 'common ')) and
+                    not any(fragment in plant_name.lower() for fragment in ['one large', 'flower is', 'is actually', 'this specific', 'best practices'])):
+                    valid_plant_names.append(info)
+            
+            if valid_plant_names:
+                enhanced_analysis += "\n\n## Garden Database Integration\n\n"
+                
+                for info in valid_plant_names:  # Iterate through valid database info
+                    enhanced_analysis += f"**{info.get('plant_name', 'Unknown Plant')}**: {info['message']}\n\n"
+                
+                # Add action suggestions
+                new_plants = [info for info in valid_plant_names if not info['exists']]  # Get new plants
+                existing_plants = [info for info in valid_plant_names if info['exists']]  # Get existing plants
+                
+                if new_plants:  # Check if there are new plants
+                    enhanced_analysis += "**💡 Action Items:**\n"
+                    enhanced_analysis += "- Consider tracking these plants in your garden database\n\n"
+                
+                if existing_plants:  # Check if there are existing plants
+                    enhanced_analysis += "**📋 Garden Management:**\n"
+                    enhanced_analysis += "- Review care information for existing plants\n"
+                    enhanced_analysis += "- Update plant records with new observations\n\n"
+            else:
+                logger.info("No valid plant names found, skipping database integration")
+        else:
+            logger.info("No database info found, skipping database integration")
         
         return enhanced_analysis  # Return enhanced analysis
         

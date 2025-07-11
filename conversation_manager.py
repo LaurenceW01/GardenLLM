@@ -63,7 +63,16 @@ class ConversationManager:
 
     def add_message(self, conversation_id: str, message: Dict) -> None:
         """Add a message to the conversation, managing token limits and timeouts."""
-        if conversation_id not in self.conversations:
+        # Check if conversation exists but might be inactive
+        if conversation_id in self.conversations:
+            # Conversation exists, just update activity and add message
+            logger.info(f"Adding message to existing conversation {conversation_id}")
+            self.conversations[conversation_id]['last_activity'] = datetime.now()
+            self.conversations[conversation_id]['messages'].append(message)
+            self.conversations[conversation_id]['metadata']['total_messages'] += 1
+            logger.info(f"Added message to existing conversation {conversation_id}. Total messages: {len(self.conversations[conversation_id]['messages'])}")
+        else:
+            # Create new conversation
             logger.info(f"Creating new conversation {conversation_id}")
             self.conversations[conversation_id] = {
                 'messages': [],
@@ -74,10 +83,10 @@ class ConversationManager:
                     'total_messages': 0
                 }
             }
-        self.conversations[conversation_id]['last_activity'] = datetime.now()  # Update last activity
-        self.conversations[conversation_id]['messages'].append(message)  # Add the message
-        self.conversations[conversation_id]['metadata']['total_messages'] += 1  # Update message count
-        logger.info(f"Added message to conversation {conversation_id}. Total messages: {len(self.conversations[conversation_id]['messages'])}")
+            self.conversations[conversation_id]['messages'].append(message)
+            self.conversations[conversation_id]['metadata']['total_messages'] += 1
+            logger.info(f"Created new conversation {conversation_id}. Total messages: {len(self.conversations[conversation_id]['messages'])}")
+        
         # Trim messages if token limit exceeded
         while self._get_total_tokens(conversation_id) > (MAX_TOKENS - TOKEN_BUFFER):
             if len(self.conversations[conversation_id]['messages']) > 2:
