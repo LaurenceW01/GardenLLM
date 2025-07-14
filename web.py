@@ -15,7 +15,7 @@ from PIL import Image
 import requests
 
 from config import openai_client
-from plant_operations import add_plant, get_plants, update_plant, delete_plant, search_plants
+from plant_operations import add_plant, get_plants, update_plant, delete_plant, search_plants, find_plant_by_id_or_name
 from sheets_client import initialize_sheet
 from enhanced_weather_service import get_current_weather, get_hourly_forecast
 from field_config import get_all_field_names, get_field_alias, get_canonical_field_name
@@ -108,6 +108,11 @@ def index():
         flash(f"Error loading page: {str(e)}", 'error')
         return render_template('index.html', plants=[], weather_summary="", climate_context="", default_location="")
 
+@app.route('/add-plant', methods=['GET', 'POST'])
+def add_plant_route_hyphen():
+    """Add a new plant - hyphenated route for menu compatibility"""
+    return add_plant_route()
+
 @app.route('/add_plant', methods=['GET', 'POST'])
 def add_plant_route():
     """Add a new plant"""
@@ -152,6 +157,8 @@ def add_plant_route():
     # Get field names for form
     field_names = get_all_field_names()
     return render_template('add_plant.html', field_names=field_names)
+
+
 
 @app.route('/weather')
 def weather():
@@ -265,8 +272,9 @@ def api_plants():
             if not plant_name:
                 return jsonify({'success': False, 'error': 'Plant name is required'}), 400
             
+            # Locations are now optional
             if not locations:
-                return jsonify({'success': False, 'error': 'At least one location is required'}), 400
+                locations = []
             
             # Convert locations array to comma-separated string
             location_string = ', '.join(locations)
@@ -434,6 +442,33 @@ def api_plant(plant_id):
     
     except Exception as e:
         logger.error(f"Error in plant API operation: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/upload-photo', methods=['POST'])
+def api_upload_photo():
+    """API endpoint to upload plant photos"""
+    try:
+        if 'photo' not in request.files:
+            return jsonify({'success': False, 'error': 'No photo file provided'}), 400
+        
+        file = request.files['photo']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+        
+        if file and allowed_file(file.filename):
+            photo_url = process_image_upload(file)
+            if photo_url:
+                return jsonify({
+                    'success': True,
+                    'photo_url': photo_url
+                })
+            else:
+                return jsonify({'success': False, 'error': 'Failed to save photo'}), 500
+        else:
+            return jsonify({'success': False, 'error': 'Invalid file type'}), 400
+            
+    except Exception as e:
+        logger.error(f"Error uploading photo: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/weather')

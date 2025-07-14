@@ -1,5 +1,5 @@
 import logging
-from test_openai import initialize_sheet
+from ai_and_sheets_core import initialize_sheet
 import os
 from dotenv import load_dotenv
 import multiprocessing

@@ -21,7 +21,7 @@ from plant_operations import (
 )
 from chat_response import get_chat_response  # Generate chat responses for user queries
 from weather_service import get_weather_forecast, analyze_forecast_for_plants, handle_weather_query  # Weather-related functions
-from test_openai import setup_sheets_client, initialize_sheet, parse_care_guide, SPREADSHEET_ID, RANGE_NAME  # OpenAI and sheet utilities
+from ai_and_sheets_core import setup_sheets_client, initialize_sheet, parse_care_guide, SPREADSHEET_ID, RANGE_NAME  # OpenAI and sheet utilities
 
 # Set up logging configuration for debugging and monitoring
 logging.basicConfig(level=logging.INFO)

@@ -45,16 +45,22 @@ Write-Log $gitStatus "White"
 $ErrorActionPreference = 'Stop'
 
 # Add all changes
-Write-Host "Adding all changes to git..."
+Write-Log "Adding all changes to git..." "Yellow"
 git add -A
 
-# Commit with a descriptive message
-$commitMessage = "Release v1.00.07: Phase 3 Frontend Conversation History Enhancement - Complete frontend enhancements for seamless conversation flow across modes. Features conversation ID preservation during mode switches, enhanced UI with conversation history sidebar and localStorage integration, mode indicators in chat messages, conversation context display, and comprehensive event tracking. Includes robust error handling, performance optimization, and cross-mode conversation continuity. Backend enhancements include unified conversation management, enhanced context preservation, and improved integration with chat response and plant vision systems. Comprehensive test suite: 28/28 tests passing (16 backend + 12 frontend). Successfully tested conversation flow, UI state management, API integration, and cross-mode functionality."
-Write-Host "Committing with message: $commitMessage"
+# Get commit message from user or use default
+$defaultMessage = "Update project files"
+$commitMessage = Read-Host "Enter commit message (or press Enter for default: '$defaultMessage')"
+
+if ([string]::IsNullOrWhiteSpace($commitMessage)) {
+    $commitMessage = $defaultMessage
+}
+
+Write-Log "Committing with message: $commitMessage" "Yellow"
 git commit -m "$commitMessage"
 
-# Push to main
-Write-Host "Pushing to origin/main..."
+# Push to current branch (which should be main now)
+Write-Log "Pushing to origin/main..." "Yellow"
 git push origin main
 
 Write-Host "Commit and push complete!" 

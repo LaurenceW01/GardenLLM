@@ -1,4 +1,4 @@
-from test_openai import initialize_sheet
+from ai_and_sheets_core import initialize_sheet
 
 def init():
     initialize_sheet()
