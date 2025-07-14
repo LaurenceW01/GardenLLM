@@ -48,15 +48,35 @@ $ErrorActionPreference = 'Stop'
 Write-Log "Adding all changes to git..." "Yellow"
 git add -A
 
-# Get commit message from user or use default
-$defaultMessage = "Update project files"
-$commitMessage = Read-Host "Enter commit message (or press Enter for default: '$defaultMessage')"
+# Use detailed commit message explaining changes
+$commitMessage = @"
+Implement Weather Context Integration for AI Gardening Assistant
 
-if ([string]::IsNullOrWhiteSpace($commitMessage)) {
-    $commitMessage = $defaultMessage
-}
+- Added weather_context_integration.py: Provides concise, real-time weather and forecast context for all AI conversations
+- Enhanced conversation_manager.py: Injects weather context into conversation history for every user query
+- Updated chat_response.py: Ensures all AI responses include up-to-date weather context
+- Updated and created comprehensive tests:
+  - tests/test_weather_context_integration.py: Verifies all weather context features and integration points
+  - tests/test_weather_aware_chat.py: Confirms weather context is present in chat responses
+  - tests/test_web_weather_integration.py: Ensures web API endpoints and UI use weather context
+  - tests/show_weather_context.py: Prints generated weather context messages for manual verification
+- All tests passed (9/9): Weather context is now available in chat, web, and all AI responses
+- Caching and fallback logic implemented for performance and reliability
+- Documentation and summary added: tests-results/weather_context_integration_summary.md
 
-Write-Log "Committing with message: $commitMessage" "Yellow"
+File changes:
+- weather_context_integration.py: New module for weather context logic
+- conversation_manager.py: Weather-aware message retrieval
+- chat_response.py: Weather context injection in all AI calls
+- enhanced_weather_service.py: Used for real-time weather data
+- tests/: New and updated tests for all integration points
+- tests-results/weather_context_integration_summary.md: Summary of implementation and test results
+- commit_and_push.ps1: Updated commit message for weather context integration
+
+This commit completes the implementation of the WEATHER_CONTEXT_INTEGRATION_PLAN.md, enabling the AI assistant to provide weather-aware gardening advice for all user queries.
+"@
+
+Write-Log "Committing with detailed message..." "Yellow"
 git commit -m "$commitMessage"
 
 # Push to current branch (which should be main now)

@@ -13,6 +13,14 @@ MODEL_NAME = "gpt-4-turbo"  # The model name used for encoding
 MAX_TOKENS = 4096            # Maximum allowed tokens for a conversation
 TOKEN_BUFFER = 512           # Buffer to prevent exceeding the token limit
 
+# Import weather context integration
+try:
+    from weather_context_integration import get_weather_context_messages, inject_weather_context_into_conversation
+    WEATHER_CONTEXT_AVAILABLE = True
+except ImportError:
+    WEATHER_CONTEXT_AVAILABLE = False
+    logger.warning("Weather context integration not available")
+
 class ConversationManager:
     """
     Manages in-memory conversation history for AI chat sessions.
@@ -110,6 +118,34 @@ class ConversationManager:
         messages = self.conversations.get(conversation_id, {}).get('messages', [])
         logger.info(f"Retrieved {len(messages)} messages for conversation {conversation_id}")
         return messages
+    
+    def get_weather_aware_messages(self, conversation_id: str) -> List[Dict]:
+        """
+        Retrieve messages for a conversation with weather context injected.
+        
+        Args:
+            conversation_id (str): The conversation ID
+            
+        Returns:
+            List[Dict]: Messages with weather context injected
+        """
+        messages = self.get_messages(conversation_id)
+        
+        if not messages:
+            return messages
+        
+        # Inject weather context if available
+        if WEATHER_CONTEXT_AVAILABLE:
+            try:
+                enhanced_messages = inject_weather_context_into_conversation(messages)
+                logger.info(f"Injected weather context into conversation {conversation_id}")
+                return enhanced_messages
+            except Exception as e:
+                logger.error(f"Error injecting weather context: {e}")
+                return messages  # Return original messages on error
+        else:
+            logger.debug("Weather context not available, returning original messages")
+            return messages
 
     def get_conversation_context(self, conversation_id: str) -> Dict:
         """Get conversation metadata and context information."""

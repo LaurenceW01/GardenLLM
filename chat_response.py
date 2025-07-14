@@ -996,12 +996,25 @@ def get_chat_response_legacy(message: str) -> str:
         - Support both Photo URL and Raw Photo URL fields
         - Show confirmation summary before adding/updating to database"""
 
-        response = openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
+        # Get weather context if available
+        try:
+            from weather_context_integration import get_weather_context_messages
+            weather_context = get_weather_context_messages()
+            messages = [{"role": "system", "content": system_prompt}]
+            messages.extend(weather_context)
+            messages.append({"role": "user", "content": message})
+            logger.info("Added weather context to legacy chat response")
+        except ImportError:
+            # Fallback to original behavior if weather context not available
+            messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": message}
-            ],
+            ]
+            logger.debug("Weather context not available for legacy chat response")
+
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
             temperature=0.7,
             max_tokens=500
         )
@@ -1270,7 +1283,8 @@ def generate_ai_response_with_context(query_type: str, context: str, message: st
         
         # Add conversation history if conversation_id provided
         if conversation_id:
-            conversation_messages = conversation_manager.get_messages(conversation_id)
+            # Use weather-aware messages for enhanced context
+            conversation_messages = conversation_manager.get_weather_aware_messages(conversation_id)
             if conversation_messages:
                 # Add conversation history (excluding the current user message)
                 for msg in conversation_messages[:-1]:  # Exclude the last message (current user message)
@@ -1280,7 +1294,7 @@ def generate_ai_response_with_context(query_type: str, context: str, message: st
                             "role": msg["role"],
                             "content": str(msg["content"])
                         })
-                logger.info(f"Phase 4: Added {len(conversation_messages)-1} conversation history messages")
+                logger.info(f"Phase 4: Added {len(conversation_messages)-1} weather-aware conversation history messages")
         
         # Add current user message with context
         user_prompt = f"""Context: {context}
