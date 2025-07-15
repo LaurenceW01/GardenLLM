@@ -46,13 +46,9 @@
                            class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                            :class="{'bg-gray-100': window.location.pathname === '/'}"
                         >
-                            Chat
-                        </a>
-                        <a href="/weather" 
-                           class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                           :class="{'bg-gray-100': window.location.pathname === '/weather'}"
-                        >
-                            Weather
+                            <span class="flex items-center gap-2">
+                                <span>💬</span> Chat
+                            </span>
                         </a>
                         <a href="/add-plant" 
                            class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -60,6 +56,14 @@
                         >
                             <span class="flex items-center gap-2">
                                 <span>🌱</span> Add/Update Plant
+                            </span>
+                        </a>
+                        <a href="/weather" 
+                           class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                           :class="{'bg-gray-100': window.location.pathname === '/weather'}"
+                        >
+                            <span class="flex items-center gap-2">
+                                <span>🌦️</span> Weather
                             </span>
                         </a>
                         <button 

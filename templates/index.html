@@ -256,6 +256,15 @@
                 
                 this.loading = true;
                 const chatHistory = document.querySelector('#chat-history .space-y-4');
+
+                // Helper: Scroll so latest user message is at the top
+                function scrollToLatestUserMessage() {
+                    const userMessages = chatHistory.querySelectorAll('.flex.justify-end');
+                    if (userMessages.length > 0) {
+                        const latestUser = userMessages[userMessages.length - 1];
+                        latestUser.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }
                 
                 // Phase 3: Generate conversation ID if needed
                 if (!this.conversationId) {
@@ -349,6 +358,7 @@
                         
                         setTimeout(() => {
                             botDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            scrollToLatestUserMessage();
                         }, 100);
                         
                         this.clearImage();
@@ -429,6 +439,7 @@
                                         
                                         setTimeout(() => {
                                             chatHistory.scrollTop = chatHistory.scrollHeight;
+                                            scrollToLatestUserMessage();
                                         }, 100);
                                         
                                         this.loading = false;
@@ -530,6 +541,7 @@
                     
                     setTimeout(() => {
                         chatHistory.scrollTop = chatHistory.scrollHeight;
+                        scrollToLatestUserMessage();
                     }, 100);
                     
                 } catch (error) {
@@ -550,8 +562,19 @@
             },
 
             saveConversation() {
+                console.log('saveConversation called');
                 const chatHistory = document.querySelector('#chat-history .space-y-4');
-                const messages = [];
+                if (!chatHistory) {
+                    alert('Could not find chat history container.');
+                    return;
+                }
+                
+                // Check if there are any messages to save - look for actual message containers
+                const messageElements = chatHistory.querySelectorAll('.flex.justify-end, .flex.justify-start');
+                if (messageElements.length === 0) {
+                    alert('No messages to save. Start a conversation first.');
+                    return;
+                }
                 
                 // Create HTML document structure
                 let htmlContent = `
@@ -579,17 +602,24 @@
                             <div class="conversation-info">
                                 <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
                                 <p><strong>Current Mode:</strong> ${this.useDatabase ? 'Garden Database' : 'Image Analysis'}</p>
-
-                                <p><strong>Total Messages:</strong> ${chatHistory.children.length}</p>
+                                <p><strong>Total Messages:</strong> ${messageElements.length}</p>
                             </div>
                         </div>
                         <div class="chat-content">
                 `;
                 
                 // Process each message
-                chatHistory.querySelectorAll('.flex').forEach(messageDiv => {
+                messageElements.forEach(messageDiv => {
                     const isUser = messageDiv.classList.contains('justify-end');
-                    const content = messageDiv.querySelector('div > div').cloneNode(true);
+                    const contentDiv = messageDiv.querySelector('div > div');
+                    
+                    // Skip if we can't find the content div
+                    if (!contentDiv) {
+                        console.warn('Could not find content div for message:', messageDiv);
+                        return;
+                    }
+                    
+                    const content = contentDiv.cloneNode(true);
                     const timestamp = new Date().toLocaleString();
                     
                     // Extract mode badge if present
@@ -630,16 +660,21 @@
                 `;
                 
                 // Create and download the HTML file
-                const blob = new Blob([htmlContent], { type: 'text/html' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `conversation_${this.conversationId || new Date().toISOString().slice(0,19).replace(/:/g, '-')}.html`;
-                
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
+                try {
+                    const blob = new Blob([htmlContent], { type: 'text/html' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `conversation_${this.conversationId || new Date().toISOString().slice(0,19).replace(/:/g, '-')}.html`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    console.log('Download triggered successfully');
+                } catch (e) {
+                    console.error('Failed to save chat:', e);
+                    alert('Failed to save chat: ' + e.message);
+                }
             },
 
             updateMessageStatus() {
