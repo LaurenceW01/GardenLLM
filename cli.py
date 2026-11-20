@@ -116,16 +116,16 @@ class GardenBotCLI:
                         "**Spacing:**"
                     )
                     
-                    # Get plant care information from OpenAI directly using GPT-4 Turbo
-                    from config import openai_client  # Import OpenAI client for direct API calls
+                    # Get plant care information from OpenAI
+                    from config import openai_client, CARE_MODEL
                     response = openai_client.chat.completions.create(
-                        model="gpt-4-turbo-preview",  # Use latest GPT-4 model for best results
+                        model=CARE_MODEL,
                         messages=[
                             {"role": "system", "content": "You are a gardening expert assistant. Provide detailed, practical plant care guides with specific instructions. Use the exact section titles provided without modification."},
                             {"role": "user", "content": prompt}
                         ],
-                        temperature=0.7,  # Balance between creativity and consistency
-                        max_tokens=1000  # Limit response length for efficiency
+                        reasoning_effort="low",
+                        max_completion_tokens=1000
                     )
                     response = response.choices[0].message.content or ""  # Extract response text, default to empty string if None
                     

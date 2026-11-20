@@ -14,6 +14,10 @@ import tempfile
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# gpt-3.5-turbo and gpt-4-turbo were shut down. These are the current replacements.
+CHAT_MODEL = "gpt-5.6-terra"  # Everyday chat and query classification
+CARE_MODEL = "gpt-5.6-sol"    # Care guides and image analysis
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -47,13 +51,9 @@ def init_openai_client():
         max_retries=2
     )
     
-    # Test connection
-    test_response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": "test"}],
-        max_tokens=5
-    )
-    logger.info(f"OpenAI connection successful. Test response: {test_response}")
+    # Do not make live API calls during startup/import. This prevents
+    # deployment crashes when quota is exhausted or OpenAI is temporarily unavailable.
+    logger.info("OpenAI client initialized")
     return client
 
 # Initialize Google Sheets client

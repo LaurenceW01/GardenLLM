@@ -21,15 +21,16 @@ logger = logging.getLogger(__name__)  # Create a logger for this module
 
 # Initialize OpenAI client - use the one from config.py if available
 try:
-    from config import openai_client
+    from config import openai_client, CARE_MODEL
     client = openai_client  # Use the client from config.py
+    MODEL_NAME = CARE_MODEL
 except ImportError:
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # Fallback to creating a new client
+    MODEL_NAME = "gpt-5.6-sol"
 
 # Constants for token management
 MAX_TOKENS = 4000  # Maximum tokens allowed for context in a conversation
 TOKEN_BUFFER = 1000  # Buffer tokens reserved for new responses
-MODEL_NAME = "gpt-4-turbo"  # Specify the model name for OpenAI API
 
 # Use the global conversation manager from chat_response
 def get_conversation_manager():
@@ -245,12 +246,12 @@ IMPORTANT:
         # Get conversation history
         messages = conversation_manager.get_messages(conversation_id)  # Retrieve messages for conversation
 
-        # Call GPT-4 Turbo API with conversation history
+        # Call the care model with conversation history
         response = client.chat.completions.create(
             model=MODEL_NAME,  # Specify model name
             messages=messages,  # type: ignore  # Provide conversation messages
-            max_tokens=1500,  # Increased tokens for comprehensive analysis
-            temperature=0.7,  # Set response randomness
+            max_completion_tokens=1500,  # Increased tokens for comprehensive analysis
+            reasoning_effort="low",
             seed=123,  # Added for consistency
             response_format={ "type": "text" }  # Specify response format
         )

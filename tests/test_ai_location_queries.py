@@ -102,6 +102,7 @@ def implement_ai_location_matching():
     try:
         # Add the AI location matching function to chat_response.py
         from chat_response import openai_client
+        from config import CHAT_MODEL
         
         def ai_match_locations(user_query: str, location_list: List[str]) -> List[str]:
             """
@@ -139,13 +140,13 @@ Return ONLY the JSON array, no other text:
 """
                 
                 response = openai_client.chat.completions.create(
-                    model="gpt-3.5-turbo",
+                    model=CHAT_MODEL,
                     messages=[
                         {"role": "system", "content": "You are a gardening assistant that matches user queries to garden locations."},
                         {"role": "user", "content": prompt}
                     ],
-                    temperature=0.1,
-                    max_tokens=200
+                    reasoning_effort="low",
+                    max_completion_tokens=200
                 )
                 
                 ai_response = response.choices[0].message.content

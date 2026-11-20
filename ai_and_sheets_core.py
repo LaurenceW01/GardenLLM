@@ -150,14 +150,8 @@ try:
         max_retries=2
     )
 
-    # Test the OpenAI connection
-    logger.info("Testing OpenAI connection...")
-    test_response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": "test"}],
-        max_tokens=5
-    )
-    logger.info(f"OpenAI connection successful. Test response: {test_response}")
+    # Do not call the API during import. A failed test request exits the process.
+    logger.info("OpenAI client initialized")
 except Exception as e:
     logger.error(f"OpenAI connection failed: {str(e)}")
     logger.error(traceback.format_exc())

@@ -12,7 +12,7 @@ Date: December 2024
 import logging
 import json
 from typing import Dict, List, Optional, Tuple
-from config import openai_client
+from config import openai_client, CHAT_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -77,13 +77,13 @@ def analyze_query(user_query: str, plant_list: Optional[List[str]] = None) -> Di
             plant_list = get_plant_list_from_database()
         prompt = _build_analysis_prompt(user_query, plant_list)
         response = openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model=CHAT_MODEL,
             messages=[
                 {"role": "system", "content": "You are a gardening assistant that analyzes user queries to extract plant references and classify query types."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.1,
-            max_tokens=500
+            reasoning_effort="low",
+            max_completion_tokens=500
         )
         ai_response_content = response.choices[0].message.content
         if ai_response_content is None:

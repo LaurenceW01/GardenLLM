@@ -300,16 +300,16 @@ def api_plants():
                     "**Spacing:**"
                 )
                 
-                # Get plant care information from OpenAI directly using GPT-4 Turbo
-                from config import openai_client
+                # Get plant care information from OpenAI
+                from config import openai_client, CARE_MODEL
                 response = openai_client.chat.completions.create(
-                    model="gpt-4-turbo-preview",
+                    model=CARE_MODEL,
                     messages=[
                         {"role": "system", "content": "You are a gardening expert assistant. Provide detailed, practical plant care guides with specific instructions. CRITICAL: Use the EXACT section format provided with double asterisks (**Section:**) - do not use markdown headers (###)."},
                         {"role": "user", "content": prompt}
                     ],
-                    temperature=0.7,
-                    max_tokens=1000
+                    reasoning_effort="low",
+                    max_completion_tokens=1000
                 )
                 response = response.choices[0].message.content or ""
                 

@@ -3,7 +3,7 @@ import time
 from typing import List, Dict, Optional, Tuple
 import re
 from plant_operations import get_plant_data, find_plant_by_id_or_name, update_plant_field
-from config import openai_client
+from config import openai_client, CHAT_MODEL
 from field_config import get_canonical_field_name, is_valid_field, get_all_field_names
 from climate_config import get_climate_context, get_default_location
 import json
@@ -414,13 +414,13 @@ Please provide a helpful, informative response that addresses the user's questio
     
     try:
         response = openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model=CHAT_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.7,
-            max_tokens=500
+            reasoning_effort="low",
+            max_completion_tokens=500
         )
         
         return response.choices[0].message.content or "I'm sorry, I couldn't generate a response at this time."
@@ -748,13 +748,13 @@ Return ONLY the JSON array, no other text:
         
         # Call OpenAI for location matching
         response = openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model=CHAT_MODEL,
             messages=[
                 {"role": "system", "content": "You are a gardening assistant that matches user queries to valid garden locations. Be flexible with partial matches and return only JSON arrays."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.1,
-            max_tokens=300
+            reasoning_effort="low",
+            max_completion_tokens=300
         )
         
         ai_response = response.choices[0].message.content
@@ -1013,10 +1013,10 @@ def get_chat_response_legacy(message: str) -> str:
             logger.debug("Weather context not available for legacy chat response")
 
         response = openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model=CHAT_MODEL,
             messages=messages,
-            temperature=0.7,
-            max_tokens=500
+            reasoning_effort="low",
+            max_completion_tokens=500
         )
         
         return response.choices[0].message.content or "I'm sorry, I couldn't generate a response at this time."
@@ -1306,10 +1306,10 @@ Please provide a helpful, accurate response based on the context and user's ques
         
         # Make AI call
         response = openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model=CHAT_MODEL,
             messages=messages,
-            temperature=0.7,
-            max_tokens=500
+            reasoning_effort="low",
+            max_completion_tokens=500
         )
         
         ai_response = response.choices[0].message.content
@@ -1334,13 +1334,13 @@ def generate_fallback_ai_response(message: str) -> str:
     """
     try:
         response = openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model=CHAT_MODEL,
             messages=[
                 {"role": "system", "content": "You are a helpful gardening assistant for Houston, Texas."},
                 {"role": "user", "content": message}
             ],
-            temperature=0.7,
-            max_tokens=300
+            reasoning_effort="low",
+            max_completion_tokens=300
         )
         
         ai_response = response.choices[0].message.content
