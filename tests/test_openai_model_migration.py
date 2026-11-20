@@ -26,7 +26,7 @@ class TestOpenAIModelMigration(unittest.TestCase):
 
         kwargs = mock_create.call_args.kwargs
         self.assertEqual(kwargs["model"], CHAT_MODEL)
-        self.assertEqual(kwargs["reasoning_effort"], "low")
+        self.assertEqual(kwargs["reasoning_effort"], "none")
         self.assertEqual(kwargs["max_completion_tokens"], 500)
         self.assertNotIn("temperature", kwargs)
         self.assertNotIn("max_tokens", kwargs)
@@ -43,7 +43,7 @@ class TestOpenAIModelMigration(unittest.TestCase):
         self.assertEqual(result, "Water deeply once a week.")
         kwargs = mock_create.call_args.kwargs
         self.assertEqual(kwargs["model"], CHAT_MODEL)
-        self.assertEqual(kwargs["reasoning_effort"], "low")
+        self.assertEqual(kwargs["reasoning_effort"], "none")
         self.assertEqual(kwargs["max_completion_tokens"], 300)
         self.assertNotIn("temperature", kwargs)
         self.assertNotIn("max_tokens", kwargs)

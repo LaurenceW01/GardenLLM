@@ -419,7 +419,7 @@ Please provide a helpful, informative response that addresses the user's questio
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            reasoning_effort="low",
+            reasoning_effort="none",
             max_completion_tokens=500
         )
         
@@ -753,7 +753,7 @@ Return ONLY the JSON array, no other text:
                 {"role": "system", "content": "You are a gardening assistant that matches user queries to valid garden locations. Be flexible with partial matches and return only JSON arrays."},
                 {"role": "user", "content": prompt}
             ],
-            reasoning_effort="low",
+            reasoning_effort="none",
             max_completion_tokens=300
         )
         
@@ -1015,7 +1015,7 @@ def get_chat_response_legacy(message: str) -> str:
         response = openai_client.chat.completions.create(
             model=CHAT_MODEL,
             messages=messages,
-            reasoning_effort="low",
+            reasoning_effort="none",
             max_completion_tokens=500
         )
         
@@ -1308,7 +1308,7 @@ Please provide a helpful, accurate response based on the context and user's ques
         response = openai_client.chat.completions.create(
             model=CHAT_MODEL,
             messages=messages,
-            reasoning_effort="low",
+            reasoning_effort="none",
             max_completion_tokens=500
         )
         
@@ -1339,7 +1339,7 @@ def generate_fallback_ai_response(message: str) -> str:
                 {"role": "system", "content": "You are a helpful gardening assistant for Houston, Texas."},
                 {"role": "user", "content": message}
             ],
-            reasoning_effort="low",
+            reasoning_effort="none",
             max_completion_tokens=300
         )
         

@@ -251,7 +251,7 @@ IMPORTANT:
             model=MODEL_NAME,  # Specify model name
             messages=messages,  # type: ignore  # Provide conversation messages
             max_completion_tokens=1500,  # Increased tokens for comprehensive analysis
-            reasoning_effort="low",
+            reasoning_effort="none",
             seed=123,  # Added for consistency
             response_format={ "type": "text" }  # Specify response format
         )

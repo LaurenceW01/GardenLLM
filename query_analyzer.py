@@ -82,7 +82,7 @@ def analyze_query(user_query: str, plant_list: Optional[List[str]] = None) -> Di
                 {"role": "system", "content": "You are a gardening assistant that analyzes user queries to extract plant references and classify query types."},
                 {"role": "user", "content": prompt}
             ],
-            reasoning_effort="low",
+            reasoning_effort="none",
             max_completion_tokens=500
         )
         ai_response_content = response.choices[0].message.content

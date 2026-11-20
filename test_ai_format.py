@@ -35,7 +35,7 @@ def test_ai_format():
                 {"role": "system", "content": "You are a gardening expert assistant. Provide detailed, practical plant care guides with specific instructions. CRITICAL: Use the EXACT section format provided with double asterisks (**Section:**) - do not use markdown headers (###)."},
                 {"role": "user", "content": prompt}
             ],
-            reasoning_effort="low",
+            reasoning_effort="none",
             max_completion_tokens=1000
         )
         

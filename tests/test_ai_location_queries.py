@@ -145,7 +145,7 @@ Return ONLY the JSON array, no other text:
                         {"role": "system", "content": "You are a gardening assistant that matches user queries to garden locations."},
                         {"role": "user", "content": prompt}
                     ],
-                    reasoning_effort="low",
+                    reasoning_effort="none",
                     max_completion_tokens=200
                 )
                 
